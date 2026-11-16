@@ -7,7 +7,7 @@ import { usePrefs } from '../store'
 import { FormulaField } from './FormulaField'
 import { MathSvg } from './MathSvg'
 import { useEditor, useSession } from '../editorContext'
-import { onAnswer } from '../easter' // easter egg
+import { onAnswer, onNoAnswer } from '../easter' // easter egg
 
 const PAD = 8
 
@@ -41,7 +41,12 @@ export function FormulaEditor() {
   useEffect(() => {
     if (!result && revealed) setRevealed('')
   }, [result, revealed])
-  useEffect(() => void (open && result && onAnswer(result.value)), [open, result]) // easter egg
+  useEffect(() => {
+    if (!open || !result) return
+    const id = setTimeout(() => onAnswer(result.value), 350)
+    return () => clearTimeout(id)
+  }, [open, result]) // easter egg
+  useEffect(() => void (!result && onNoAnswer(rows)), [rows, result]) // easter egg
   // A long formula grows past the window edge: keep the caret in sight by moving the board.
   const caret = fe && lay ? caretOf(lay, fe.cur) : undefined
   const caretX = fe && caret ? (fe.x - cam.x) * cam.zoom + caret.x : null
@@ -94,6 +99,7 @@ export function FormulaEditor() {
           className="formula-result formula-reveal"
           title={t('formula.showAnswerTitle')}
           onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => setRevealed(session)}
         >
           {t('formula.showAnswer')}
@@ -105,6 +111,7 @@ export function FormulaEditor() {
           title={t('formula.insertResult')}
           // Not a focus change: the formula keeps the caret.
           onPointerDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={accept}
         >
           <MathSvg lay={shown} pad={2} holes={false} />

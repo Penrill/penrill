@@ -1,0 +1,60 @@
+/* The eyepiece (Lens.tsx): the board shows through a round hole; the view fills the screen around it. */
+
+.lens {
+  --R: min(34vw, 34vh);
+  position: absolute;
+  inset: 0;
+}
+
+.lens-view {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask-image: radial-gradient(circle at 50% 46%, transparent calc(var(--R) + 6px), #000 calc(var(--R) + 7px));
+  mask-image: radial-gradient(circle at 50% 46%, transparent calc(var(--R) + 6px), #000 calc(var(--R) + 7px));
+  animation: egg-fade-in 0.6s ease-out both;
+}
+
+.lens-rim {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: calc(var(--R) * 2 + 28px);
+  height: calc(var(--R) * 2 + 28px);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: inset 0 0 0 14px #2c303c, inset 0 0 0 16px #5a6070, inset 0 0 50px 22px rgba(0, 0, 0, 0.75), 0 0 40px rgba(0, 0, 0, 0.8);
+  animation: lens-iris 0.8s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+
+.lens.far .lens-rim {
+  box-shadow: inset 0 0 0 14px #5b4618, inset 0 0 0 16px #c9a64a, inset 0 0 50px 22px rgba(0, 0, 0, 0.75), 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.lens-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  font: 800 30px/1 system-ui, sans-serif;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  animation: lens-label 0.5s 0.6s ease-out both;
+}
+
+.lens-icon {
+  font-size: 52px;
+}
+
+@keyframes lens-iris {
+  from { transform: translate(-50%, -50%) scale(0.1); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes lens-label {
+  from { transform: translateY(30px); opacity: 0; }
+}

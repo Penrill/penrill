@@ -1,18 +1,12 @@
-/* Easter egg: the 777 jackpot (jackpot.tsx).
+/* The 777 jackpot (jackpot.tsx).
    Timeline: lever pulled at 0.1 s, reels spin from 0.4 s, the last 7 lands at 2 s (the hit),
    then flash, rays, title and coins; everything fades out by 10 s. */
 
-.jackpot {
+.egg-jackpot {
   --hit: 2s;
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
   display: grid;
   place-items: center;
-  overflow: hidden;
   background: radial-gradient(circle at 50% 45%, rgba(255, 170, 0, 0.3), rgba(10, 4, 30, 0.7) 70%);
-  animation: jackpot-life 10s ease forwards;
-  cursor: pointer;
 }
 
 /* ---------- light rays and the flash at the hit ---------- */
@@ -390,11 +384,6 @@
     animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
   }
   100% { opacity: 1; transform: translate(var(--dx), 100vh); }
-}
-
-@keyframes jackpot-life {
-  0%, 93% { opacity: 1; }
-  100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

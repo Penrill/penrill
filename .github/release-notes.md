@@ -2,7 +2,12 @@
 
 ![Inkboard](https://raw.githubusercontent.com/yaroslavyushchenko/inkboard/main/docs/images/hero.png)
 
-## What's new in 0.11.1
+## What's new in 0.12.0: Achievements and easter eggs
+
+- **Achievements, if you want them.** A grey medal on the All boards screen (or a switch at the bottom of the settings) turns on collecting achievements. Nothing plays until you do.
+- **Hidden easter eggs.** Special formula answers, old game cheat codes typed on a board, zooming to the very edge, working at 3 a.m. and more. Each plays once and leaves a medal on the All boards screen.
+
+## Also in 0.11.1
 
 - **Sharp PDF exports:** the dots, grid and lines of the paper are now real vector shapes in the PDF.
   They stay crisp at any zoom instead of looking soft, and dots no longer smear into dashes.

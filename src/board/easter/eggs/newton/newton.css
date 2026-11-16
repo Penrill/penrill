@@ -1,0 +1,407 @@
+/* Universal gravitation (newton.tsx): falling apple, Newton's wig, formulas and gravity drop of the board. */
+
+html.ach-newton .app {
+  transform-origin: 50% 100%;
+  animation: nwt-app-drop 7s cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+
+.nwt-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(165, 225, 130, 0.25), rgba(14, 28, 18, 0.78) 65%, rgba(6, 14, 10, 0.9));
+  animation: egg-fade-in 0.5s ease-out both;
+}
+
+/* ---------- Tree branch at top ---------- */
+.nwt-branch {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  width: 440px;
+  height: 90px;
+  margin-left: -220px;
+  animation: nwt-branch-sway 2.4s ease-in-out infinite alternate;
+}
+
+.nwt-wood {
+  position: absolute;
+  left: -40px;
+  right: 40px;
+  top: 22px;
+  height: 18px;
+  border-radius: 0 99px 99px 0;
+  background: linear-gradient(180deg, #7a4b2a, #4a2b14);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45);
+}
+
+.nwt-leaf {
+  position: absolute;
+  top: 12px;
+  width: 54px;
+  height: 30px;
+  border-radius: 2px 50% 2px 50%;
+  background: linear-gradient(135deg, #6bd94c, #278a22);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.25), 0 4px 10px rgba(0, 0, 0, 0.35);
+  transform: rotate(var(--rot)) scale(var(--s));
+}
+
+/* ---------- Strobe marks y = ½ g t² ---------- */
+.nwt-strobe {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+}
+
+.nwt-strobe span {
+  position: absolute;
+  left: -18px;
+  width: 36px;
+  height: 2px;
+  background: rgba(255, 230, 140, 0.65);
+  opacity: 0;
+  animation: egg-fade-in 0.15s var(--d) ease-out forwards;
+}
+
+.nwt-strobe span i {
+  position: absolute;
+  left: 44px;
+  top: -9px;
+  font: italic 600 13px/1 'Cambria Math', Georgia, serif;
+  color: #ffe999;
+  white-space: nowrap;
+  text-shadow: 0 2px 6px #000;
+}
+
+/* ---------- The hero red apple ---------- */
+.nwt-hero-apple {
+  position: absolute;
+  left: 50%;
+  top: 46px;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  z-index: 4;
+  animation: nwt-apple-fall 2.6s cubic-bezier(0.55, 0, 0.85, 0.5) both;
+}
+
+.nwt-apple-body {
+  position: absolute;
+  inset: 6px;
+  border-radius: 46% 46% 42% 42% / 52% 52% 44% 44%;
+  background:
+    radial-gradient(circle at 32% 28%, #ff9e9e 0%, #ff2a2a 38%, #b80b0b 78%, #5e0303 100%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 60, 60, 0.5);
+}
+
+.nwt-apple-stem {
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  width: 5px;
+  height: 12px;
+  margin-left: -2.5px;
+  border-radius: 3px;
+  background: #5c3416;
+  transform: rotate(10deg);
+}
+
+.nwt-apple-leaf {
+  position: absolute;
+  left: 52%;
+  top: -8px;
+  width: 18px;
+  height: 10px;
+  border-radius: 2px 50% 2px 50%;
+  background: #48c93a;
+  transform: rotate(-18deg);
+}
+
+/* ---------- Isaac Newton's bust & impact at the bottom ---------- */
+.nwt-target {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 240px;
+  height: 220px;
+  margin-left: -120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.nwt-bust {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: nwt-bust-bonk 0.6s 1.35s ease-out;
+}
+
+.nwt-wig {
+  position: relative;
+  width: 118px;
+  height: 110px;
+  border-radius: 52% 52% 24% 24%;
+  background: radial-gradient(circle at 50% 25%, #ffffff, #e6e3da 65%, #b8b3a6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+.nwt-wig .curl {
+  position: absolute;
+  width: 34px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #dedad0 68%, #a6a092);
+  box-shadow: inset -2px -3px 5px rgba(0, 0, 0, 0.22);
+}
+
+.nwt-wig .curl.l1 { left: -14px; top: 24px; }
+.nwt-wig .curl.l2 { left: -18px; top: 50px; }
+.nwt-wig .curl.l3 { left: -14px; top: 76px; }
+.nwt-wig .curl.r1 { right: -14px; top: 24px; }
+.nwt-wig .curl.r2 { right: -18px; top: 50px; }
+.nwt-wig .curl.r3 { right: -14px; top: 76px; }
+
+.nwt-face {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  top: 28px;
+  bottom: 12px;
+  border-radius: 40% 40% 46% 46%;
+  background: linear-gradient(180deg, #ffdfc4, #edb891);
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.18);
+}
+
+.nwt-face .eye {
+  position: absolute;
+  top: 26px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #241a14;
+}
+
+.nwt-face .eye.l { left: 16px; }
+.nwt-face .eye.r { right: 16px; }
+
+.nwt-face .nose {
+  position: absolute;
+  left: 50%;
+  top: 28px;
+  width: 8px;
+  height: 15px;
+  margin-left: -4px;
+  border-radius: 4px;
+  background: #dba076;
+}
+
+.nwt-face .mouth {
+  position: absolute;
+  left: 50%;
+  bottom: 11px;
+  width: 18px;
+  height: 8px;
+  margin-left: -9px;
+  border-radius: 50%;
+  border-top: 3px solid #7a3e28;
+}
+
+.nwt-collar {
+  width: 148px;
+  height: 44px;
+  margin-top: -6px;
+  border-radius: 36px 36px 0 0;
+  background:
+    radial-gradient(ellipse 22px 34px at 50% 0%, #fff 0 70%, transparent 74%),
+    linear-gradient(180deg, #5c1922, #330b11);
+}
+
+/* ---------- Impact star & flying equations ---------- */
+.nwt-bonk {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  animation: nwt-bonk-pop 0.75s 1.32s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+
+.nwt-bonk-star {
+  position: absolute;
+  left: -65px;
+  top: -45px;
+  width: 130px;
+  height: 90px;
+  background: #ffd93b;
+  clip-path: polygon(50% 0%, 63% 28%, 98% 18%, 76% 48%, 100% 78%, 66% 74%, 50% 100%, 34% 74%, 0% 78%, 24% 48%, 2% 18%, 37% 28%);
+  box-shadow: 0 0 24px #ff8800;
+}
+
+.nwt-bonk-word {
+  position: relative;
+  font: 900 26px/1 'Arial Black', Impact, system-ui, sans-serif;
+  color: #b80b0b;
+  -webkit-text-stroke: 1.5px #fff;
+  paint-order: stroke;
+}
+
+.nwt-ideas {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  width: 0;
+  height: 0;
+}
+
+.nwt-ideas span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: rgba(20, 34, 22, 0.9);
+  border: 1.5px solid #ffd559;
+  font: italic 700 18px/1.1 'Cambria Math', Georgia, serif;
+  color: #fff3b8;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 210, 75, 0.45);
+  opacity: 0;
+  animation: nwt-idea-fly 2.4s var(--d) cubic-bezier(0.18, 0.9, 0.3, 1) forwards;
+}
+
+/* ---------- Shower of apples ---------- */
+.nwt-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.nwt-drop {
+  position: absolute;
+  top: -70px;
+  font-size: var(--sz);
+  line-height: 1;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+  opacity: 0;
+  animation: nwt-drop var(--dur) var(--d) linear forwards;
+}
+
+.nwt-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 14%;
+  text-align: center;
+  opacity: 0;
+  animation: nwt-banner-in 0.55s 1.45s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+.nwt-eq {
+  font: italic 700 26px/1.2 'Cambria Math', Georgia, serif;
+  color: #ffe380;
+  text-shadow: 0 0 16px rgba(255, 200, 50, 0.8), 0 2px 10px #000;
+}
+
+.nwt-title {
+  margin-top: 4px;
+  font: 900 42px/1.05 system-ui, sans-serif;
+  letter-spacing: 4px;
+  color: #ffffff;
+  text-shadow: 0 0 22px rgba(255, 80, 60, 0.85), 0 4px 16px #000;
+}
+
+@keyframes nwt-app-drop {
+  0%, 18% { transform: none; }
+  21% { transform: translateY(58px) scaleY(0.96); }
+  25% { transform: translateY(-22px) scaleY(1.01); }
+  29% { transform: translateY(28px) scaleY(0.98); }
+  33% { transform: translateY(-8px); }
+  37%, 100% { transform: none; }
+}
+
+@keyframes nwt-branch-sway {
+  from { transform: rotate(-1.5deg); }
+  to { transform: rotate(1.5deg); }
+}
+
+@keyframes nwt-apple-fall {
+  0%, 24% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  26% {
+    transform: translate(0, -4px) rotate(-12deg);
+  }
+  52% {
+    transform: translate(0, calc(100vh - 235px)) rotate(18deg) scale(1.12, 0.88);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.5, 1);
+  }
+  68% {
+    transform: translate(110px, calc(100vh - 380px)) rotate(190deg) scale(1);
+    animation-timing-function: cubic-bezier(0.55, 0.05, 0.85, 0.5);
+  }
+  84% {
+    transform: translate(210px, calc(100vh - 115px)) rotate(350deg);
+  }
+  100% {
+    transform: translate(290px, calc(100vh - 40px)) rotate(480deg);
+    opacity: 0;
+  }
+}
+
+@keyframes nwt-bust-bonk {
+  0%, 100% { transform: none; }
+  25% { transform: translateY(18px) scale(1.08, 0.88); }
+  55% { transform: translateY(-8px) scale(0.97, 1.04); }
+}
+
+@keyframes nwt-bonk-pop {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.2); }
+  30% { opacity: 1; transform: translateX(-50%) scale(1.2); }
+  75% { opacity: 1; transform: translateX(-50%) scale(0.95); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.3); }
+}
+
+@keyframes nwt-idea-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  20% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) - 24px)) rotate(var(--rot)) scale(0.95);
+  }
+}
+
+@keyframes nwt-drop {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  62% { transform: translate(calc(var(--drift) * 0.6), 98vh) rotate(calc(var(--spin) * 0.6)); }
+  78% { transform: translate(calc(var(--drift) * 0.8), 76vh) rotate(calc(var(--spin) * 0.8)); }
+  94% { opacity: 1; transform: translate(var(--drift), 98vh) rotate(var(--spin)); }
+  100% { opacity: 0; transform: translate(var(--drift), 104vh) rotate(var(--spin)); }
+}
+
+@keyframes nwt-banner-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ach-newton .app { animation: none !important; }
+  .nwt-drop, .nwt-hero-apple { animation: none !important; }
+}

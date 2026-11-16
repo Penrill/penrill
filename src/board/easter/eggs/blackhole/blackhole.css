@@ -1,0 +1,308 @@
+/* Event horizon (blackhole.tsx): Gargantua black hole with accretion disk and spaghettification of the board. */
+
+html.ach-blackhole .app {
+  transform-origin: 50% 50%;
+  animation: bh-swallow 8s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.egg-blackhole {
+  display: grid;
+  place-items: center;
+}
+
+.bh-cosmos {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 12%, rgba(8, 4, 22, 0.86) 36%, rgba(2, 1, 8, 0.96) 75%);
+  animation: egg-fade-in 0.9s ease-out both;
+}
+
+.bh-lensing-waves {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.bh-lensing-waves span {
+  position: absolute;
+  left: -42vmin;
+  top: -42vmin;
+  width: 84vmin;
+  height: 84vmin;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 195, 110, 0.35);
+  box-shadow: 0 0 28px rgba(255, 140, 60, 0.25), inset 0 0 28px rgba(130, 210, 255, 0.2);
+  opacity: 0;
+  animation: bh-wave 2.8s var(--d) ease-in infinite;
+}
+
+.bh-infall {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.bh-streak,
+.bh-sym {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  animation: bh-spiral var(--dur) var(--d) cubic-bezier(0.55, 0.05, 0.9, 0.4) infinite;
+}
+
+.bh-streak {
+  width: 34px;
+  height: 3px;
+  margin: -1.5px 0 0 -17px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--c), #fff);
+  box-shadow: 0 0 10px var(--c);
+}
+
+.bh-sym {
+  margin: -14px 0 0 -14px;
+  font: 800 24px/1 'Cambria Math', Georgia, serif;
+  color: var(--c);
+  text-shadow: 0 0 12px var(--c), 0 0 24px #fff;
+}
+
+/* ---------- Gargantua core: jets, gravitationally lensed arches, shadow and tilted disk ---------- */
+.bh-core-wrap {
+  position: relative;
+  width: min(56vmin, 480px);
+  height: min(56vmin, 480px);
+  display: grid;
+  place-items: center;
+  transform: rotate(-16deg);
+  animation: bh-core-in 1.1s cubic-bezier(0.16, 1.2, 0.3, 1) both;
+}
+
+.bh-jet {
+  position: absolute;
+  left: 50%;
+  width: 26px;
+  height: 62vmax;
+  margin-left: -13px;
+  background: linear-gradient(90deg, transparent, rgba(120, 220, 255, 0.45), #ffffff, rgba(185, 130, 255, 0.45), transparent);
+  filter: blur(4px);
+  opacity: 0;
+  animation: bh-jet 6.5s 0.9s ease-out both;
+}
+
+.bh-jet.north {
+  bottom: 50%;
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(0deg, #000 10%, transparent 95%);
+  mask-image: linear-gradient(0deg, #000 10%, transparent 95%);
+}
+
+.bh-jet.south {
+  top: 50%;
+  transform-origin: 50% 0%;
+  -webkit-mask-image: linear-gradient(180deg, #000 10%, transparent 95%);
+  mask-image: linear-gradient(180deg, #000 10%, transparent 95%);
+}
+
+/* Lensed light from behind the black hole bent over the top and bottom of the shadow */
+.bh-lensed-top,
+.bh-lensed-bottom {
+  position: absolute;
+  width: 56%;
+  height: 54%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      closest-side,
+      transparent 62%,
+      #ffffff 67%,
+      #ffd782 73%,
+      #ff7b29 82%,
+      rgba(175, 45, 15, 0.5) 92%,
+      transparent 100%
+    );
+  filter: blur(1.5px) drop-shadow(0 0 22px rgba(255, 150, 50, 0.85));
+}
+
+.bh-lensed-top {
+  top: 16%;
+  transform: scaleY(0.92);
+}
+
+.bh-lensed-bottom {
+  bottom: 16%;
+  transform: scaleY(0.88);
+  opacity: 0.85;
+}
+
+.bh-disk {
+  position: absolute;
+  width: 118%;
+  height: 34%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 0 28px rgba(255, 145, 45, 0.9));
+}
+
+.bh-disk.back {
+  clip-path: inset(0 0 50% 0);
+}
+
+.bh-disk.front {
+  clip-path: inset(46% 0 0 0);
+}
+
+.bh-disk-spin {
+  width: 100%;
+  height: 280%;
+  border-radius: 50%;
+  transform: scaleY(0.35);
+  background:
+    radial-gradient(
+      closest-side,
+      transparent 0% 34%,
+      #ffffff 36% 41%,
+      #ffe299 42% 52%,
+      #ff9436 53% 68%,
+      #d9381e 69% 82%,
+      rgba(120, 20, 60, 0.55) 83% 93%,
+      transparent 94% 100%
+    ),
+    repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0.45) 0deg 14deg,
+      rgba(255, 140, 40, 0.15) 14deg 32deg,
+      rgba(255, 230, 160, 0.4) 32deg 45deg
+    );
+  background-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(closest-side, transparent 33%, #000 37% 90%, transparent 98%);
+  mask-image: radial-gradient(closest-side, transparent 33%, #000 37% 90%, transparent 98%);
+  animation: bh-spin 1.8s linear infinite;
+}
+
+.bh-shadow {
+  position: relative;
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+  background: #000;
+  box-shadow:
+    0 0 0 3px #fff8e6,
+    0 0 18px 6px #ffb84d,
+    0 0 48px 14px rgba(255, 110, 30, 0.85),
+    inset 0 0 24px #000;
+}
+
+.bh-photon-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(185, 235, 255, 0.9);
+  box-shadow: 0 0 14px #8be8ff;
+  animation: bh-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.bh-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, #ffffff 0%, rgba(255, 210, 130, 0.7) 35%, transparent 70%);
+  opacity: 0;
+  animation: bh-rebirth 1.1s 6.4s ease-out both;
+}
+
+.bh-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 7%;
+  text-align: center;
+  animation: bh-caption-in 0.7s 0.8s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+
+.bh-eq {
+  font: italic 700 24px/1.2 'Cambria Math', Georgia, serif;
+  color: #ffd78a;
+  letter-spacing: 1px;
+  text-shadow: 0 0 16px rgba(255, 165, 60, 0.9);
+}
+
+.bh-title {
+  margin-top: 6px;
+  font: 900 44px/1.05 system-ui, sans-serif;
+  letter-spacing: 6px;
+  color: #ffffff;
+  text-shadow: 0 0 20px #ff8c3b, 0 4px 18px #000;
+}
+
+@keyframes bh-swallow {
+  0% { transform: scale(1) rotate(0deg); filter: none; }
+  12% { transform: scale(0.96) rotate(-4deg); }
+  58% { transform: scale(0.015) rotate(520deg); filter: hue-rotate(40deg) brightness(1.8) blur(3px); }
+  80% { transform: scale(0.005) rotate(720deg); opacity: 0.1; }
+  84% { transform: scale(1.04) rotate(0deg); opacity: 1; filter: brightness(2); }
+  100% { transform: none; filter: none; }
+}
+
+@keyframes bh-core-in {
+  from { transform: rotate(-16deg) scale(0.05); opacity: 0; }
+  to { transform: rotate(-16deg) scale(1); opacity: 1; }
+}
+
+@keyframes bh-spin {
+  from { transform: scaleY(0.35) rotate(0deg); }
+  to { transform: scaleY(0.35) rotate(360deg); }
+}
+
+@keyframes bh-pulse {
+  from { transform: scale(0.98) rotate(-8deg); opacity: 0.75; }
+  to { transform: scale(1.03) rotate(8deg); opacity: 1; }
+}
+
+@keyframes bh-wave {
+  0% { transform: scale(1.35); opacity: 0; }
+  30% { opacity: 0.75; }
+  100% { transform: scale(0.18); opacity: 0; }
+}
+
+@keyframes bh-spiral {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(var(--r)) scale(1.1, 0.9);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(calc(var(--a) + 420deg)) translateX(2vmin) scale(2.4, 0.25);
+  }
+}
+
+@keyframes bh-jet {
+  0% { opacity: 0; transform: scaleY(0.05); }
+  18% { opacity: 0.95; transform: scaleY(1); }
+  80% { opacity: 0.85; transform: scaleY(1.05); }
+  100% { opacity: 0; transform: scaleY(0.2); }
+}
+
+@keyframes bh-rebirth {
+  0% { opacity: 0; transform: scale(0.2); }
+  25% { opacity: 0.95; transform: scale(1.1); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes bh-caption-in {
+  from { transform: translateY(28px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ach-blackhole .app { animation: none !important; }
+  .bh-disk-spin, .bh-streak, .bh-sym, .bh-lensing-waves span { animation: none !important; }
+}

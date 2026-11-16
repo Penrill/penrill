@@ -1,22 +1,13 @@
-import { useEffect, useState, type CSSProperties } from 'react'
-import { usePrefs } from '../store'
-import { canEarn, unlock } from './achievements'
+import { near, type Egg, type ShowProps, type Vars } from '../../core/types'
+import { rnd } from '../../core/random'
 import './jackpot.css'
 
 /**
- * Easter egg: with achievements on, the first answer that comes out as exactly 777 spins a little
- * slot machine and earns the "Jackpot" medal. Only once: after that it is a plain answer again.
+ * Jackpot: the first answer that comes out as exactly 777 pulls the lever of a slot machine. The
+ * reels spin and land on three sevens, then coins and confetti rain down.
  */
-const listeners = new Set<() => void>()
 
-/** Plays the jackpot if `value` is 777 and the Jackpot achievement can still be earned. */
-export function maybeJackpot(value: number): void {
-  if (Math.abs(value - 777) > 1e-9 || !canEarn('jackpot')) return
-  unlock('jackpot', LIFE - 2500) // the medal shows up as the coins run out
-  listeners.forEach((f) => f())
-}
-
-/** How long the whole show lasts, in ms (keep in step with jackpot-life in the CSS). */
+/** How long the whole show lasts, ms. */
 const LIFE = 10000
 const SYMBOLS = ['🍒', '🍋', '🔔', '⭐', '🍉', '💎']
 const SPINS = 14
@@ -26,14 +17,6 @@ function reel(seed: number): string[] {
   strip.push('7')
   return strip
 }
-
-/** A cheap repeatable "random" number in [0, 1), so the show looks the same every time. */
-const rnd = (i: number, k: number): number => {
-  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453
-  return x - Math.floor(x)
-}
-
-type Vars = CSSProperties & Record<`--${string}`, string | number>
 
 /** Light bulbs around the machine, clockwise from the top left corner. */
 const BULBS: Vars[] = (() => {
@@ -96,22 +79,9 @@ function Coin({ style, className }: { style: Vars; className: string }) {
   )
 }
 
-export function Jackpot() {
-  const uk = usePrefs((s) => s.lang) === 'uk'
-  const [run, setRun] = useState(0)
-  useEffect(() => {
-    const play = (): void => setRun((n) => n + 1)
-    listeners.add(play)
-    return () => void listeners.delete(play)
-  }, [])
-  useEffect(() => {
-    if (!run) return
-    const id = setTimeout(() => setRun(0), LIFE)
-    return () => clearTimeout(id)
-  }, [run])
-  if (!run) return null
+function Jackpot({ uk }: ShowProps) {
   return (
-    <div className="jackpot" key={run} aria-live="polite" onPointerDown={() => setRun(0)}>
+    <>
       <div className="jackpot-rays" />
       <div className="jackpot-flash" />
       <div className="jackpot-stage">
@@ -154,6 +124,17 @@ export function Jackpot() {
           <Coin key={i} className="jackpot-drop" style={c} />
         ))}
       </div>
-    </div>
+    </>
   )
+}
+
+export const jackpot: Egg = {
+  id: 'jackpot',
+  icon: '🎰',
+  name: { en: 'Jackpot', uk: 'Джекпот' },
+  how: { en: 'Got 777 as an answer', uk: 'Отримати відповідь 777' },
+  life: LIFE,
+  toastAt: LIFE - 2500, // the medal shows up as the coins run out
+  Show: Jackpot,
+  answer: (v) => near(v, 777)
 }

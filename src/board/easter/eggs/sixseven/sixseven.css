@@ -1,0 +1,109 @@
+/* Six seven (sixseven.tsx): two palms seesawing the 6 and the 7. */
+
+.egg-sixseven {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 70px;
+  background: radial-gradient(circle, rgba(255, 120, 40, 0.35), rgba(30, 10, 60, 0.6) 70%);
+  animation: egg-life var(--life) ease forwards, ss-bg 0.5s steps(2) infinite;
+}
+
+.ss-scale {
+  display: flex;
+  gap: 90px;
+  animation: ss-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.ss-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: ss-seesaw 0.55s ease-in-out infinite;
+}
+
+.ss-right {
+  animation-delay: -0.275s;
+}
+
+.ss-num {
+  font: 900 150px/1 system-ui, sans-serif;
+  color: #fff;
+  -webkit-text-stroke: 5px #1b0f3a;
+  paint-order: stroke;
+  text-shadow: 0 8px 0 #1b0f3a, 0 0 40px rgba(255, 200, 60, 0.8);
+  margin-bottom: -30px;
+}
+
+.ss-left .ss-num {
+  color: #ffd54a;
+}
+
+.ss-right .ss-num {
+  color: #6bd1ff;
+}
+
+.ss-hand {
+  font-size: 110px;
+  line-height: 1;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.25));
+}
+
+/* The left palm is the right one mirrored. */
+.ss-left .ss-hand {
+  transform: scaleX(-1);
+}
+
+.ss-title {
+  font: 900 64px/1 system-ui, sans-serif;
+  letter-spacing: 4px;
+  color: #fff;
+  -webkit-text-stroke: 4px #1b0f3a;
+  paint-order: stroke;
+  text-shadow: 0 6px 0 #1b0f3a;
+  animation: ss-shout 0.55s ease-in-out infinite alternate;
+}
+
+.ss-ball {
+  position: absolute;
+  left: -80px;
+  bottom: 12%;
+  font-size: 64px;
+  animation: ss-ball 2.2s 0.4s linear 2;
+}
+
+@keyframes ss-seesaw {
+  0%, 100% { transform: translateY(-40px) rotate(-4deg); }
+  50% { transform: translateY(40px) rotate(4deg); }
+}
+
+@keyframes ss-in {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes ss-shout {
+  from { transform: scale(0.95) rotate(-3deg); }
+  to { transform: scale(1.1) rotate(3deg); }
+}
+
+@keyframes ss-bg {
+  50% { background-color: rgba(255, 80, 160, 0.15); }
+}
+
+@keyframes ss-ball {
+  0% { transform: translate(0, 0) rotate(0); }
+  12% { transform: translate(14vw, -26vh) rotate(160deg); }
+  25% { transform: translate(28vw, 0) rotate(320deg); }
+  37% { transform: translate(42vw, -22vh) rotate(480deg); }
+  50% { transform: translate(56vw, 0) rotate(640deg); }
+  62% { transform: translate(70vw, -16vh) rotate(800deg); }
+  75% { transform: translate(84vw, 0) rotate(960deg); }
+  87% { transform: translate(98vw, -10vh) rotate(1120deg); }
+  100% { transform: translate(115vw, 0) rotate(1280deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-side, .ss-title, .ss-ball { animation: none !important; }
+}

@@ -1,0 +1,26 @@
+/* The stage every show plays on (stage.tsx). `--life` is the egg's length. */
+
+.egg {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+  animation: egg-life var(--life) ease forwards;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.egg-pass {
+  pointer-events: none;
+}
+
+@keyframes egg-life {
+  0%, 92% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes egg-fade-in {
+  from { opacity: 0; }
+}

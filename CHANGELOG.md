@@ -3,6 +3,11 @@
 All notable changes to Inkboard. Downloads for every version are on the
 [Releases page](https://github.com/yaroslavyushchenko/inkboard/releases).
 
+## 0.12.0
+
+- Opt-in achievements with medals on the All boards screen.
+- Hidden easter eggs (formula answers, cheat codes, zoom limits and more), each playing once.
+
 ## [0.11.1] (2026-11-16)
 
 ### Fixed
