@@ -1,20 +1,19 @@
 :root {
   /* Neutrals follow a cool zinc scale; borders are translucent rings so they sit well on any
      surface. Accent stays blue. Radii, shadows and focus are shared tokens for every panel. */
-  --accent: #2f5bd8;
-  --accent-hover: #2349b8;
+  --accent: #435bdb;
+  --accent-hover: #364ec9;
   --accent-text: #fff;
-  --accent-soft: #edf2fe;
-  --accent-border: #c3d3fb;
-  --accent-solid: #2f5bd8;
-  --accent-solid-hover: #2349b8;
+  --accent-soft: #eef1ff;
+  --accent-border: #ccd5ff;
+  --accent-solid: #435bdb;
+  --accent-solid-hover: #364ec9;
   --accent-solid-text: #fff;
   --focus: #3b82f6;
   --panel-bg: #fff;
   --panel-border: rgb(9 9 11 / 10%);
   --panel-shadow: 0 1px 2px rgb(9 9 11 / 5%), 0 4px 12px -2px rgb(9 9 11 / 8%);
   --popover-shadow: 0 10px 15px -3px rgb(9 9 11 / 10%), 0 4px 6px -4px rgb(9 9 11 / 10%);
-  --dialog-shadow: 0 20px 25px -5px rgb(9 9 11 / 10%), 0 8px 10px -6px rgb(9 9 11 / 10%);
   --shadow-xs: 0 1px 2px rgb(9 9 11 / 5%);
   --highlight: inset 0 1px 0 rgb(255 255 255 / 15%);
   --radius-sm: 6px;
@@ -37,8 +36,8 @@
   --input-border-hover: rgb(9 9 11 / 22%);
   --menu-hover-bg: var(--focus);
   --menu-hover-text: #fff;
-  --group-bg: #fafafa;
-  --switch-off: #e4e4e7;
+  --switch-off: #d4d4d8;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2371717a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.75 10.75 8 13l2.25-2.25M10.25 5.25 8 3 5.75 5.25'/%3E%3C/svg%3E");
   --icon: #3f3f46;
   --chip-bg: rgb(9 9 11 / 5%);
   --chip-text: #3f3f46;
@@ -68,20 +67,19 @@
   --accent-solid-hover: #5b95f7;
   --accent-solid-text: #fff;
   --focus: #3b82f6;
-  --panel-bg: #1c1c1f;
+  --panel-bg: #27272a;
   --panel-border: rgb(255 255 255 / 10%);
   --panel-shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 6px 16px -4px rgb(0 0 0 / 45%);
   --popover-shadow: 0 10px 15px -3px rgb(0 0 0 / 40%), 0 4px 6px -4px rgb(0 0 0 / 40%);
-  --dialog-shadow: 0 20px 25px -5px rgb(0 0 0 / 50%), 0 8px 10px -6px rgb(0 0 0 / 50%);
   --shadow-xs: none;
   --highlight: inset 0 1px 0 rgb(255 255 255 / 10%);
   --backdrop: rgb(9 9 11 / 50%);
   --text: #fafafa;
   --muted: #a1a1aa;
   --app-bg: #18181b;
-  --home-bg: #111113;
-  --surface: #27272a;
-  --surface-2: #202023;
+  --home-bg: #18181b;
+  --surface: #3f3f46;
+  --surface-2: #2e2e32;
   --hover: rgb(255 255 255 / 7%);
   --hover-strong: rgb(255 255 255 / 11%);
   --line: rgb(255 255 255 / 8%);
@@ -89,8 +87,8 @@
   --input-bg: rgb(255 255 255 / 5%);
   --input-border: rgb(255 255 255 / 10%);
   --input-border-hover: rgb(255 255 255 / 20%);
-  --group-bg: rgb(255 255 255 / 3%);
-  --switch-off: rgb(255 255 255 / 12%);
+  --switch-off: #52525b;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23a1a1aa' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.75 10.75 8 13l2.25-2.25M10.25 5.25 8 3 5.75 5.25'/%3E%3C/svg%3E");
   --icon: #d4d4d8;
   --chip-bg: rgb(255 255 255 / 8%);
   --chip-text: #d4d4d8;
@@ -280,7 +278,7 @@ button:disabled {
 
 .toolbar-dialog-header,
 .toolbar-dialog-footer {
-  padding: 14px 18px;
+  padding: 16px 20px;
 }
 
 .toolbar-dialog-header h2 {
@@ -309,7 +307,7 @@ button:disabled {
   align-items: flex-start;
   gap: 6px;
   min-height: 44px;
-  margin: 0 18px 14px;
+  margin: 0 20px 16px;
   padding: 8px;
   overflow: auto;
   border: 1px dashed var(--border);
@@ -371,7 +369,7 @@ button:disabled {
   border-radius: var(--radius);
   color: var(--icon);
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--panel-border), var(--shadow-xs);
+  box-shadow: inset 0 0 0 1px var(--panel-border);
 }
 
 .toolbar-tile-icon > svg {
@@ -413,7 +411,6 @@ button:disabled {
 
 .pen.active {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 .sep {
@@ -460,8 +457,8 @@ button:disabled {
 .instrument-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
+  gap: 12px;
+  padding: 8px 12px;
   border-radius: var(--radius);
   font-size: 14px;
   text-align: left;
@@ -493,7 +490,6 @@ button:disabled {
 
 .instrument-row.active {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 .icon-btn.menu-btn {
@@ -531,7 +527,6 @@ button:disabled {
 .icon-btn.open {
   background: var(--accent-soft);
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 /* ---------- popovers ---------- */
@@ -591,7 +586,6 @@ button:disabled {
 
 .size.active {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 /* ---------- background picker (top right) ---------- */
@@ -667,7 +661,7 @@ button:disabled {
 }
 
 .popover-title.section {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 
 .lang-options {
@@ -690,7 +684,6 @@ button:disabled {
 .lang-option.active {
   background: var(--accent-soft);
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 /* ---------- selection action bar ---------- */
@@ -733,7 +726,7 @@ button:disabled {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   border-radius: var(--radius);
   font-size: 14px;
   text-align: left;
@@ -846,7 +839,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  padding: 6px 12px;
   border-radius: var(--radius);
   font-size: 13px;
   font-weight: 500;
@@ -935,7 +928,7 @@ button:disabled {
 }
 
 .home-header {
-  padding: 22px var(--home-gutter) 20px;
+  padding: 24px var(--home-gutter) 20px;
 }
 
 .home-brand,
@@ -974,7 +967,7 @@ button:disabled {
   align-items: flex-end;
   gap: 12px 20px;
   flex-wrap: wrap;
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .home h1 {
@@ -997,7 +990,7 @@ button:disabled {
 
 .home-actions .text-btn {
   min-height: 40px;
-  padding: 0 13px;
+  padding: 0 12px;
   border-radius: var(--radius);
   font-weight: 600;
 }
@@ -1063,13 +1056,12 @@ button:disabled {
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  padding: 4px 11px;
+  padding: 4px 12px;
   border: 1px solid var(--panel-border);
   border-radius: 999px;
   font-size: 13px;
   font-weight: 500;
   background: var(--panel-bg);
-  box-shadow: var(--shadow-xs);
 }
 
 .chip:hover {
@@ -1086,7 +1078,6 @@ button:disabled {
 .chip.ghost {
   background: transparent;
   border-color: transparent;
-  box-shadow: none;
   color: var(--muted);
 }
 
@@ -1247,8 +1238,8 @@ button:disabled {
 
 .card-open {
   display: block;
-  width: calc(100% - 14px);
-  margin: 7px 7px 0;
+  width: calc(100% - 16px);
+  margin: 8px 8px 0;
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -1273,7 +1264,7 @@ button:disabled {
 }
 
 .card-body {
-  padding: 11px 44px 13px 13px;
+  padding: 12px 44px 12px 12px;
 }
 
 .card-title {
@@ -1431,7 +1422,6 @@ button:disabled {
 .shape-btn.active {
   background: var(--accent-soft);
   color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
 .insert-popover .settings-hint {
@@ -1457,7 +1447,7 @@ button:disabled {
 
 .template-card {
   border-radius: var(--radius-panel);
-  box-shadow: 0 0 0 1px var(--panel-border), var(--shadow-xs);
+  box-shadow: 0 0 0 1px var(--panel-border);
   overflow: hidden;
   background: var(--surface);
 }
@@ -1536,7 +1526,7 @@ button:disabled {
 }
 
 .modal {
-  padding: 20px;
+  padding: 24px;
   width: min(440px, calc(100vw - 32px));
 }
 
@@ -1544,11 +1534,11 @@ button:disabled {
 .toolbar-dialog.panel,
 .shortcuts-dialog.panel {
   border-radius: var(--radius-dialog);
-  box-shadow: var(--dialog-shadow);
+  box-shadow: var(--popover-shadow);
 }
 
 .modal h3 {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   font-size: 17px;
   font-weight: 600;
 }
@@ -1575,7 +1565,7 @@ button:disabled {
 
 .seg button.active {
   background: var(--surface);
-  box-shadow: 0 0 0 1px var(--panel-border), 0 1px 2px rgb(9 9 11 / 10%);
+  box-shadow: 0 1px 2px rgb(9 9 11 / 12%);
   color: var(--text);
 }
 
@@ -1587,7 +1577,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 130px 1fr;
   align-items: center;
-  gap: 12px 10px;
+  gap: 12px;
   margin: 16px 0;
   font-size: 13px;
 }
@@ -1644,7 +1634,7 @@ button:disabled {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 16px;
+  margin-top: 24px;
 }
 
 .text-btn.primary {
@@ -1668,7 +1658,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 8px 8px 14px;
+  padding: 8px 8px 8px 16px;
   font-size: 13px;
 }
 
@@ -1799,13 +1789,13 @@ button:disabled {
 }
 
 /* ---------- settings popover (top right) ---------- */
-/* Sections divided by hairlines; related settings sit in grouped cards of rows with the control on
-   the right; choices are segmented controls and on/off settings are switches. */
+/* Sections are divided by hairlines; inside a section, plain rows with the label on the left and
+   the control on the right. Choices are segmented controls, on/off settings are switches. */
 .bg-popover {
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 340px;
+  width: 336px;
   max-width: calc(100vw - 24px);
   /* Ends above the zoom controls in the bottom-right corner. */
   max-height: calc(100vh - 144px);
@@ -1817,7 +1807,7 @@ button:disabled {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .bg-popover .popover-title.section {
@@ -1828,41 +1818,40 @@ button:disabled {
 
 .bg-popover .settings-hint {
   max-width: none;
-  margin: 8px 2px 0;
+  margin: 8px 0 0;
 }
 
-/* Background: tiles fill the width. */
+/* Background: tiles fill the width; the preview's outline alone marks the chosen one. */
 .bg-popover .bg-options {
   grid-template-columns: repeat(4, 1fr);
   gap: 4px;
 }
 
 .bg-popover .bg-option {
-  padding: 6px 4px;
-  border-radius: 10px;
+  padding: 4px;
+  border-radius: var(--radius);
 }
 
 .bg-popover .bg-option.active {
-  background: var(--accent-soft);
+  background: none;
   color: var(--accent);
   font-weight: 500;
 }
 
 /* Paper / chalkboard choice above the patterns. */
 .bg-popover .surface-options {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .bg-popover .surface-option {
-  border-radius: 10px;
-  padding: 6px;
+  padding: 4px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 500;
-  box-shadow: inset 0 0 0 1px var(--panel-border);
 }
 
 .bg-popover .surface-option.active {
-  box-shadow: inset 0 0 0 1px var(--accent-border);
+  background: none;
 }
 
 .bg-popover .surface-swatch {
@@ -1870,7 +1859,7 @@ button:disabled {
 }
 
 .bg-popover .bg-more {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   font-weight: 500;
@@ -1887,11 +1876,10 @@ button:disabled {
 
 .bg-popover .lang-option {
   flex: 1;
-  padding: 5px 10px;
+  padding: 4px 12px;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
-  box-shadow: none;
 }
 
 .bg-popover .lang-option:not(.active):hover {
@@ -1902,28 +1890,21 @@ button:disabled {
 .bg-popover .lang-option.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 0 0 1px var(--panel-border), 0 1px 2px rgb(9 9 11 / 10%);
+  box-shadow: 0 1px 2px rgb(9 9 11 / 12%);
 }
 
-/* Grouped rows. */
-.settings-group {
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  background: var(--group-bg);
-}
-
+/* Rows of label + control. */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 42px;
-  padding: 6px 10px 6px 12px;
+  min-height: 36px;
   font-size: 13px;
 }
 
 .settings-row + .settings-row {
-  border-top: 1px solid var(--line);
+  margin-top: 4px;
 }
 
 label.settings-row {
@@ -1943,8 +1924,7 @@ label.settings-row {
 .settings-group.backup-row,
 .settings-group.about-row {
   max-width: none;
-  min-height: 42px;
-  padding: 6px 8px 6px 12px;
+  min-height: 36px;
 }
 
 /* On/off switch drawn from a plain checkbox. */
@@ -1957,7 +1937,6 @@ label.settings-row {
   margin: 0;
   border-radius: 999px;
   background: var(--switch-off);
-  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 6%);
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -1971,7 +1950,7 @@ label.settings-row {
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 2px rgb(9 9 11 / 25%), 0 0 0 0.5px rgb(9 9 11 / 8%);
+  box-shadow: 0 1px 2px rgb(9 9 11 / 25%);
   transition: transform 0.15s ease;
 }
 
@@ -1997,19 +1976,25 @@ label.settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   font-size: 13px;
 }
 
+/* Select, drawn like the input fields with its own chevron. */
 .pen-row select {
+  appearance: none;
+  min-width: 160px;
   font: inherit;
   font-size: 13px;
-  padding: 4px 6px;
+  line-height: 20px;
+  padding: 5px 32px 5px 11px;
   color: var(--text);
   border-radius: var(--radius);
   border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  background: var(--input-bg) var(--select-chevron) no-repeat right 8px center / 16px 16px;
   box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: border-color 0.12s ease;
 }
 
 .pen-row select:hover {
@@ -2017,15 +2002,21 @@ label.settings-row {
 }
 
 .pen-row select:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 1px var(--focus);
+}
+
+.pen-row select option {
+  background: var(--panel-bg);
+  color: var(--text);
 }
 
 .pen-tester {
-  margin-top: 8px;
+  margin-top: 12px;
   padding: 12px;
-  border-radius: 10px;
-  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
   font-size: 12px;
   color: var(--muted);
   text-align: center;
@@ -2042,7 +2033,7 @@ label.settings-row {
   width: min(980px, calc(100vw - 32px));
   max-height: calc(100vh - 40px);
   overflow-y: auto;
-  padding: 24px 28px;
+  padding: 24px;
 }
 
 .shortcuts-dialog h3 {
@@ -2059,7 +2050,7 @@ label.settings-row {
 }
 
 .shortcuts-cols > div {
-  padding: 14px 16px;
+  padding: 16px;
   border-radius: var(--radius-panel);
   background: var(--hover);
 }
@@ -2077,7 +2068,7 @@ label.settings-row {
   justify-content: space-between;
   gap: 16px;
   font-size: 13.5px;
-  padding: 7px 0;
+  padding: 8px 0;
   border-top: 1px solid var(--line);
 }
 
@@ -2098,13 +2089,13 @@ label.settings-row {
   border-radius: var(--radius-sm);
   background: var(--panel-bg, var(--bg));
   border: 1px solid var(--panel-border);
-  box-shadow: inset 0 -1px 0 var(--panel-border), var(--shadow-xs);
+  box-shadow: inset 0 -1px 0 var(--panel-border);
   white-space: nowrap;
 }
 
 .wacom-guide {
   margin-top: 20px;
-  padding: 14px 16px;
+  padding: 16px;
   border-radius: var(--radius-panel);
   background: var(--hover);
   font-size: 13.5px;
@@ -2401,7 +2392,7 @@ label.settings-row {
   align-items: center;
   gap: 10px;
   max-width: min(640px, calc(100vw - 260px));
-  padding: 8px 8px 8px 14px;
+  padding: 8px 8px 8px 16px;
   font-size: 13px;
   line-height: 1.4;
 }
