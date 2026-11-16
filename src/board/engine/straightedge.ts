@@ -1,3 +1,4 @@
+import { ACCENT, ACCENT_TINT } from './accent'
 import { COMPASS_CELL } from './compass'
 import { rgba } from './protractor'
 import type { Camera, Point } from '@inkboard/core/types'
@@ -243,7 +244,6 @@ export function cmText(len: number, unit: string, comma = false): string {
   return `${comma ? t.replace('.', ',') : t} ${unit}`
 }
 
-const ACCENT = '#4f6bed'
 
 export interface StraightState {
   /** Part under the pointer (or in use): drawn lit. */
@@ -279,7 +279,7 @@ export function drawStraightedge(
   ctx.beginPath()
   poly(g.verts)
   if (g.hole) poly(g.hole)
-  ctx.fillStyle = rgba('#e8eeff', hot === 'body' ? 0.67 : 0.55)
+  ctx.fillStyle = rgba(ACCENT_TINT, hot === 'body' ? 0.67 : 0.55)
   ctx.fill('evenodd')
   ctx.fillStyle = rgba(ACCENT, hot === 'body' ? 0.1 : 0.05)
   ctx.fill('evenodd')

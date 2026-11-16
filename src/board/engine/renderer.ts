@@ -1,3 +1,4 @@
+import { ACCENT, accent } from './accent'
 import { drawBackground } from './background'
 import { viewportBBox } from '@inkboard/core/camera'
 import { bboxIntersects } from '@inkboard/core/geometry'
@@ -61,7 +62,6 @@ export const HANDLE_SIZE = 10
 export const END_HANDLE_R = 7
 export const SELECTION_PAD = 6
 
-const ACCENT = '#4f6bed'
 
 function sizeCanvas(c: HTMLCanvasElement, w: number, h: number, dpr: number): void {
   c.width = Math.max(1, Math.round(w * dpr))
@@ -191,7 +191,7 @@ export class BoardRenderer {
         else ctx.lineTo(sx, sy)
       })
       ctx.closePath()
-      ctx.fillStyle = 'rgba(79, 107, 237, 0.06)'
+      ctx.fillStyle = accent(0.06)
       ctx.fill()
       ctx.setLineDash([5, 4])
       ctx.lineWidth = 1.5
@@ -205,10 +205,10 @@ export class BoardRenderer {
       const r = selectionScreenRect(sel.hover, cam)
       ctx.beginPath()
       ctx.roundRect(r.x, r.y, r.w, r.h, 6)
-      ctx.fillStyle = 'rgba(79, 107, 237, 0.07)'
+      ctx.fillStyle = accent(0.07)
       ctx.fill()
       ctx.lineWidth = 1.5
-      ctx.strokeStyle = 'rgba(79, 107, 237, 0.7)'
+      ctx.strokeStyle = accent(0.7)
       ctx.stroke()
     }
 
@@ -280,8 +280,8 @@ export class BoardRenderer {
       if (cursor.penHover) {
         // Soft halo: the pen is near the surface but has not touched it yet.
         const g = ctx.createRadialGradient(sx, sy, r, sx, sy, r + 14)
-        g.addColorStop(0, 'rgba(79, 107, 237, 0.28)')
-        g.addColorStop(1, 'rgba(79, 107, 237, 0)')
+        g.addColorStop(0, accent(0.28))
+        g.addColorStop(1, accent(0))
         ctx.fillStyle = g
         ctx.beginPath()
         ctx.arc(sx, sy, r + 14, 0, Math.PI * 2)
@@ -300,7 +300,7 @@ export class BoardRenderer {
         ctx.strokeStyle = 'rgba(255,255,255,0.9)'
         ctx.stroke()
       } else if (cursor.kind === 'select') {
-        ctx.fillStyle = 'rgba(79, 107, 237, 0.08)'
+        ctx.fillStyle = accent(0.08)
         ctx.fill()
         ctx.setLineDash([5, 4])
         ctx.lineWidth = 1.5
@@ -336,7 +336,7 @@ export class BoardRenderer {
 
 const LASER = '#ff2d2d'
 /** Tint laid over selected items (the accent colour, see-through). */
-const SELECT_TINT = 'rgba(79, 107, 237, 0.38)'
+const SELECT_TINT = accent(0.38)
 
 /** Laser pointer: a glowing red trail in screen space that fades with age (never saved to the board). */
 function drawLaser(

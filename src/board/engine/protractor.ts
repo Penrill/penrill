@@ -1,3 +1,4 @@
+import { ACCENT, ACCENT_TINT } from './accent'
 import type { Camera, Point } from '@inkboard/core/types'
 
 /**
@@ -121,7 +122,6 @@ export function baseStroke(p: Protractor, u0: number, u1: number, offset: number
   ]
 }
 
-const ACCENT = '#4f6bed'
 
 export interface ProtractorState {
   /** Part under the pointer (or in use): drawn lit. */
@@ -164,7 +164,7 @@ export function drawProtractor(
 
   // Body: translucent like a real plastic protractor.
   outline()
-  ctx.fillStyle = rgba('#e8eeff', hot === 'body' ? 0.67 : 0.55)
+  ctx.fillStyle = rgba(ACCENT_TINT, hot === 'body' ? 0.67 : 0.55)
   ctx.fill()
   ctx.fillStyle = rgba(col, hot === 'body' ? 0.1 : 0.05)
   ctx.fill()

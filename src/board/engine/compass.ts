@@ -1,3 +1,4 @@
+import { ACCENT, accent } from './accent'
 import type { Camera, Point } from '@inkboard/core/types'
 
 /**
@@ -120,9 +121,8 @@ export function radiusCells(r: number): { n: number; form: 'cell1' | 'cellFew' |
   return { n, form: 'cellMany' }
 }
 
-const ACCENT = '#4f6bed'
 const METAL = '#5c6270'
-const GLOW = 'rgba(79, 107, 237, 0.22)'
+const GLOW = accent(0.22)
 
 /** How the compass answers the pointer. */
 export interface CompassState {
@@ -164,7 +164,7 @@ export function drawCompass(
   ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2)
   ctx.setLineDash([4 * px, 6 * px])
   ctx.lineWidth = 1 * px
-  ctx.strokeStyle = 'rgba(79, 107, 237, 0.35)'
+  ctx.strokeStyle = accent(0.35)
   ctx.stroke()
 
   // Radius: dashed line needle → pencil with its length.
@@ -225,7 +225,7 @@ export function drawCompass(
     ctx.stroke()
   }
   ctx.lineWidth = 6 * px
-  ctx.strokeStyle = bodyHot ? 'rgba(79, 107, 237, 0.85)' : 'rgba(92, 98, 112, 0.75)'
+  ctx.strokeStyle = bodyHot ? accent(0.85) : 'rgba(92, 98, 112, 0.75)'
   ctx.stroke()
   ctx.beginPath()
   ctx.arc(L.hinge.x, L.hinge.y, 8 * px, 0, Math.PI * 2)

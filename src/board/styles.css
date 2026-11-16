@@ -1357,7 +1357,7 @@ button:disabled {
 .card-thumb-empty {
   width: 100%;
   height: 100%;
-  background: radial-gradient(circle, #c8d1e4 1px, transparent 1.2px) center / 14px 14px #f7f9fe;
+  background: radial-gradient(circle, var(--color-zinc-300) 1px, transparent 1.2px) center / 14px 14px var(--color-zinc-50);
 }
 
 .card-body {
@@ -1821,7 +1821,7 @@ button:disabled {
 .graph-preview {
   width: 100%;
   height: 84px;
-  background: #fff radial-gradient(circle, #d6d9e0 0.8px, transparent 1px) 0 0 / 8px 8px;
+  background: var(--color-white) radial-gradient(circle, var(--color-zinc-300) 0.8px, transparent 1px) 0 0 / 8px 8px;
   border-radius: 6px;
 }
 
@@ -2829,7 +2829,7 @@ label.settings-row {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #c2255c;
+  background: var(--primary);
 }
 
 .keypad-more {
