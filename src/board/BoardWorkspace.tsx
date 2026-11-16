@@ -3,6 +3,7 @@ import type { Editor } from './editor'
 import { EditorProvider } from './editorContext'
 import { useAppTheme } from './theme'
 import { BackgroundPicker } from './ui/BackgroundPicker'
+import { Easter } from './easter' // easter egg
 import { FormulaEditor } from './ui/FormulaEditor'
 import { FunctionPanel } from './ui/FunctionPanel'
 import { MathKeypad } from './ui/MathKeypad'
@@ -52,6 +53,7 @@ export function BoardWorkspace({
       <Board fileActions={fileActions} />
       <TextEditor />
       <FormulaEditor />
+      <Easter /> {/* easter egg */}
       <SelectionToolbar actions={selectionActions} />
       <Toolbar
         extraTools={extraTools}

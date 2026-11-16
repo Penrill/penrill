@@ -1,0 +1,403 @@
+/* Easter egg: the 777 jackpot (jackpot.tsx).
+   Timeline: lever pulled at 0.1 s, reels spin from 0.4 s, the last 7 lands at 2 s (the hit),
+   then flash, rays, title and coins; everything fades out by 10 s. */
+
+.jackpot {
+  --hit: 2s;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 170, 0, 0.3), rgba(10, 4, 30, 0.7) 70%);
+  animation: jackpot-life 10s ease forwards;
+  cursor: pointer;
+}
+
+/* ---------- light rays and the flash at the hit ---------- */
+.jackpot-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260vmax;
+  height: 260vmax;
+  margin: -130vmax 0 0 -130vmax;
+  background: repeating-conic-gradient(rgba(255, 214, 80, 0.32) 0deg 7deg, transparent 7deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 32%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 32%);
+  opacity: 0;
+  animation: jackpot-fade-in 0.6s var(--hit) ease-out forwards, jackpot-turn 14s var(--hit) linear infinite;
+}
+
+.jackpot-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff8d6;
+  opacity: 0;
+  pointer-events: none;
+  animation: jackpot-flash 0.55s var(--hit) ease-out;
+}
+
+/* ---------- the machine ---------- */
+.jackpot-stage {
+  position: relative;
+  animation: jackpot-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both, jackpot-shake 0.5s var(--hit) ease-in-out;
+}
+
+.jackpot-machine {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 26px 32px 24px;
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 40%),
+    linear-gradient(180deg, #e0132f, #8a001b 75%, #5c0012);
+  border: 5px solid #ffd54a;
+  box-shadow:
+    0 0 0 3px #a86b00,
+    0 0 40px rgba(255, 200, 40, 0.55),
+    0 30px 70px rgba(0, 0, 0, 0.55);
+}
+
+.jackpot-sign {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font: 800 14px/1.2 system-ui, sans-serif;
+  letter-spacing: 3px;
+  color: #ffe9a0;
+  background: #3a0010;
+  box-shadow: inset 0 0 0 2px #ffd54a, 0 0 14px rgba(255, 213, 74, 0.5);
+  animation: jackpot-sign 0.6s steps(2) infinite;
+}
+
+.jackpot-bulb {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border-radius: 50%;
+  background: #7a5a10;
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.4);
+  animation:
+    jackpot-chase 0.45s calc(var(--i) * -0.15s) linear infinite,
+    jackpot-all 0.24s var(--hit) steps(1) infinite;
+}
+
+.jackpot-reels {
+  display: flex;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 16px;
+  background: #2a000a;
+  box-shadow: inset 0 0 0 3px #ffd54a, inset 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+.jackpot-window {
+  --h: 96px;
+  position: relative;
+  width: 88px;
+  height: var(--h);
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #cfcfcf, #fff 28%, #fff 72%, #cfcfcf);
+  box-shadow: inset 0 5px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Glass shine over each reel. */
+.jackpot-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 25%, transparent 75%, rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+}
+
+.jackpot-strip {
+  display: flex;
+  flex-direction: column;
+  animation: jackpot-spin var(--spin) 0.4s cubic-bezier(0.15, 0.6, 0.25, 1.08) both;
+}
+
+.jackpot-strip span {
+  height: var(--h);
+  display: grid;
+  place-items: center;
+  font-size: 56px;
+  line-height: 1;
+}
+
+.jackpot-seven {
+  font: 900 76px/1 Georgia, 'Times New Roman', serif;
+  color: #e0001f;
+  text-shadow: 0 3px 0 #ffd54a, 0 0 14px rgba(255, 190, 0, 0.9);
+}
+
+.jackpot-title {
+  font: 900 52px/1 system-ui, sans-serif;
+  letter-spacing: 3px;
+  color: transparent;
+  background: linear-gradient(90deg, #ffd54a, #fff, #ff9d00, #fff6c2, #ffd54a, #fff, #ffd54a) 0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 3px 0 #8a5200) drop-shadow(0 0 18px rgba(255, 213, 74, 0.9));
+  opacity: 0;
+  animation: jackpot-title 0.9s var(--hit) ease-out forwards, jackpot-shimmer 1.2s var(--hit) linear infinite;
+}
+
+/* The lever on the right, pulled before the reels go. */
+.jackpot-lever {
+  position: absolute;
+  right: -30px;
+  top: 46%;
+  width: 22px;
+  height: 34px;
+  border-radius: 0 10px 10px 0;
+  background: linear-gradient(90deg, #8a8f99, #e9ecf2, #8a8f99);
+}
+
+.jackpot-lever-arm {
+  position: absolute;
+  left: 7px;
+  bottom: 50%;
+  width: 8px;
+  height: 92px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #8a8f99, #f4f6fa, #8a8f99);
+  transform-origin: 50% 100%;
+  animation: jackpot-pull 0.7s 0.1s ease-in-out both;
+}
+
+.jackpot-lever-arm::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a8a, #e0001f 55%, #7a0010);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- coins: a solid gold disc that turns over on its axis ---------- */
+.jackpot-coin {
+  --t: 2.5px;
+  position: relative;
+  display: block;
+  width: var(--size);
+  height: var(--size);
+  transform-style: preserve-3d;
+  animation: jackpot-flip var(--flip) linear infinite;
+}
+
+.jackpot-coin-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.85), transparent 30%),
+    radial-gradient(circle, #ffe680 0%, #ffc61a 55%, #d99400 100%);
+  box-shadow: inset 0 0 0 calc(var(--size) * 0.08) #e8a800, inset 0 0 0 calc(var(--size) * 0.11) #fff0a8;
+  transform: translateZ(var(--t));
+  backface-visibility: hidden;
+}
+
+.jackpot-coin-face::after {
+  content: '7';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 900 calc(var(--size) * 0.55) / 1 Georgia, serif;
+  color: #b07400;
+  text-shadow: 0 1px 0 #fff3b0;
+}
+
+.jackpot-coin-back {
+  transform: rotateY(180deg) translateZ(var(--t));
+}
+
+.jackpot-coin-edge {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: calc(50% - var(--t));
+  width: calc(var(--t) * 2);
+  border-radius: 2px;
+  background: repeating-linear-gradient(180deg, #a86b00 0 2px, #e0a400 2px 4px);
+  transform: rotateY(90deg);
+}
+
+.jackpot-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.jackpot-drop {
+  position: absolute;
+  top: -50px;
+  perspective: 400px;
+  opacity: 0;
+  animation: jackpot-drop var(--fall) var(--delay) cubic-bezier(0.45, 0, 0.9, 0.55) 2;
+}
+
+.jackpot-fountain {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.jackpot-jet {
+  position: absolute;
+  left: calc(var(--size) / -2);
+  top: calc(var(--size) / -2);
+  perspective: 400px;
+  opacity: 0;
+  animation: jackpot-jet var(--fall) var(--delay) linear forwards;
+}
+
+/* Confetti: the outer bit falls and drifts, the inner one tumbles over. */
+.jackpot-confetti {
+  position: absolute;
+  top: -30px;
+  perspective: 300px;
+  opacity: 0;
+  animation: jackpot-drop-twist var(--fall) var(--delay) cubic-bezier(0.3, 0, 0.7, 1) 2;
+}
+
+.jackpot-confetti > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--paint);
+  animation: jackpot-tumble var(--tumble) linear infinite;
+}
+
+/* ---------- keyframes ---------- */
+@keyframes jackpot-spin {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(var(--n) * var(--h) * -1)); }
+}
+
+@keyframes jackpot-in {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes jackpot-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-8px, 3px) rotate(-1.5deg); }
+  40% { transform: translate(7px, -4px) rotate(1.2deg); }
+  60% { transform: translate(-5px, 2px) rotate(-0.8deg); }
+  80% { transform: translate(3px, -1px) rotate(0.4deg); }
+}
+
+@keyframes jackpot-pull {
+  0%, 100% { transform: scaleY(1); }
+  45% { transform: scaleY(-0.85); }
+  60% { transform: scaleY(-0.85); }
+}
+
+@keyframes jackpot-chase {
+  0%, 32% {
+    background: #fff6b0;
+    box-shadow: 0 0 6px 2px #ffd54a, 0 0 16px 4px rgba(255, 170, 0, 0.7);
+  }
+  33%, 100% {
+    background: #7a5a10;
+    box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes jackpot-all {
+  0% {
+    background: #fff;
+    box-shadow: 0 0 8px 3px #fff3a0, 0 0 22px 6px rgba(255, 170, 0, 0.85);
+  }
+  50% {
+    background: #ffcc33;
+    box-shadow: 0 0 4px 1px #ffd54a;
+  }
+}
+
+@keyframes jackpot-sign {
+  50% { color: #fff; box-shadow: inset 0 0 0 2px #fff3a0, 0 0 22px rgba(255, 213, 74, 0.9); }
+}
+
+@keyframes jackpot-title {
+  0% { opacity: 0; transform: scale(0.3) rotate(-8deg); }
+  60% { opacity: 1; transform: scale(1.3) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes jackpot-shimmer {
+  to { background-position: 150% 0; }
+}
+
+@keyframes jackpot-flash {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+@keyframes jackpot-fade-in {
+  to { opacity: 1; }
+}
+
+@keyframes jackpot-turn {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes jackpot-flip {
+  to { transform: rotateY(360deg); }
+}
+
+@keyframes jackpot-drop {
+  0% { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 1; transform: translate(var(--sway), calc(100vh + 100px)); }
+}
+
+@keyframes jackpot-drop-twist {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  50% { transform: translate(calc(var(--sway) * -0.4), 50vh) rotate(calc(var(--twist) * 0.5)); }
+  100% { opacity: 1; transform: translate(var(--sway), calc(100vh + 60px)) rotate(var(--twist)); }
+}
+
+@keyframes jackpot-tumble {
+  0% { transform: rotateX(0) rotateY(0); filter: brightness(1); }
+  50% { transform: rotateX(180deg) rotateY(90deg); filter: brightness(0.7); }
+  100% { transform: rotateX(360deg) rotateY(180deg); filter: brightness(1); }
+}
+
+@keyframes jackpot-jet {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  35% {
+    opacity: 1;
+    transform: translate(calc(var(--dx) * 0.4), var(--up));
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5);
+  }
+  100% { opacity: 1; transform: translate(var(--dx), 100vh); }
+}
+
+@keyframes jackpot-life {
+  0%, 93% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jackpot-strip { animation-duration: 0.01s !important; }
+  .jackpot-rain, .jackpot-fountain, .jackpot-rays { display: none; }
+}

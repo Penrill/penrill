@@ -9,6 +9,7 @@ import { PaperIcon } from './icons'
 import { PenSettings } from './PenSettings'
 import { BoardSettings } from './BoardSettings'
 import { ExperimentalSettings, ThemeSettings } from './ExperimentalSettings'
+import { AchievementsSettings } from '../easter' // easter egg
 import { Popover } from './Popover'
 
 type Option = { kind: PaperPattern; label: MessageKey }
@@ -154,6 +155,7 @@ export function BackgroundPicker({
           <PenSettings />
           {!hideExperimental && <ExperimentalSettings />}
           {about}
+          <AchievementsSettings /> {/* easter egg */}
         </Popover>
       )}
     </div>

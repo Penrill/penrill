@@ -8,6 +8,7 @@ import { usePrefs } from '../../../board/store'
 import { ArrowLeftIcon, CheckIcon, DotsIcon, FolderIcon, HomeIcon, PinIcon, PlusIcon, SearchIcon } from '../../../board/ui/icons'
 import { Popover } from '../../../board/ui/Popover'
 import { useApp } from '../appState'
+import { Medals } from '../../../board/easter' // easter egg
 
 const lib = platform.library
 const refresh = (): Promise<void> => boardLibrary.refreshLibrary()
@@ -299,6 +300,7 @@ export function HomeScreen() {
           )}
           <img src={appIcon} alt="" draggable={false} />
           <span>Inkboard</span>
+          <Medals /> {/* easter egg */}
         </div>
         <div className="home-title-row">
           <h1>{t('home.title')}</h1>
