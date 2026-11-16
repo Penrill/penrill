@@ -1,8 +1,9 @@
-import { BACKGROUND_STYLE, drawBackground, MAJOR_COLOR, patternColor, ROW } from './background'
+import { drawBackground } from './background'
+import { patternSvg } from './paperSvg'
 import { SMUDGE_TILE, smudgeDataUrl } from './chalkTexture'
 import { loadImage } from './images'
 import { drawItems } from './renderer'
-import { bgPattern, isChalk, surfaceColor, withInkSurface } from './surface'
+import { isChalk, surfaceColor, withInkSurface } from './surface'
 import { unionBBox } from './transform'
 import type { BackgroundKind, BBox, Camera, Item } from '@inkboard/core/types'
 import type { FeatureRegistry } from '../registry'
@@ -72,38 +73,12 @@ export async function renderPng(items: readonly Item[], bg: BackgroundKind, kind
 
 const r2 = (v: number): string => (Math.round(v * 100) / 100).toString()
 
-function patternDefs(bgKind: BackgroundKind): string {
-  const bg = bgPattern(bgKind)
+/** The chalkboard's smudge texture (a picture, the only raster part of the background). */
+function smudgeDefs(bgKind: BackgroundKind): string {
   const smudge = isChalk(bgKind) ? smudgeDataUrl() : null
-  const smudgeTile = smudge
-    ? `<pattern id="smudge" width="${SMUDGE_TILE}" height="${SMUDGE_TILE}" patternUnits="userSpaceOnUse"><image href="${smudge}" width="${SMUDGE_TILE}" height="${SMUDGE_TILE}"/></pattern>`
+  return smudge
+    ? `<defs><pattern id="smudge" width="${SMUDGE_TILE}" height="${SMUDGE_TILE}" patternUnits="userSpaceOnUse"><image href="${smudge}" width="${SMUDGE_TILE}" height="${SMUDGE_TILE}"/></pattern></defs>`
     : ''
-  if (bg === 'blank') return smudgeTile ? `<defs>${smudgeTile}</defs>` : ''
-  const st = { step: BACKGROUND_STYLE[bg].step, color: patternColor(bgKind, bg) }
-  const s = st.step
-  let tile = ''
-  if (bg === 'dots') {
-    tile = `<pattern id="paper" width="${s}" height="${s}" x="${-s / 2}" y="${-s / 2}" patternUnits="userSpaceOnUse"><circle cx="${s / 2}" cy="${s / 2}" r="1.1" fill="${st.color}"/></pattern>`
-  } else if (bg === 'math') {
-    // Five cells per tile: the first line darker.
-    const major = isChalk(bgKind) ? MAJOR_COLOR.chalk : MAJOR_COLOR.paper
-    const t = s * 5
-    const fine = [1, 2, 3, 4].map((i) => `<rect x="${i * s}" width="1" height="${t}" fill="${st.color}"/><rect y="${i * s}" width="${t}" height="1" fill="${st.color}"/>`).join('')
-    tile = `<pattern id="paper" width="${t}" height="${t}" patternUnits="userSpaceOnUse">${fine}<rect width="${t}" height="1" fill="${major}"/><rect width="1" height="${t}" fill="${major}"/></pattern>`
-  } else if (bg === 'hand') {
-    const major = isChalk(bgKind) ? MAJOR_COLOR.chalk : MAJOR_COLOR.paper
-    tile = `<pattern id="paper" width="8" height="${s}" patternUnits="userSpaceOnUse"><rect width="8" height="1" fill="${major}"/><rect y="${ROW.letter}" width="4" height="1" fill="${st.color}"/><rect y="${ROW.letter * 2}" width="8" height="1" fill="${major}"/></pattern>`
-  } else if (bg === 'slant') {
-    // Upright guide line in the tile; skewing the pattern leans it to the copybook slant (rows stay level).
-    const major = isChalk(bgKind) ? MAJOR_COLOR.chalk : MAJOR_COLOR.paper
-    const w = ROW.slantStep
-    tile = `<pattern id="paper" width="${w}" height="${s}" patternUnits="userSpaceOnUse" patternTransform="skewX(${-(90 - ROW.slantDeg)})"><rect width="1" height="${s}" fill="${st.color}"/><rect width="${w}" height="1" fill="${major}"/><rect y="${ROW.letter}" width="${w}" height="1" fill="${major}"/></pattern>`
-  } else if (bg === 'grid') {
-    tile = `<pattern id="paper" width="${s}" height="${s}" patternUnits="userSpaceOnUse"><rect width="${s}" height="1" fill="${st.color}"/><rect width="1" height="${s}" fill="${st.color}"/></pattern>`
-  } else {
-    tile = `<pattern id="paper" width="${s}" height="${s}" patternUnits="userSpaceOnUse"><rect width="${s}" height="1" fill="${st.color}"/></pattern>`
-  }
-  return `<defs>${smudgeTile}${tile}</defs>`
 }
 
 /**
@@ -124,10 +99,12 @@ function buildSvg(items: readonly Item[], bg: BackgroundKind, kinds: FeatureRegi
   const parts: string[] = []
   const vb = `${r2(box.minX)} ${r2(box.minY)} ${r2(bw)} ${r2(bh)}`
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${vb}">`)
-  parts.push(patternDefs(bg))
+  parts.push(smudgeDefs(bg))
   parts.push(`<rect x="${r2(box.minX)}" y="${r2(box.minY)}" width="${r2(bw)}" height="${r2(bh)}" fill="${surfaceColor(bg)}"/>`)
   if (isChalk(bg) && smudgeDataUrl()) parts.push(`<rect x="${r2(box.minX)}" y="${r2(box.minY)}" width="${r2(bw)}" height="${r2(bh)}" fill="url(#smudge)"/>`)
-  if (bgPattern(bg) !== 'blank') parts.push(`<rect x="${r2(box.minX)}" y="${r2(box.minY)}" width="${r2(bw)}" height="${r2(bh)}" fill="url(#paper)"/>`)
+  // Lines that lean (copybook guides) run past the page edge: clip them to it.
+  parts.push(`<clipPath id="page"><rect x="${r2(box.minX)}" y="${r2(box.minY)}" width="${r2(bw)}" height="${r2(bh)}"/></clipPath>`)
+  parts.push(`<g clip-path="url(#page)">${patternSvg(bg, box)}</g>`)
   for (const it of items) parts.push(kinds.svg(it))
   parts.push('</svg>')
   return { svg: parts.join(''), width, height }
