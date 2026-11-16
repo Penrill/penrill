@@ -26,7 +26,7 @@ export function App() {
   return (
     <BoardWorkspace
       editor={boardLibrary.editor}
-      surfaceFollowsTheme
+      hideExperimental
       fileActions={fileActions}
       menu={<MainMenu />}
       extraTools={<TemplatesMenu />}

@@ -1,8 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { BACKGROUND_STYLE, CHALK_PATTERN_COLOR, MAJOR_COLOR } from '../engine/background'
-import { bgPattern, CHALKBOARD_COLOR, isChalk, withPattern, withSurface } from '../engine/surface'
+import { bgPattern, CHALK_WHITE, CHALKBOARD_COLOR, isChalk, withPattern, withSurface } from '../engine/surface'
 import type { PaperPattern } from '@inkboard/core/types'
-import { useFeature } from '../features'
 import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
 import { prefsStore, usePrefs } from '../store'
 import { useShallow } from 'zustand/react/shallow'
@@ -12,11 +11,18 @@ import { BoardSettings } from './BoardSettings'
 import { ExperimentalSettings, ThemeSettings } from './ExperimentalSettings'
 import { Popover } from './Popover'
 
-const OPTIONS: { kind: PaperPattern; label: MessageKey }[] = [
+type Option = { kind: PaperPattern; label: MessageKey }
+
+/** The everyday patterns, always shown. */
+const MAIN_OPTIONS: Option[] = [
   { kind: 'blank', label: 'bg.blank' },
   { kind: 'dots', label: 'bg.dots' },
   { kind: 'grid', label: 'bg.grid' },
-  { kind: 'lines', label: 'bg.lines' },
+  { kind: 'lines', label: 'bg.lines' }
+]
+
+/** Busier school patterns, folded under "More" so they do not crowd the picker. */
+const MORE_OPTIONS: Option[] = [
   { kind: 'math', label: 'bg.math' },
   { kind: 'hand', label: 'bg.hand' },
   { kind: 'slant', label: 'bg.slant' }
@@ -66,18 +72,29 @@ function Preview({ kind, chalk }: { kind: PaperPattern; chalk: boolean }) {
   )
 }
 
-/** Top-right board settings: paper background and UI language. */
+/** Top-right board settings: board surface and pattern, UI language. */
 export function BackgroundPicker({
-  storageSettings, about, fixedLanguage, surfaceFollowsTheme
-}: { storageSettings?: ReactNode; about?: ReactNode; fixedLanguage?: boolean; surfaceFollowsTheme: boolean }) {
+  storageSettings, about, fixedLanguage, hideExperimental
+}: { storageSettings?: ReactNode; about?: ReactNode; fixedLanguage?: boolean; hideExperimental?: boolean }) {
   const { background, lang } = usePrefs(useShallow((s) => ({ background: s.background, lang: s.lang })))
   const { setBackground, setLang } = prefsStore.getState()
-  const chalkFlag = useFeature('chalkboard')
   const chalk = isChalk(background)
   const pattern = bgPattern(background)
   const t = useT()
   const [open, setOpen] = useState(false)
   const close = useCallback(() => setOpen(false), [])
+  const moreActive = MORE_OPTIONS.some((o) => o.kind === pattern)
+  const [moreOpen, setMoreOpen] = useState(moreActive)
+  const option = (o: Option): ReactNode => (
+    <button
+      key={o.kind}
+      className={`bg-option ${pattern === o.kind ? 'active' : ''}`}
+      onClick={() => setBackground(withPattern(background, o.kind))}
+    >
+      <Preview kind={o.kind} chalk={chalk} />
+      <span>{t(o.label)}</span>
+    </button>
+  )
   return (
     <div className="bg-picker">
       <button data-popover-anchor className="icon-btn" title={t('settings.title')} onClick={() => setOpen((o) => !o)}>
@@ -86,28 +103,39 @@ export function BackgroundPicker({
       {open && (
         <Popover onClose={close} className="bg-popover">
           <div className="popover-title">{t('settings.background')}</div>
-          {/* Shown while the flag is on, or to switch a chalkboard back to paper after it was turned off. */}
-          {!surfaceFollowsTheme && (chalkFlag || chalk) && (
-            <div className="lang-options surface-options">
-              {[false, true].map((c) => (
-                <button key={String(c)} className={`lang-option ${chalk === c ? 'active' : ''}`} onClick={() => setBackground(withSurface(background, c))}>
-                  {t(c ? 'surface.chalkboard' : 'surface.paper')}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="bg-options">
-            {OPTIONS.map((o) => (
+          {/* The surface is chosen on its own, independent of the interface theme. */}
+          <div className="surface-options" role="radiogroup" aria-label={t('settings.surface')}>
+            {[false, true].map((c) => (
               <button
-                key={o.kind}
-                className={`bg-option ${pattern === o.kind ? 'active' : ''}`}
-                onClick={() => setBackground(withPattern(background, o.kind))}
+                key={String(c)}
+                role="radio"
+                aria-checked={chalk === c}
+                title={t(c ? 'surface.chalkboard' : 'surface.paper')}
+                className={`surface-option ${chalk === c ? 'active' : ''}`}
+                onClick={() => setBackground(withSurface(background, c))}
               >
-                <Preview kind={o.kind} chalk={chalk} />
-                <span>{t(o.label)}</span>
+                <span className="surface-swatch" style={{ background: c ? CHALKBOARD_COLOR : '#fff' }}>
+                  {/* A short stroke in the ink colour that board shows: dark on paper, chalk white on green. */}
+                  <svg width="30" height="18" viewBox="0 0 30 18" aria-hidden>
+                    <path d="M4 12c4-7 7-7 9-2s5 5 8-1 4-4 5-2" fill="none" stroke={c ? CHALK_WHITE : '#222'} strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                </span>
+                <span>{t(c ? 'surface.chalkboard' : 'surface.paper')}</span>
               </button>
             ))}
           </div>
+          <div className="bg-options">{MAIN_OPTIONS.map(option)}</div>
+          <button
+            className={`bg-more ${moreOpen ? 'open' : ''} ${moreActive ? 'has-active' : ''}`}
+            aria-expanded={moreOpen}
+            onClick={() => setMoreOpen((o) => !o)}
+          >
+            <span>{t('bg.more')}</span>
+            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+              <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          {moreOpen && <div className="bg-options">{MORE_OPTIONS.map(option)}</div>}
           {!fixedLanguage && (
             <>
               <div className="popover-title section">{t('settings.language')}</div>
@@ -124,7 +152,7 @@ export function BackgroundPicker({
           <ThemeSettings />
           <BoardSettings />
           <PenSettings />
-          {!surfaceFollowsTheme && <ExperimentalSettings />}
+          {!hideExperimental && <ExperimentalSettings />}
           {about}
         </Popover>
       )}

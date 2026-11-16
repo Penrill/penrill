@@ -18,10 +18,6 @@ export const FEATURES = {
   darkTheme: {
     default: true,
     description: 'Dark theme for the app interface (toolbars, menus, home screen). Board content keeps its colors.'
-  },
-  chalkboard: {
-    default: false,
-    description: 'Dark green chalkboard surface for boards, with chalk-white default ink.'
   }
 } as const satisfies Record<string, { default: boolean; description: string }>
 

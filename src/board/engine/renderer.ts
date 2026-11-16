@@ -55,9 +55,24 @@ export interface SelectionOverlay {
   sides?: boolean
   /** End points of a straight line that can be dragged (world units). */
   ends?: readonly (readonly [number, number])[] | null
+  /** The ↻ handle above the frame that turns the selection. */
+  turn?: boolean
+  /** While turning: the frame (`box`, unturned) is drawn turned by this angle about its centre (radians, clockwise). */
+  angle?: number
 }
 
 export const HANDLE_SIZE = 10
+/**
+ * The turn handle: a circle this far right of the middle of the frame's right edge (screen px).
+ * On the right like the instruments' ↻, and clear of the selection toolbar above the frame.
+ */
+export const TURN_GAP = 26
+export const TURN_R = 9
+
+/** Centre of the turn handle for a selection rectangle in screen px. */
+export function selectionTurnHandle(r: { x: number; y: number; w: number; h: number }): [number, number] {
+  return [r.x + r.w + TURN_GAP, r.y + r.h / 2]
+}
 /** Radius of the round end-point handles of straight lines (screen px). */
 export const END_HANDLE_R = 7
 export const SELECTION_PAD = 6
@@ -176,10 +191,10 @@ export class BoardRenderer {
     const ctx = this.overlay
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height)
-    if (extras.ruler) drawStraightedge(ctx, cam, this.dpr, extras.ruler.s, extras.ruler.state)
-    if (extras.setSquare) drawStraightedge(ctx, cam, this.dpr, extras.setSquare.s, extras.setSquare.state)
-    if (extras.protractor) drawProtractor(ctx, cam, this.dpr, extras.protractor.p, extras.protractor.state)
-    if (extras.compass) drawCompass(ctx, cam, this.dpr, extras.compass.c, extras.compass.color, extras.compass.label, extras.compass.state)
+    if (extras.ruler) drawStraightedge(ctx, cam, this.dpr, extras.ruler.s, extras.ruler.state, isChalk(this.bg))
+    if (extras.setSquare) drawStraightedge(ctx, cam, this.dpr, extras.setSquare.s, extras.setSquare.state, isChalk(this.bg))
+    if (extras.protractor) drawProtractor(ctx, cam, this.dpr, extras.protractor.p, extras.protractor.state, isChalk(this.bg))
+    if (extras.compass) drawCompass(ctx, cam, this.dpr, extras.compass.c, extras.compass.color, extras.compass.label, extras.compass.state, isChalk(this.bg))
 
     if (sel.lasso && sel.lasso.length > 1) {
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
@@ -215,6 +230,12 @@ export class BoardRenderer {
     if (sel.box) {
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
       const r = selectionScreenRect(sel.box, cam)
+      if (sel.angle) {
+        // Turning: the frame turns with the items, the handle stays where the pointer holds it.
+        ctx.translate(r.x + r.w / 2, r.y + r.h / 2)
+        ctx.rotate(sel.angle)
+        ctx.translate(-(r.x + r.w / 2), -(r.y + r.h / 2))
+      }
       ctx.setLineDash(sel.locked ? [] : [6, 4])
       ctx.lineWidth = 1.5
       ctx.strokeStyle = sel.locked ? 'rgba(90, 96, 120, 0.8)' : ACCENT
@@ -230,6 +251,35 @@ export class BoardRenderer {
             ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs)
             ctx.strokeRect(hx - hs / 2, hy - hs / 2, hs, hs)
           }
+        }
+        if (sel.turn) {
+          const [hx, hy] = selectionTurnHandle(r)
+          ctx.beginPath()
+          ctx.moveTo(r.x + r.w, hy)
+          ctx.lineTo(hx - TURN_R, hy)
+          ctx.lineWidth = 1.5
+          ctx.strokeStyle = ACCENT
+          ctx.stroke()
+          ctx.beginPath()
+          ctx.arc(hx, hy, TURN_R, 0, Math.PI * 2)
+          ctx.fillStyle = '#fff'
+          ctx.fill()
+          ctx.stroke()
+          // ↻: an open circle with an arrow head.
+          const k = 4.2
+          ctx.beginPath()
+          ctx.arc(hx, hy, k, -Math.PI * 0.9, Math.PI * 0.45)
+          ctx.lineCap = 'round'
+          ctx.stroke()
+          const ex = hx + Math.cos(Math.PI * 0.45) * k
+          const ey = hy + Math.sin(Math.PI * 0.45) * k
+          ctx.beginPath()
+          ctx.moveTo(ex, ey)
+          ctx.lineTo(ex + 2.6, ey - 1)
+          ctx.moveTo(ex, ey)
+          ctx.lineTo(ex - 0.4, ey - 2.8)
+          ctx.stroke()
+          ctx.lineCap = 'butt'
         }
         if (sel.sides) {
           for (const [hx, hy] of selectionSides(r)) {
@@ -401,6 +451,7 @@ export function drawItems(
     if (moving) {
       c.save()
       c.translate(moving.ax + moving.dx, moving.ay + moving.dy)
+      if (moving.r) c.rotate(moving.r)
       c.scale(moving.s, moving.s)
       c.translate(-moving.ax, -moving.ay)
     }

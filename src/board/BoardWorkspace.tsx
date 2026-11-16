@@ -27,14 +27,15 @@ interface BoardWorkspaceProps {
   storageSettings?: ReactNode
   about?: ReactNode
   fixedLanguage?: boolean
-  surfaceFollowsTheme?: boolean
+  /** Hide the Experimental features section (the desktop app keeps flags out of the way). */
+  hideExperimental?: boolean
   children?: ReactNode
 }
 
 export function BoardWorkspace({
-  editor, fileActions, menu, extraTools, selectionActions, storageSettings, about, fixedLanguage, surfaceFollowsTheme = false, children
+  editor, fileActions, menu, extraTools, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, children
 }: BoardWorkspaceProps) {
-  useAppTheme(surfaceFollowsTheme)
+  useAppTheme()
   useEffect(() => {
     // Buttons and sliders shouldn't keep keyboard focus after a click: a focused button would be
     // "pressed" again by Space (hold-to-pan) or Enter, and the focus ring lingers on the toolbar.
@@ -55,7 +56,7 @@ export function BoardWorkspace({
       <Toolbar
         extraTools={extraTools}
         menu={menu}
-        settings={<BackgroundPicker storageSettings={storageSettings} about={about} fixedLanguage={fixedLanguage} surfaceFollowsTheme={surfaceFollowsTheme} />}
+        settings={<BackgroundPicker storageSettings={storageSettings} about={about} fixedLanguage={fixedLanguage} hideExperimental={hideExperimental} />}
       />
       <ZoomControls />
       <ShortcutsButton />

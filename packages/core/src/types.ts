@@ -26,7 +26,7 @@ interface ItemBase {
  * Ink is stored as vector data (the raw points), never as pixels.
  * The outline is rebuilt for the current zoom on every render, so strokes stay sharp at any scale.
  */
-export interface StrokeItem extends ItemBase {
+export interface StrokeItem extends ItemBase, Turnable {
   type: 'stroke'
   tool: 'pen' | 'highlighter'
   color: string
@@ -66,8 +66,19 @@ export interface ShapeSpec {
 export type LineDash = 'dashed' | 'dotted'
 export type LineCap = 'arrow' | 'dot' | 'circle' | 'bar'
 
+/**
+ * Turn of an item, in radians, clockwise on screen. Absent = not turned.
+ * - Image, text, formula: the turn about the centre of the unturned box that x, y (and w, h)
+ *   describe; `bbox` is the turned box's bounds.
+ * - Ink: its points are already turned; `rot` only remembers by how much, so the turn can be undone
+ *   later (double click on the ↻ handle).
+ */
+interface Turnable {
+  rot?: number
+}
+
 /** A raster image placed on the board. Kept at its original resolution. */
-export interface ImageItem extends ItemBase {
+export interface ImageItem extends ItemBase, Turnable {
   type: 'image'
   src: string
   x: number
@@ -151,7 +162,7 @@ export interface TextRun extends TextFormat {
  * Typed text. Position is the top-left corner; `size` is the font size in board units.
  * `runs` (optional) splits `text` into differently formatted pieces; their texts joined equal `text`.
  */
-export interface TextItem extends ItemBase {
+export interface TextItem extends ItemBase, Turnable {
   type: 'text'
   x: number
   y: number
@@ -166,7 +177,7 @@ export interface TextItem extends ItemBase {
  * (engine/formula.ts) and typeset when drawn, so it stays vector and can be edited again.
  * Position is the top-left corner; `size` is the font size in board units.
  */
-export interface FormulaItem extends ItemBase {
+export interface FormulaItem extends ItemBase, Turnable {
   type: 'formula'
   x: number
   y: number

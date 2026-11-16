@@ -11,7 +11,7 @@ import {
   type BoardFile
 } from './engine/serialize'
 import { editableShape, regenerateShape } from '@inkboard/core/shapeItems'
-import { applyXform, unionBBox, type Xform } from './engine/transform'
+import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
 import { COMPASS_CELL } from './engine/compass'
 import { CM } from './engine/straightedge'
 import { formatAll, formatRange, fullRuns, textBBox, textFields, trimRunsEnd } from './engine/text'
@@ -254,6 +254,8 @@ export class Editor {
       y: te.y,
       ...fields,
       ...(old?.groupId ? { groupId: old.groupId } : {}),
+      // A turned item stays turned after editing (it is edited upright).
+      ...(old?.rot ? { rot: old.rot } : {}),
       bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
     }
     item.bbox = textBBox(item)
@@ -356,6 +358,8 @@ export class Editor {
       color: fe.color,
       rows: fe.rows,
       ...(old?.groupId ? { groupId: old.groupId } : {}),
+      // A turned item stays turned after editing (it is edited upright).
+      ...(old?.rot ? { rot: old.rot } : {}),
       bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
     }
     item.bbox = formulaBBox(item)
@@ -411,14 +415,7 @@ export class Editor {
   selectionBBox(): BBox | null {
     const box = unionBBox(this.selectedItems())
     if (!box || !this.preview) return box
-    const t = this.preview.t
-    const f = (x: number, a: number, d: number): number => a + (x - a) * t.s + d
-    return {
-      minX: f(box.minX, t.ax, t.dx),
-      minY: f(box.minY, t.ay, t.dy),
-      maxX: f(box.maxX, t.ax, t.dx),
-      maxY: f(box.maxY, t.ay, t.dy)
-    }
+    return xformBBox(box, this.preview.t)
   }
 
   setPreview(t: Xform | null): void {
@@ -429,9 +426,26 @@ export class Editor {
   commitPreview(): void {
     const p = this.preview
     this.preview = null
-    if (!p || (p.t.s === 1 && p.t.dx === 0 && p.t.dy === 0)) return this.invalidate(true)
+    if (!p || isIdentity(p.t)) return this.invalidate(true)
     const old = this.scene.getById(p.ids)
     this.scene.replace(old, old.map((i) => applyXform(i, p.t)))
+  }
+
+  /**
+   * Turn the selection back upright (double click on the ↻ handle). Undoable.
+   * Items turned together (the same turn) go back together, about the middle of the selection, so a
+   * drawing keeps its shape; otherwise each item turns back about its own middle.
+   */
+  resetTurn(): void {
+    const items = this.selectedItems().filter((i) => !i.locked)
+    const rotOf = (i: Item): number => (i.type === 'graph' ? 0 : (i.rot ?? 0))
+    if (!items.some((i) => rotOf(i))) return
+    const r0 = rotOf(items[0])
+    const centre = (b: BBox): { ax: number; ay: number } => ({ ax: (b.minX + b.maxX) / 2, ay: (b.minY + b.maxY) / 2 })
+    const next = items.every((i) => Math.abs(rotOf(i) - r0) < 1e-6)
+      ? items.map((i) => applyXform(i, { s: 1, dx: 0, dy: 0, ...centre(unionBBox(items)!), r: -r0 }))
+      : items.map((i) => (rotOf(i) ? applyXform(i, { s: 1, dx: 0, dy: 0, ...centre(i.bbox), r: -rotOf(i) }) : i))
+    this.scene.replace(items, next)
   }
 
   /** Delete the selection; locked items stay (and stay selected). */
@@ -736,7 +750,8 @@ export class Editor {
       return
     }
     const { width, height } = this.view()
-    const r = (Math.min(width, height) * 0.3) / this.camera.zoom
+    // A quarter of the short side: big enough to read, small enough to leave room for the drawing.
+    const r = (Math.min(width, height) * 0.25) / this.camera.zoom
     const c = screenToWorld(this.camera, width / 2, height / 2)
     this.session.setState({ protractor: { x: c.x, y: c.y + r * 0.45, r, rot: 0 } })
   }

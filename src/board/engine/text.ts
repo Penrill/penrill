@@ -1,4 +1,5 @@
 import { inkColor } from './surface'
+import { turnedBBox } from '@inkboard/core/geometry'
 import type { BBox, TextFormat, TextItem, TextRun } from '@inkboard/core/types'
 
 /**
@@ -203,9 +204,15 @@ export function measureText(text: string, size: number): { w: number; h: number 
   return { w: l.w, h: l.h }
 }
 
-export function textBBox(t: Pick<TextItem, 'x' | 'y'> & TextLike): BBox {
+/** The text's own (unturned) box: x, y is its top-left corner. */
+export function textBox(t: Pick<TextItem, 'x' | 'y'> & TextLike): BBox {
   const { w, h } = layoutText(t)
   return { minX: t.x, minY: t.y, maxX: t.x + w, maxY: t.y + h }
+}
+
+/** Bounds on the board, turned text included. */
+export function textBBox(t: Pick<TextItem, 'x' | 'y' | 'rot'> & TextLike): BBox {
+  return turnedBBox(textBox(t), t.rot)
 }
 
 export function drawText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, t: TextItem): void {

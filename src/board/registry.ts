@@ -4,6 +4,7 @@ import { paint } from '@inkboard/render-canvas/paint'
 import { toSvg, type Prim } from '@inkboard/render/display'
 import type { NumericResult } from './engine/formulaexpr'
 import { inkColors } from './engine/surface'
+import { itemTurn } from './engine/transform'
 
 /**
  * Feature modules (docs/ARCHITECTURE.md). The board's core knows item types and hooks only through
@@ -73,14 +74,26 @@ export class FeatureRegistry {
   /** Draws one item in board coordinates, in the colours of the current surface (withInkSurface). */
   draw(ctx: Ctx, item: Item): void {
     const kind = this.kinds.get(item.type)
+    // A turned image, text or formula is drawn upright in its own box, turned about the box's centre.
+    const turn = itemTurn(item)
+    if (turn) {
+      ctx.save()
+      ctx.translate(turn.cx, turn.cy)
+      ctx.rotate(turn.rot)
+      ctx.translate(-turn.cx, -turn.cy)
+    }
     if (kind?.display) paint(ctx, kind.display(item), inkColors)
     else kind?.draw?.(ctx, item)
+    if (turn) ctx.restore()
   }
 
   /** One item as SVG markup (for SVG and PDF exports); empty when no module draws its type. */
   svg(item: Item): string {
     const kind = this.kinds.get(item.type)
-    if (kind?.display) return toSvg(kind.display(item), inkColors)
-    return kind?.svg?.(item) ?? ''
+    const out = kind?.display ? toSvg(kind.display(item), inkColors) : (kind?.svg?.(item) ?? '')
+    const turn = itemTurn(item)
+    if (!turn || !out) return out
+    const r2 = (v: number): number => Math.round(v * 100) / 100
+    return `<g transform="rotate(${r2((turn.rot * 180) / Math.PI)} ${r2(turn.cx)} ${r2(turn.cy)})">${out}</g>`
   }
 }

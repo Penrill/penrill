@@ -3,6 +3,7 @@ import { isEquation } from './formulaexpr'
 import { formulaBBox } from './formulatype'
 import { graphBBox, sanitizeGraph } from './graph'
 import { isShapeKind, MAX_BASE, MIN_BASE } from '@inkboard/core/shapes'
+import { turnedBBox } from '@inkboard/core/geometry'
 import { bgPattern, isBackgroundKind, isChalk, SCHOOL_PATTERNS } from './surface'
 import { textBBox } from './text'
 import type { TextRun } from '@inkboard/core/types'
@@ -23,13 +24,15 @@ export const FORMAT = 'inkboard'
  *     named functions and other variables (`name`, `arg`; older versions show them as y and x).
  * 8 = chalkboard surface (`chalk-<pattern>` backgrounds).
  * 9 = school paper patterns (`math`, `hand`, `slant` backgrounds, on paper or chalkboard).
+ * 10 = turned images, texts and formulas (`rot`; turned ink needs nothing new, its points turn).
  * Readers accept ≤ this; older apps refuse newer files instead of silently dropping data.
  * A file is stamped with the lowest version that can show it.
  */
-export const FORMAT_VERSION = 9
+export const FORMAT_VERSION = 10
 
 /** Lowest format version that can represent these items without losing anything. */
 export function requiredVersion({ items, background }: Pick<BoardData, 'items' | 'background'>): number {
+  if (items.some((i) => (i.type === 'image' || i.type === 'text' || i.type === 'formula') && !!i.rot)) return 10
   if (SCHOOL_PATTERNS.includes(bgPattern(background))) return 9
   if (isChalk(background)) return 8
   // Version 7: formulas, functions drawn on a range only (older versions would draw them whole), and
@@ -57,6 +60,8 @@ interface SerializedStroke {
   endCap?: LineCap
   shape?: ShapeSpec
   locked?: boolean
+  /** How much the (already turned) points were turned; older versions simply drop it. */
+  rot?: number
 }
 
 interface SerializedGraph extends GraphParams {
@@ -81,6 +86,7 @@ interface SerializedImage {
   y: number
   w: number
   h: number
+  rot?: number
 }
 
 interface SerializedText {
@@ -95,6 +101,7 @@ interface SerializedText {
   runs?: TextRun[]
   groupId?: string
   locked?: boolean
+  rot?: number
 }
 
 interface SerializedFormula {
@@ -108,6 +115,7 @@ interface SerializedFormula {
   rows: Row
   groupId?: string
   locked?: boolean
+  rot?: number
 }
 
 type SerializedItem = SerializedStroke | SerializedImage | SerializedGraph | SerializedText | SerializedFormula
@@ -147,7 +155,7 @@ export function serializeBoard(data: BoardData): BoardFile {
         pts[i * 3 + 1] = r2(y)
         pts[i * 3 + 2] = r3(p)
       })
-      const { id, z, tool, color, size, pressure, geom, groupId, dash, startCap, endCap, shape, locked } = it
+      const { id, z, tool, color, size, pressure, geom, groupId, dash, startCap, endCap, shape, locked, rot } = it
       return {
         type: 'stroke', id, z, tool, color, size, pressure, pts,
         ...(geom ? { geom } : {}),
@@ -156,7 +164,8 @@ export function serializeBoard(data: BoardData): BoardFile {
         ...(startCap ? { startCap } : {}),
         ...(endCap ? { endCap } : {}),
         ...(shape ? { shape } : {}),
-        ...(locked ? { locked } : {})
+        ...(locked ? { locked } : {}),
+        ...(rot ? { rot } : {})
       }
     }
     if (it.type === 'graph' || it.type === 'text' || it.type === 'formula') {
@@ -172,11 +181,15 @@ export function serializeBoard(data: BoardData): BoardFile {
     return {
       type: 'image', id: it.id, z: it.z, asset: key, x: it.x, y: it.y, w: it.w, h: it.h,
       ...(it.groupId ? { groupId: it.groupId } : {}),
-      ...(it.locked ? { locked: true } : {})
+      ...(it.locked ? { locked: true } : {}),
+      ...(it.rot ? { rot: it.rot } : {})
     }
   })
   return { format: FORMAT, version: requiredVersion(data), background: data.background, camera: data.camera, assets, items }
 }
+
+/** A turn read from a file: a finite, non-zero number of radians, or nothing. */
+const readRot = (v: unknown): { rot?: number } => (typeof v === 'number' && Number.isFinite(v) && v !== 0 ? { rot: v } : {})
 
 export function deserializeBoard(file: BoardFile): BoardData {
   if (file?.format !== FORMAT) throw new Error('Not an Inkboard file')
@@ -205,6 +218,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
         ...(s.endCap ? { endCap: s.endCap } : {}),
         ...(readSpec(s.shape) ? { shape: readSpec(s.shape)! } : {}),
         ...(s.locked ? { locked: true } : {}),
+        ...readRot(s.rot),
         bbox: { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }
       })
     } else if (s.type === 'graph') {
@@ -220,6 +234,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
         ...(readRuns(s.runs, s.text) ? { runs: readRuns(s.runs, s.text)! } : {}),
         ...(s.groupId ? { groupId: s.groupId } : {}),
         ...(s.locked ? { locked: true } : {}),
+        ...readRot(s.rot),
         bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
       }
       t.bbox = textBBox(t)
@@ -231,6 +246,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
         type: 'formula', id: s.id, z: s.z, x: s.x, y: s.y, size: s.size, color: noWhite(s.color), rows,
         ...(s.groupId ? { groupId: s.groupId } : {}),
         ...(s.locked ? { locked: true } : {}),
+        ...readRot(s.rot),
         bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
       }
       f.bbox = formulaBBox(f)
@@ -242,7 +258,8 @@ export function deserializeBoard(file: BoardFile): BoardData {
         type: 'image', id: s.id, z: s.z, src, x: s.x, y: s.y, w: s.w, h: s.h,
         ...(s.groupId ? { groupId: s.groupId } : {}),
         ...(s.locked ? { locked: true } : {}),
-        bbox: { minX: s.x, minY: s.y, maxX: s.x + s.w, maxY: s.y + s.h }
+        ...readRot(s.rot),
+        bbox: turnedBBox({ minX: s.x, minY: s.y, maxX: s.x + s.w, maxY: s.y + s.h }, readRot(s.rot).rot)
       })
     }
   }

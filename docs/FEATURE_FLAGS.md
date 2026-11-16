@@ -11,7 +11,7 @@ them on. No rebuild is needed to switch them.
   `~/.config/Inkboard` on Linux):
 
   ```json
-  { "darkTheme": true, "chalkboard": true }
+  { "darkTheme": false }
   ```
 
   The file is read once when the app starts. Unknown keys and values that are not `true`/`false`
@@ -22,7 +22,6 @@ them on. No rebuild is needed to switch them.
 | id | default | what it does |
 | --- | --- | --- |
 | `darkTheme` | on | Dark interface (toolbars, menus, home screen, dialogs). Adds a System / Light / Dark choice in Settings. Board content, thumbnails and exports keep their own colors. |
-| `chalkboard` | off | Dark green chalkboard surface with subtle grain in Settings → Background. Dark ink is shown lighter on it (black as chalk white); the stored colors don't change. Boards using it are saved as format version 8. |
 
 ## Adding or removing a flag
 

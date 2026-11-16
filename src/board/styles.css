@@ -4,7 +4,17 @@
    2. A semantic colour scheme built only from those colours: primary, secondary, success,
       warning, danger and the neutral surfaces. Components use the semantic names only.
    Nested corners are concentric: a child's radius is its parent's radius minus the parent's
-   border and padding (see --inner-radius on .panel). */
+   border and padding (see --inner-radius on .panel).
+
+   UI system: every control is one of these, and looks the same wherever it appears.
+   - Button (.text-btn): plain, .outline, .primary, .danger. One height, one radius.
+   - Segmented control (.lang-options / .seg): one choice among a few text options. Sunken
+     track, the chosen option is a raised thumb.
+   - Selectable item (tool button, menu row, pattern tile, paper/chalkboard, chip, size...):
+     hover = neutral --hover fill; selected = --primary-soft fill + 1px --primary-ring outline +
+     --primary-text. Hover and selected change the same box, so clicking never jumps to a
+     different look. The shared rules are at the end of this file ("Selectable items").
+   Components only set layout; they don't restyle hover or selected on their own. */
 :root {
   --spacing: 0.25rem;
   --radius-xs: 0.125rem;
@@ -40,6 +50,7 @@
   --color-zinc-900: oklch(21% 0.006 285.885);
   --color-zinc-950: oklch(14.1% 0.005 285.823);
   --color-blue-50: oklch(97% 0.014 254.604);
+  --color-blue-300: oklch(80.9% 0.105 251.813);
   --color-blue-400: oklch(70.7% 0.165 254.624);
   --color-blue-500: oklch(62.3% 0.214 259.815);
   --color-blue-600: oklch(54.6% 0.245 262.881);
@@ -61,9 +72,17 @@
   --primary-hover: var(--color-blue-700);
   --primary-fg: var(--color-white);
   --primary-text: var(--color-blue-600);
-  --primary-soft: color-mix(in oklab, var(--color-blue-500) 10%, transparent);
-  --primary-ring: color-mix(in oklab, var(--color-blue-500) 35%, transparent);
+  --primary-soft: color-mix(in oklab, var(--color-blue-500) 12%, transparent);
+  --primary-ring: color-mix(in oklab, var(--color-blue-500) 40%, transparent);
   --focus: var(--color-blue-500);
+  /* Selected item in a list or grid: a clear blue outline, not just a faint tint. */
+  --selected-ring: var(--color-blue-600);
+  /* Segmented control: a sunken track and a raised, clearly lighter thumb for the chosen option. */
+  --seg-track: var(--color-zinc-100);
+  --seg-track-ring: color-mix(in oklab, var(--color-zinc-950) 5%, transparent);
+  --seg-thumb: var(--color-white);
+  --seg-thumb-ring: color-mix(in oklab, var(--color-zinc-950) 10%, transparent);
+  --seg-thumb-shadow: var(--shadow-sm);
   /* Secondary: outline and plain buttons, neutral fills. */
   --secondary-border: color-mix(in oklab, var(--color-zinc-950) 10%, transparent);
   --secondary-hover: color-mix(in oklab, var(--color-zinc-950) 2.5%, transparent);
@@ -128,9 +147,15 @@
 :root[data-theme='dark'] {
   --primary: var(--color-blue-600);
   --primary-hover: var(--color-blue-500);
-  --primary-text: var(--color-blue-400);
-  --primary-soft: color-mix(in oklab, var(--color-blue-500) 20%, transparent);
-  --primary-ring: color-mix(in oklab, var(--color-blue-400) 40%, transparent);
+  --primary-text: var(--color-blue-300);
+  --primary-soft: color-mix(in oklab, var(--color-blue-500) 30%, transparent);
+  --primary-ring: color-mix(in oklab, var(--color-blue-400) 55%, transparent);
+  --selected-ring: var(--color-blue-400);
+  --seg-track: var(--color-zinc-950);
+  --seg-track-ring: color-mix(in oklab, var(--color-white) 10%, transparent);
+  --seg-thumb: var(--color-zinc-600);
+  --seg-thumb-ring: color-mix(in oklab, var(--color-white) 15%, transparent);
+  --seg-thumb-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --secondary-border: color-mix(in oklab, var(--color-white) 15%, transparent);
   --secondary-hover: color-mix(in oklab, var(--color-white) 5%, transparent);
   --success: var(--color-green-500);
@@ -145,7 +170,7 @@
   --danger-soft: color-mix(in oklab, var(--color-red-500) 15%, transparent);
   --text: var(--color-white);
   --muted: var(--color-zinc-400);
-  --icon: var(--color-zinc-300);
+  --icon: var(--color-zinc-200);
   --kbd: var(--color-zinc-500);
   --app-bg: var(--color-zinc-900);
   --home-bg: var(--color-zinc-900);
@@ -731,18 +756,6 @@ button:disabled {
   box-shadow: 0 0 0 1px var(--panel-border);
 }
 
-.bg-option:hover {
-  background: var(--hover);
-}
-
-.bg-option.active {
-  background: var(--primary-soft);
-  color: var(--primary-text);
-}
-
-.bg-option.active svg {
-  box-shadow: 0 0 0 2px var(--primary-text);
-}
 
 /* ---------- shortcuts (bottom left) ---------- */
 .shortcuts-corner {
@@ -779,28 +792,6 @@ button:disabled {
 
 .popover-title.section {
   margin-top: 16px;
-}
-
-.lang-options {
-  display: flex;
-  gap: 6px;
-}
-
-.lang-option {
-  padding: 6px 12px;
-  border-radius: var(--radius-lg);
-  font-size: 13px;
-  font-weight: 500;
-  background: var(--hover);
-}
-
-.lang-option:hover {
-  background: var(--hover-strong);
-}
-
-.lang-option.active {
-  background: var(--primary-soft);
-  color: var(--primary-text);
 }
 
 /* ---------- selection action bar ---------- */
@@ -1672,14 +1663,15 @@ button:disabled {
 .seg {
   --seg-pad: calc(var(--spacing) * 0.5);
   display: inline-flex;
-  background: var(--hover);
+  background: var(--seg-track);
+  box-shadow: inset 0 0 0 1px var(--seg-track-ring);
   border-radius: var(--radius-lg);
   padding: var(--seg-pad);
   gap: 2px;
 }
 
 .seg button {
-  padding: calc(var(--spacing) * 1.5 - 1px) calc(var(--spacing) * 3);
+  padding: var(--spacing) calc(var(--spacing) * 3);
   border-radius: calc(var(--radius-lg) - var(--seg-pad));
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
@@ -1691,9 +1683,10 @@ button:disabled {
 }
 
 .seg button.active {
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  background: var(--seg-thumb);
+  box-shadow: var(--seg-thumb-shadow), 0 0 0 1px var(--seg-thumb-ring);
   color: var(--text);
+  font-weight: var(--font-weight-semibold);
 }
 
 .seg.small button {
@@ -1968,7 +1961,7 @@ button:disabled {
   margin: calc(var(--spacing) * 2) 0 0;
 }
 
-/* Background: tiles fill the width; the preview's outline alone marks the chosen one. */
+/* Background: tiles fill the width. Hover and selected come from the shared rules (UI system). */
 .bg-popover .bg-options {
   grid-template-columns: repeat(4, 1fr);
   gap: var(--spacing);
@@ -1981,30 +1974,16 @@ button:disabled {
   border-radius: calc(var(--radius-md) + var(--spacing));
 }
 
-.bg-popover .bg-option.active {
-  background: none;
-  color: var(--primary-text);
-  font-weight: 500;
-}
-
 /* Paper / chalkboard choice above the patterns. */
 .bg-popover .surface-options {
   margin-bottom: calc(var(--spacing) * 3);
 }
 
+/* Paper / chalkboard: a swatch and its name. Hover and selected come from the shared rules. */
 .bg-popover .surface-option {
   padding: var(--spacing);
   border-radius: calc(var(--radius-md) + var(--spacing));
   font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.bg-popover .surface-option.active {
-  background: none;
-}
-
-.bg-popover .surface-swatch {
-  box-shadow: 0 0 0 1px var(--panel-border);
 }
 
 .bg-popover .bg-more {
@@ -2014,17 +1993,18 @@ button:disabled {
   font-weight: 500;
 }
 
-/* Segmented control: the language, theme and mouse wheel choices. */
-.bg-popover .lang-options {
+/* Segmented control (see "UI system" at the top): every single choice between a few text options. */
+.lang-options {
   --seg-pad: calc(var(--spacing) * 0.5);
   display: flex;
   gap: 2px;
   padding: var(--seg-pad);
   border-radius: var(--radius-lg);
-  background: var(--hover);
+  background: var(--seg-track);
+  box-shadow: inset 0 0 0 1px var(--seg-track-ring);
 }
 
-.bg-popover .lang-option {
+.lang-option {
   flex: 1;
   padding: var(--spacing) calc(var(--spacing) * 3);
   border-radius: calc(var(--radius-lg) - var(--seg-pad));
@@ -2033,15 +2013,16 @@ button:disabled {
   color: var(--muted);
 }
 
-.bg-popover .lang-option:not(.active):hover {
+.lang-option:not(.active):hover {
   background: transparent;
   color: var(--text);
 }
 
-.bg-popover .lang-option.active {
-  background: var(--surface);
+.lang-option.active {
+  background: var(--seg-thumb);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--seg-thumb-shadow), 0 0 0 1px var(--seg-thumb-ring);
 }
 
 /* Rows of label + control. */
@@ -3042,8 +3023,36 @@ label.settings-row {
 }
 
 .surface-options {
-  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
 }
+
+.surface-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.surface-option:hover {
+  background: var(--hover);
+}
+
+
+.surface-swatch {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px var(--panel-border);
+}
+
 
 .toolbar.is-customizing .toolbar-item button,
 .toolbar-tile {
@@ -3075,4 +3084,59 @@ label.settings-row {
 .toolbar.is-customizing .toolbar-divider .icon-btn {
   width: 24px;
   background: var(--surface-2);
+}
+
+/* "More" disclosure under the main background patterns. */
+.bg-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.bg-more:hover {
+  background: var(--hover);
+}
+
+.bg-more svg {
+  transition: transform 0.15s;
+}
+
+.bg-more.open svg {
+  transform: rotate(180deg);
+}
+
+.bg-more.has-active {
+  color: var(--primary-text);
+}
+
+/* ---------- Selectable items: one hover and one selected look everywhere ----------
+   Listed here once instead of per component, and last so it wins over component rules. */
+:is(
+  .icon-btn.active, .icon-btn.open, .pen.active, .instrument-row.active, .size.active, .chip.active,
+  .shape-btn.active, .tf-btn.active, .labeled-btn.active, .bg-option.active, .surface-option.active
+) {
+  background: var(--primary-soft);
+  color: var(--primary-text);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--primary-ring);
+}
+
+:is(.bg-option, .surface-option) {
+  color: var(--muted);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.12s var(--ease-out), color 0.12s var(--ease-out);
+}
+
+:is(.bg-option, .surface-option):not(.active):hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+:is(.bg-option, .surface-option).active {
+  font-weight: var(--font-weight-semibold);
 }

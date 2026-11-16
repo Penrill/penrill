@@ -2,6 +2,7 @@ import type { BoardEntry, TemplateEntry } from '../../shared/library'
 import { createEditor, DEFAULT_CAMERA, type Editor } from '../../board/editor'
 import { builtinModules } from '../../board/modules'
 import { renderPng, renderSvg, renderThumbnail } from '../../board/engine/export'
+import { withSurface } from '../../board/engine/surface'
 import { decodeBoard, encodeBoard, type BoardData } from '../../board/engine/serialize'
 import { translate } from '../../board/i18n'
 import { prefsStore } from '../../board/store'
@@ -352,7 +353,9 @@ class BoardLibrary {
   async exportBoard(kind: 'png' | 'pdf'): Promise<void> {
     const sel = this.editor.selectedItems()
     const items = sel.length ? sel : [...this.editor.scene.getItems()]
-    const bg = prefsStore.getState().background
+    // Exports are always on white paper (same pattern), even from the chalkboard: they get printed
+    // and pasted into documents, where a dark green page wastes ink and reads badly.
+    const bg = withSurface(prefsStore.getState().background, false)
     const title = useApp.getState().board?.title ?? 'Inkboard'
     try {
       if (kind === 'png') {

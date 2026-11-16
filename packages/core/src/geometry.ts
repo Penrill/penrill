@@ -62,3 +62,26 @@ export function newId(): string {
   idCounter++
   return `${Date.now().toString(36)}-${idCounter.toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
+
+/** Bounds of box `b` turned by `rot` radians (clockwise on screen) about its centre. */
+export function turnedBBox(b: BBox, rot: number | undefined): BBox {
+  if (!rot) return b
+  const cx = (b.minX + b.maxX) / 2
+  const cy = (b.minY + b.maxY) / 2
+  const hw = (b.maxX - b.minX) / 2
+  const hh = (b.maxY - b.minY) / 2
+  const c = Math.abs(Math.cos(rot))
+  const s = Math.abs(Math.sin(rot))
+  const ex = hw * c + hh * s
+  const ey = hw * s + hh * c
+  return { minX: cx - ex, minY: cy - ey, maxX: cx + ex, maxY: cy + ey }
+}
+
+/** Point (x, y) turned by `rot` radians (clockwise on screen) about (cx, cy). */
+export function turnPoint(x: number, y: number, cx: number, cy: number, rot: number): [number, number] {
+  const c = Math.cos(rot)
+  const s = Math.sin(rot)
+  const dx = x - cx
+  const dy = y - cy
+  return [cx + dx * c - dy * s, cy + dx * s + dy * c]
+}

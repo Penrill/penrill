@@ -1,4 +1,5 @@
-import { ACCENT, accent } from './accent'
+import { ACCENT } from './accent'
+import { IDLE_HANDLES, instrumentLook, rgba } from './instrumentLook'
 import type { Camera, Point } from '@inkboard/core/types'
 
 /**
@@ -121,9 +122,6 @@ export function radiusCells(r: number): { n: number; form: 'cell1' | 'cellFew' |
   return { n, form: 'cellMany' }
 }
 
-const METAL = '#5c6270'
-const GLOW = accent(0.22)
-
 /** How the compass answers the pointer. */
 export interface CompassState {
   /** Part under the pointer (or being dragged): drawn lit. */
@@ -142,12 +140,16 @@ export function drawCompass(
   c: Compass,
   pencilColor: string,
   label: string,
-  state: CompassState = { hot: null, sweepFrom: null, ticks: false }
+  state: CompassState = { hot: null, sweepFrom: null, ticks: false },
+  chalk = false
 ): void {
   const s = cam.zoom * dpr
   const L = layout(c, cam.zoom)
   const px = L.px
   const hot = state.hot
+  const look = instrumentLook(chalk)
+  const METAL = look.metal
+  const GLOW = look.glow
   const glow = (x: number, y: number, rad: number): void => {
     ctx.beginPath()
     ctx.arc(x, y, rad * px, 0, Math.PI * 2)
@@ -164,7 +166,7 @@ export function drawCompass(
   ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2)
   ctx.setLineDash([4 * px, 6 * px])
   ctx.lineWidth = 1 * px
-  ctx.strokeStyle = accent(0.35)
+  ctx.strokeStyle = rgba(look.edge, 0.3)
   ctx.stroke()
 
   // Radius: dashed line needle → pencil with its length.
@@ -173,7 +175,7 @@ export function drawCompass(
   ctx.lineTo(L.p.x, L.p.y)
   ctx.setLineDash([5 * px, 4 * px])
   ctx.lineWidth = 1.2 * px
-  ctx.strokeStyle = ACCENT
+  ctx.strokeStyle = look.edge
   ctx.stroke()
   ctx.setLineDash([])
 
@@ -190,7 +192,7 @@ export function drawCompass(
       ctx.lineTo(x + uy * k, y - ux * k)
     }
     ctx.lineWidth = 1.5 * px
-    ctx.strokeStyle = ACCENT
+    ctx.strokeStyle = look.edge
     ctx.stroke()
   }
 
@@ -205,11 +207,11 @@ export function drawCompass(
       ctx.lineTo(c.x + ux * (c.r + 7 * px), c.y + uy * (c.r + 7 * px))
     }
     ctx.lineWidth = 2 * px
-    ctx.strokeStyle = ACCENT
+    ctx.strokeStyle = look.edge
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(c.x + Math.cos(state.sweepFrom) * c.r, c.y + Math.sin(state.sweepFrom) * c.r, 4 * px, 0, Math.PI * 2)
-    ctx.fillStyle = ACCENT
+    ctx.fillStyle = look.edge
     ctx.fill()
   }
 
@@ -225,7 +227,7 @@ export function drawCompass(
     ctx.stroke()
   }
   ctx.lineWidth = 6 * px
-  ctx.strokeStyle = bodyHot ? accent(0.85) : 'rgba(92, 98, 112, 0.75)'
+  ctx.strokeStyle = bodyHot ? rgba(ACCENT, 0.85) : rgba(METAL, 0.75)
   ctx.stroke()
   ctx.beginPath()
   ctx.arc(L.hinge.x, L.hinge.y, 8 * px, 0, Math.PI * 2)
@@ -265,6 +267,9 @@ export function drawCompass(
   ctx.fillStyle = pencilColor
   ctx.fill()
 
+  // Buttons: quiet until the pointer is on the compass (the needle, legs and pencil stay as they are).
+  ctx.save()
+  if (hot === null) ctx.globalAlpha = IDLE_HANDLES
   const handle = (q: { x: number; y: number }, lit: boolean, draw: () => void): void => {
     if (lit) glow(q.x, q.y, HANDLE_R + 7)
     ctx.beginPath()
@@ -305,6 +310,7 @@ export function drawCompass(
     ctx.lineTo(-k, k)
     ctx.stroke()
   })
+  ctx.restore()
 
   // Radius label below the middle of the radius line (on the side away from the hinge).
   ctx.font = `600 ${12 * px}px system-ui, sans-serif`

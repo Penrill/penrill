@@ -1,6 +1,6 @@
-import { ACCENT, ACCENT_TINT } from './accent'
+import { ACCENT } from './accent'
 import { COMPASS_CELL } from './compass'
-import { rgba } from './protractor'
+import { IDLE_HANDLES, instrumentLook, rgba } from './instrumentLook'
 import type { Camera, Point } from '@inkboard/core/types'
 
 /**
@@ -258,7 +258,8 @@ export function drawStraightedge(
   cam: Camera,
   dpr: number,
   s: Straightedge,
-  state: StraightState = { hot: null, mark: null }
+  state: StraightState = { hot: null, mark: null },
+  chalk = false
 ): void {
   const z = cam.zoom * dpr
   ctx.save()
@@ -268,37 +269,38 @@ export function drawStraightedge(
   const px = 1 / cam.zoom
   const g = geometry(s)
   const hot = state.hot
-  const glow = rgba(ACCENT, 0.22)
+  const look = instrumentLook(chalk)
+  const glow = look.glow
   const poly = (pts: V[]): void => {
     ctx.moveTo(pts[0].u, pts[0].v)
     for (const q of pts.slice(1)) ctx.lineTo(q.u, q.v)
     ctx.closePath()
   }
 
-  // Body: translucent plastic, with the window of a set square left clear.
+  // Body: clear plastic, with the window of a set square left open; lit a little under the pointer.
   ctx.beginPath()
   poly(g.verts)
   if (g.hole) poly(g.hole)
-  ctx.fillStyle = rgba(ACCENT_TINT, hot === 'body' ? 0.67 : 0.55)
-  ctx.fill('evenodd')
-  ctx.fillStyle = rgba(ACCENT, hot === 'body' ? 0.1 : 0.05)
+  ctx.fillStyle = look.body(hot === 'body')
   ctx.fill('evenodd')
   ctx.beginPath()
   poly(g.verts)
   ctx.lineWidth = (hot === 'body' ? 2.5 : 1.5) * px
-  ctx.strokeStyle = ACCENT
+  ctx.strokeStyle = look.edge
   ctx.lineJoin = 'round'
   ctx.stroke()
   if (g.hole) {
     ctx.beginPath()
     poly(g.hole)
     ctx.lineWidth = 1 * px
-    ctx.strokeStyle = rgba(ACCENT, 0.45)
+    ctx.strokeStyle = look.edge
+    ctx.globalAlpha = 0.45
     ctx.stroke()
+    ctx.globalAlpha = 1
     const degs = s.kind === 'square45' ? ['90°', '45°', '45°'] : ['90°', '30°', '60°']
     const aFont = Math.max(CM * 0.22, 9 * px)
     ctx.font = `600 ${aFont}px system-ui, sans-serif`
-    ctx.fillStyle = rgba(ACCENT, 0.85)
+    ctx.fillStyle = look.inner
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     const base = ctx.getTransform()
@@ -326,7 +328,7 @@ export function drawStraightedge(
     ctx.moveTo(e.a.u, e.a.v)
     ctx.lineTo(e.b.u, e.b.v)
     ctx.lineWidth = 2 * px
-    ctx.strokeStyle = ACCENT
+    ctx.strokeStyle = look.edge
     ctx.stroke()
   }
 
@@ -335,8 +337,7 @@ export function drawStraightedge(
   const halfShown = (CM / 2) * cam.zoom >= 3
   const numEvery = CM * cam.zoom >= 16 ? 1 : CM * cam.zoom >= 5 ? 5 : 10
   const font = Math.max(CM * 0.24, 9 * px)
-  ctx.strokeStyle = 'rgba(40, 46, 70, 0.85)'
-  ctx.fillStyle = '#23283c'
+  ctx.fillStyle = look.number
   ctx.font = `${font}px system-ui, sans-serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -350,8 +351,9 @@ export function drawStraightedge(
       ctx.beginPath()
       for (let i = 0; i <= count; i++) {
         const isCm = i % 10 === 0
-        if (isCm !== major) continue
         const isHalf = i % 5 === 0
+        // Centimetres and half centimetres in full, single millimetres faint.
+        if (isHalf !== major) continue
         if (!isCm && !(isHalf ? halfShown : mmShown)) continue
         const tl = isCm ? CM * 0.32 : isHalf ? CM * 0.22 : CM * 0.13
         const d = e.zero + i * MM
@@ -361,6 +363,7 @@ export function drawStraightedge(
         ctx.lineTo(bu - e.n.u * tl, bv - e.n.v * tl)
       }
       ctx.lineWidth = (major ? 1.2 : 0.8) * px
+      ctx.strokeStyle = major ? look.tick : look.minorTick
       ctx.stroke()
     }
     // Numbers upright on screen, whichever way the instrument is turned.
@@ -392,16 +395,18 @@ export function drawStraightedge(
     ctx.moveTo(mu - e.n.u * CM * 0.45, mv - e.n.v * CM * 0.45)
     ctx.lineTo(mu + e.n.u * 6 * px, mv + e.n.v * 6 * px)
     ctx.lineWidth = 2 * px
-    ctx.strokeStyle = ACCENT
+    ctx.strokeStyle = look.edge
     ctx.stroke()
     ctx.beginPath()
     ctx.arc(mu, mv, 3.5 * px, 0, Math.PI * 2)
-    ctx.fillStyle = ACCENT
+    ctx.fillStyle = look.edge
     ctx.fill()
   }
 
-  // Handles (constant on-screen size): close and rotate / resize.
+  // Handles (constant on-screen size): close and rotate / resize. Always the interface blue on
+  // white: they are buttons, not part of the scale. Quiet until the pointer is on the instrument.
   const H = handles(g, px)
+  if (hot === null) ctx.globalAlpha = IDLE_HANDLES
   const handle = (q: V, on: boolean, draw: () => void): void => {
     if (on) {
       ctx.beginPath()

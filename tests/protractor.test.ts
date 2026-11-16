@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { cleanInstrumentPrefs, DEFAULT_INSTRUMENTS } from '../src/board/engine/instruments.ts'
-import { degText, hitProtractor, scaleAngle, snapDeg, toWorld, type Protractor } from '../src/board/engine/protractor.ts'
+import { degText, hitProtractor, scaleAngle, signedDeg, snapDeg, toWorld, turnText, type Protractor } from '../src/board/engine/protractor.ts'
 
 const P: Protractor = { x: 0, y: 0, r: 200, rot: 0 }
 /** World point at scale angle `deg`, distance `d` from the centre. */
@@ -56,4 +56,18 @@ test('instrument preferences: defaults for missing or bad values', () => {
   assert.deepEqual(cleanInstrumentPrefs({ protStep: 7, protColor: 'red' }), DEFAULT_INSTRUMENTS)
   assert.deepEqual(cleanInstrumentPrefs({ protStep: 15 }), { protStep: 15 })
   assert.equal(cleanInstrumentPrefs({ protStep: 0 }).protStep, 0)
+})
+
+test('turnText: a turn down reads with a minus, never past 360', () => {
+  assert.equal(turnText(20), '20°')
+  assert.equal(turnText(340), '\u221220°')
+  assert.equal(turnText(-12), '\u221212°')
+  assert.equal(turnText(0), '0°')
+  assert.equal(turnText(360), '0°')
+  assert.equal(turnText(-0.01), '0°')
+  assert.equal(turnText(180), '180°')
+  assert.equal(turnText(-180), '180°')
+  assert.equal(turnText(190), '\u2212170°')
+  assert.equal(turnText(-370.5, true), '\u221210,5°')
+  assert.equal(signedDeg(450), 90)
 })

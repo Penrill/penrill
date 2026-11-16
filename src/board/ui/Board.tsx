@@ -9,13 +9,15 @@ import {
   selectionCorners,
   selectionScreenRect,
   selectionSides,
+  selectionTurnHandle,
+  TURN_R,
   type CursorState,
   type LiveStroke
 } from '../engine/renderer'
-import { arcStroke, baseStroke, degText, hitProtractor, rayStroke, scaleAngle, snapDeg, toLocal, toWorld, type ProtractorHit, type ProtractorState } from '../engine/protractor'
+import { arcStroke, baseStroke, degText, hitProtractor, rayStroke, scaleAngle, snapDeg, toLocal, toWorld, turnText, type ProtractorHit, type ProtractorState } from '../engine/protractor'
 import { buildShapeItems, editableShape, regenerateShape } from '@inkboard/core/shapeItems'
 import { isLinear, snapAngle } from '@inkboard/core/shapes'
-import { hitTest } from '../engine/transform'
+import { canTurnSelection, hitTest } from '../engine/transform'
 import type { BBox, Item, Point, ShapeSpec, StrokeItem, TextItem } from '@inkboard/core/types'
 import { useEditor } from '../editorContext'
 import type { RecognizedShape } from '../registry'
@@ -101,6 +103,8 @@ type Gesture =
   | { kind: 'pinch'; dist: number; cx: number; cy: number }
   | { kind: 'move'; pointerId: number; startX: number; startY: number }
   | { kind: 'scale'; pointerId: number; ax: number; ay: number; cx: number; cy: number }
+  /** Turning the selection about the centre of its frame `box`; `a0` = pointer angle at the press, `r` = turn so far. */
+  | { kind: 'turn'; pointerId: number; box: BBox; cx: number; cy: number; a0: number; r: number }
 
 type End = [number, number]
 
@@ -115,6 +119,7 @@ function lineEnds(it: Item): [End, End] | null {
 type SelHit =
   | { kind: 'handle'; corner: number; box: BBox }
   | { kind: 'side'; side: number }
+  | { kind: 'turn'; box: BBox }
   | { kind: 'end'; which: 0 | 1; item: StrokeItem }
   | { kind: 'body' }
 
@@ -192,7 +197,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const rs = rul ? straightState('ruler') : null
         const hintText = cs?.hint || ps?.hint || ss?.hint || rs?.hint
         renderer.renderOverlay(live, cursorState(), editor.camera, {
-          box: info?.box ?? null,
+          // While turning, the frame is the one at the press, drawn turned (its bounds would jump about).
+          box: gesture?.kind === 'turn' ? gesture.box : (info?.box ?? null),
+          angle: gesture?.kind === 'turn' ? gesture.r : undefined,
+          turn: !!info?.turn,
           lasso: shown?.lasso ?? null,
           hover: gesture ? null : hoverBox,
           locked: info?.locked,
@@ -280,6 +288,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       locked: boolean
       line: StrokeItem | null
       shape: { spec: ShapeSpec; parts: StrokeItem[] } | null
+      /** The selection can be turned (shows the ↻ handle). */
+      turn: boolean
     } | null => {
       if (!session.getState().selectedIds.length) return null
       const items = editor.selectedItems()
@@ -288,7 +298,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const locked = items.some((i) => i.locked)
       const line = items.length === 1 && !locked && lineEnds(items[0]) ? (items[0] as StrokeItem) : null
       const es = locked || line ? null : editableShape(items)
-      return { box, locked, line, shape: es && !isLinear(es.spec.kind) ? es : null }
+      const turn = canTurnSelection(items)
+      return { box, locked, line, shape: es && !isLinear(es.spec.kind) ? es : null, turn }
     }
 
     const reach = (): number => (hover?.pointerType === 'mouse' ? 0 : 6)
@@ -304,6 +315,27 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       return null
     }
 
+    /** When the ↻ handle was last pressed: a second press soon after is a double click. */
+    let lastTurnPress = 0
+
+    /**
+     * A press on the ↻ handle of the selection framed by `box`, at screen point (sx, sy): starts
+     * turning it, or on a double click turns it back upright (then there is no gesture).
+     */
+    const pressTurn = (pointerId: number, box: BBox, sx: number, sy: number): Gesture | null => {
+      const now = performance.now()
+      if (now - lastTurnPress < 400) {
+        lastTurnPress = 0
+        editor.resetTurn()
+        return null
+      }
+      lastTurnPress = now
+      const cx = (box.minX + box.maxX) / 2
+      const cy = (box.minY + box.maxY) / 2
+      const w = screenToWorld(editor.camera, sx, sy)
+      return { kind: 'turn', pointerId, box, cx, cy, a0: Math.atan2(w.y - cy, w.x - cx), r: 0 }
+    }
+
     /** What a press at screen point (sx, sy) would grab on the current selection. */
     const selectionHit = (sx: number, sy: number): SelHit | null => {
       const info = selInfo()
@@ -315,6 +347,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const r = selectionScreenRect(info.box, editor.camera)
       const near = (pt: [number, number]): boolean =>
         Math.abs(sx - pt[0]) <= HANDLE_SIZE + reach() && Math.abs(sy - pt[1]) <= HANDLE_SIZE + reach()
+      if (info.turn) {
+        const [hx, hy] = selectionTurnHandle(r)
+        if (Math.hypot(sx - hx, sy - hy) <= TURN_R + 4 + reach()) return { kind: 'turn', box: info.box }
+      }
       if (!info.locked && !info.line) {
         const corners = selectionCorners(r)
         for (let i = 0; i < 4; i++) if (near(corners[i])) return { kind: 'handle', corner: i, box: info.box }
@@ -579,15 +615,18 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       else if (sHit === 'rotate') c = 'grab'
       else if (sHit === 'close') c = 'pointer'
       else if (gesture?.kind === 'move') c = 'move'
+      else if (gesture?.kind === 'turn') c = 'grabbing'
       else if (gesture?.kind === 'scale') c = gesture.cx > gesture.ax === gesture.cy > gesture.ay ? 'nwse-resize' : 'nesw-resize'
       else if (gesture?.kind === 'reshape') c = gesture.side % 2 === 0 ? 'ns-resize' : 'ew-resize'
       else if (tool === 'brushSelect') {
         // The circle is drawn on the overlay; over a resize handle show the usual resize cursor.
         const h = hover ? selectionHit(hover.sx, hover.sy) : null
         if (h?.kind === 'handle' && !editor.selectionLocked()) c = h.corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
+        else if (h?.kind === 'turn') c = 'grab'
       } else if (tool === 'select' || tool === 'move') {
         const h = hover ? selectionHit(hover.sx, hover.sy) : null
         if (h?.kind === 'end') c = 'crosshair'
+        else if (h?.kind === 'turn') c = 'grab'
         else if (h?.kind === 'side') c = h.side % 2 === 0 ? 'ns-resize' : 'ew-resize'
         else if (h?.kind === 'handle') c = h.corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
         else if (h?.kind === 'body') c = editor.selectionLocked() ? 'default' : 'move'
@@ -703,7 +742,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const groupId = newId()
           scene.add([{ ...stroke, groupId }, { ...label, groupId }])
         } else scene.add([stroke])
-      } else if (g.kind === 'move' || g.kind === 'scale') {
+      } else if (g.kind === 'move' || g.kind === 'scale' || g.kind === 'turn') {
         editor.commitPreview()
       } else if (g.kind === 'endpoint') {
         if (g.current !== g.original) scene.record({ added: [g.current], removed: [g.original] })
@@ -966,6 +1005,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const ys = [b.minY, b.minY, b.maxY, b.maxY]
           const o = (h.corner + 2) % 4
           gesture = { kind: 'scale', pointerId: e.pointerId, ax: xs[o], ay: ys[o], cx: xs[h.corner], cy: ys[h.corner] }
+        } else if (h?.kind === 'turn' && !locked) {
+          gesture = pressTurn(e.pointerId, h.box, p.x, p.y)
         } else if (h?.kind === 'side') {
           // Stretch a shape in one direction; it's re-generated, so line widths stay the same.
           const sel = selInfo()?.shape
@@ -1017,6 +1058,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const ys = [b.minY, b.minY, b.maxY, b.maxY]
           const o = (h.corner + 2) % 4
           gesture = { kind: 'scale', pointerId: e.pointerId, ax: xs[o], ay: ys[o], cx: xs[h.corner], cy: ys[h.corner] }
+        } else if (h?.kind === 'turn' && !editor.selectionLocked()) {
+          gesture = pressTurn(e.pointerId, h.box, p.x, p.y)
         } else {
           gesture = { kind: 'brush', pointerId: e.pointerId, tool: beginBrushSelect(toolContext, sample(e), modifiers(e)) }
         }
@@ -1145,10 +1188,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             const w = screenToWorld(editor.camera, p.x, p.y)
             const next = rotateFromHandle(s, w.x, w.y, editor.camera.zoom, e.shiftKey)
             session.setState({ [g.slot]: next })
-            let deg = Math.round((-next.rot * 180) / Math.PI) % 360
-            if (deg < 0) deg += 360
+            // Tilt up reads "20°", down "−20°" (not "340°").
+            const deg = Math.round((-next.rot * 180) / Math.PI)
             const lang = prefsStore.getState().lang
-            angleLabel = { sx: p.x, sy: p.y, text: `${deg}° · ${cmText(next.size, translate(lang, 'instruments.cm'), lang === 'uk')}` }
+            angleLabel = { sx: p.x, sy: p.y, text: `${turnText(deg, lang === 'uk')} · ${cmText(next.size, translate(lang, 'instruments.cm'), lang === 'uk')}` }
           }
         } else if (g.kind === 'move') {
           const w = screenToWorld(editor.camera, p.x, p.y)
@@ -1183,7 +1226,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             deg = Math.round((Math.atan2(-(end[1] - fixed[1]), end[0] - fixed[0]) * 180) / Math.PI)
             if (deg < 0) deg += 360
           }
-          angleLabel = { sx: p.x, sy: p.y, text: `${deg % 360}°` }
+          // Up from the fixed end reads "12°", down "−12°" (not "348°").
+          angleLabel = { sx: p.x, sy: p.y, text: turnText(deg, prefsStore.getState().lang === 'uk') }
           const next = g.which === 0 ? withEnds(g.original, end, fixed) : withEnds(g.original, fixed, end)
           scene.replace([g.current], [next], false)
           g.current = next
@@ -1211,6 +1255,18 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const len2 = vx * vx + vy * vy || 1
           const s = Math.max(0.05, ((w.x - g.ax) * vx + (w.y - g.ay) * vy) / len2)
           editor.setPreview({ s, ax: g.ax, ay: g.ay, dx: 0, dy: 0 })
+        } else if (g.kind === 'turn') {
+          const w = screenToWorld(editor.camera, p.x, p.y)
+          let r = Math.atan2(w.y - g.cy, w.x - g.cx) - g.a0
+          r = Math.atan2(Math.sin(r), Math.cos(r))
+          // Shift: 15° steps; otherwise a gentle magnet to level and to quarter turns.
+          const step = e.shiftKey ? Math.PI / 12 : Math.PI / 2
+          const snapped = Math.round(r / step) * step
+          if (e.shiftKey || Math.abs(r - snapped) < (3 * Math.PI) / 180) r = snapped
+          g.r = r
+          editor.setPreview({ s: 1, ax: g.cx, ay: g.cy, dx: 0, dy: 0, r })
+          // Up (counter-clockwise) reads "20°", down "−20°".
+          angleLabel = { sx: p.x, sy: p.y, text: turnText(-Math.round((r * 180) / Math.PI), prefsStore.getState().lang === 'uk') }
         } else {
           // Coalesced events give every sample the tablet produced (often 200+ Hz), not just one per frame.
           const samples = e.getCoalescedEvents?.() ?? []
@@ -1498,7 +1554,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     overlay.addEventListener('contextmenu', preventMenu)
     window.addEventListener('keydown', onKeyDown)
     // A hidden window gets no animation frames: redraw when it is shown again, so a change made
-    // meanwhile (the system switching to the dark theme turns the board into a chalkboard) shows up.
+    // meanwhile shows up.
     const onShown = (): void => {
       if (document.visibilityState === 'visible') invalidate(true)
     }

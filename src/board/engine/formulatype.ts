@@ -14,6 +14,7 @@ import {
   type Ctx, type MathBox, type MathMark, type Measure
 } from './mathtype'
 import type { BBox } from '@inkboard/core/types'
+import { turnedBBox } from '@inkboard/core/geometry'
 
 export interface FormulaLayout {
   box: MathBox
@@ -355,9 +356,15 @@ export function formulaBox(f: Pick<Placed, 'rows' | 'size'>): MathBox {
 }
 
 /** Position is the top-left corner of the formula, like text. */
-export function formulaBBox(f: Placed): BBox {
+/** The formula's own (unturned) box: x, y is its top-left corner. */
+export function formulaLocalBox(f: Placed): BBox {
   const b = formulaBox(f)
   return { minX: f.x, minY: f.y, maxX: f.x + Math.max(b.w, f.size * 0.3), maxY: f.y + Math.max(b.asc + b.desc, f.size * 0.6) }
+}
+
+/** Bounds on the board, a turned formula included. */
+export function formulaBBox(f: Placed & { rot?: number }): BBox {
+  return turnedBBox(formulaLocalBox(f), f.rot)
 }
 
 /** A typeset formula as a display list (@inkboard/render): glyphs and the strokes of bars and roots. */

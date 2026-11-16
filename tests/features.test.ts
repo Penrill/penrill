@@ -19,10 +19,8 @@ test('every flag has a boolean default and a description', () => {
   }
 })
 
-test('dark theme is available by default and chalkboard stays experimental', () => {
-  const d = defaultFeatures()
-  assert.equal(d.darkTheme, true)
-  assert.equal(d.chalkboard, false)
+test('dark theme is available by default', () => {
+  assert.equal(defaultFeatures().darkTheme, true)
 })
 
 test('a missing, empty or broken file gives the defaults', () => {
@@ -35,16 +33,14 @@ test('a missing, empty or broken file gives the defaults', () => {
 })
 
 test('valid overrides are applied', () => {
-  const f = parseFeaturesFile('{ "darkTheme": true }')
-  assert.equal(f.darkTheme, true)
-  assert.equal(f.chalkboard, false)
+  const f = parseFeaturesFile('{ "darkTheme": false }')
+  assert.equal(f.darkTheme, false)
 })
 
 test('unknown keys and non-boolean values are ignored', () => {
   const o = cleanOverrides({ darkTheme: 'yes', chalkboard: 1, nope: true, toString: true, __proto__: { darkTheme: true } })
   assert.deepEqual(o, {})
   const f = resolveFeatures({ chalkboard: true, darkTheme: null, somethingElse: false })
-  assert.equal(f.chalkboard, true)
   assert.equal(f.darkTheme, true)
   assert.deepEqual(Object.keys(f).sort(), [...FEATURE_IDS].sort())
 })

@@ -1,4 +1,5 @@
-import { ACCENT, ACCENT_TINT } from './accent'
+import { ACCENT } from './accent'
+import { IDLE_HANDLES, instrumentLook, rgba } from './instrumentLook'
 import type { Camera, Point } from '@inkboard/core/types'
 
 /**
@@ -59,6 +60,22 @@ export function degText(deg: number, comma = false): string {
   const r = Math.round(deg * 10) / 10
   const s = Number.isInteger(r) ? String(r) : r.toFixed(1)
   return `${comma ? s.replace('.', ',') : s}°`
+}
+
+/**
+ * A turn or a direction as people count it: up (counter-clockwise on screen) from 0° to 180°, down
+ * the same with a minus. So a tilt of 20° downwards reads "−20°", not "340°".
+ */
+export function signedDeg(deg: number): number {
+  const d = (((deg + 180) % 360) + 360) % 360 - 180
+  return d === -180 ? 180 : d
+}
+
+/** "20°" / "−20°" (with a real minus sign) for a turn; see `signedDeg`. */
+export function turnText(deg: number, comma = false): string {
+  const d = signedDeg(deg)
+  // Rounding first, so a value just under zero does not read "−0°".
+  return Math.round(d * 10) / 10 < 0 ? `\u2212${degText(-d, comma)}` : degText(Math.abs(d), comma)
 }
 
 export type ProtractorHit = 'close' | 'rotate' | 'settings' | 'arc' | 'center' | 'base' | 'body'
@@ -130,19 +147,14 @@ export interface ProtractorState {
   hoverDeg: number | null
 }
 
-/** `#rrggbb` with an alpha, as rgba(). */
-export function rgba(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1, 7), 16)
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
-}
-
 /** Draw the protractor on the overlay canvas (`ctx` has an identity transform, device pixels). */
 export function drawProtractor(
   ctx: CanvasRenderingContext2D,
   cam: Camera,
   dpr: number,
   p: Protractor,
-  state: ProtractorState = { hot: null, hoverDeg: null }
+  state: ProtractorState = { hot: null, hoverDeg: null },
+  chalk = false
 ): void {
   const s = cam.zoom * dpr
   ctx.save()
@@ -151,9 +163,10 @@ export function drawProtractor(
   ctx.rotate(p.rot)
   const px = 1 / cam.zoom // one screen pixel in world units
   const r = p.r
-  const col = ACCENT
+  const look = instrumentLook(chalk)
+  const col = look.edge
   const hot = state.hot
-  const glow = rgba(col, 0.22)
+  const glow = look.glow
   // Canvas angles: scale angle d sits at canvas angle -d (y grows downwards).
   const outline = (): void => {
     ctx.beginPath()
@@ -162,11 +175,9 @@ export function drawProtractor(
     ctx.closePath()
   }
 
-  // Body: translucent like a real plastic protractor.
+  // Body: clear plastic, lit a little while the pointer is on it.
   outline()
-  ctx.fillStyle = rgba(ACCENT_TINT, hot === 'body' ? 0.67 : 0.55)
-  ctx.fill()
-  ctx.fillStyle = rgba(col, hot === 'body' ? 0.1 : 0.05)
+  ctx.fillStyle = look.body(hot === 'body')
   ctx.fill()
   ctx.lineWidth = (hot === 'body' ? 2.5 : 1.5) * px
   ctx.strokeStyle = col
@@ -181,28 +192,21 @@ export function drawProtractor(
     ctx.stroke()
   }
 
-  // Inner window.
-  ctx.beginPath()
-  ctx.arc(0, 0, r * 0.32, Math.PI, 2 * Math.PI)
-  ctx.lineWidth = 1 * px
-  ctx.strokeStyle = rgba(col, 0.45)
-  ctx.stroke()
-
-  // Degree ticks.
-  ctx.strokeStyle = 'rgba(40, 46, 70, 0.85)'
-  // Two paths (thin and thick ticks) instead of one stroke per degree: drawn on every pointer move.
+  // Degree ticks: the single degrees faint, every 5° and 10° in full.
+  // Two paths (fine and bold ticks) instead of one stroke per degree: drawn on every pointer move.
   for (const major of [false, true]) {
     ctx.beginPath()
     for (let d = 0; d <= 180; d++) {
-      if ((d % 10 === 0) !== major) continue
+      if ((d % 5 === 0) !== major) continue
       const a = (d * Math.PI) / 180
-      const len = major ? 0.11 : d % 5 === 0 ? 0.075 : 0.04
+      const len = d % 10 === 0 ? 0.11 : d % 5 === 0 ? 0.075 : 0.04
       const cx = Math.cos(a)
       const cy = -Math.sin(a)
       ctx.moveTo(cx * r, cy * r)
       ctx.lineTo(cx * r * (1 - len), cy * r * (1 - len))
     }
     ctx.lineWidth = (major ? 1.2 : 0.8) * px
+    ctx.strokeStyle = major ? look.tick : look.minorTick
     ctx.stroke()
   }
 
@@ -210,16 +214,17 @@ export function drawProtractor(
   const font = Math.max(r * 0.05, 9 * px)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  // One pass per scale, so the font and colour are set twice instead of 38 times.
+  // One pass per scale, so the font and colour are set twice instead of 34 times.
+  // 0 and 180 are left out: at the ends of the baseline they would hang across its edge.
   const scales = [
-    { at: 0.83, size: font, color: '#23283c', text: (d: number) => `${d}` },
-    { at: 0.72, size: font * 0.8, color: rgba(col, 0.85), text: (d: number) => `${180 - d}` }
+    { at: 0.83, size: font, color: look.number, text: (d: number) => `${d}` },
+    { at: 0.72, size: font * 0.78, color: look.inner, text: (d: number) => `${180 - d}` }
   ]
   const base = ctx.getTransform()
   for (const s of scales) {
     ctx.font = `${s.size}px system-ui, sans-serif`
     ctx.fillStyle = s.color
-    for (let d = 0; d <= 180; d += 10) {
+    for (let d = 10; d <= 170; d += 10) {
       const a = (d * Math.PI) / 180
       ctx.translate(Math.cos(a) * r * s.at, -Math.sin(a) * r * s.at)
       ctx.rotate(Math.PI / 2 - a)
@@ -279,7 +284,9 @@ export function drawProtractor(
   }
 
   // Handles (constant on-screen size): close and settings on the left, rotate/resize on the right.
+  // Always the interface blue on white: they are buttons, not part of the scale.
   const H = handles(p, px)
+  if (hot === null) ctx.globalAlpha = IDLE_HANDLES
   const handle = (q: { u: number; v: number }, lit: boolean, draw: () => void): void => {
     if (lit) {
       ctx.beginPath()
@@ -289,18 +296,18 @@ export function drawProtractor(
     }
     ctx.beginPath()
     ctx.arc(q.u, q.v, (lit ? HANDLE_R + 2 : HANDLE_R) * px, 0, Math.PI * 2)
-    ctx.fillStyle = lit ? rgba(col, 0.14) : '#fff'
+    ctx.fillStyle = lit ? rgba(ACCENT, 0.14) : '#fff'
     ctx.fill()
     if (lit) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
       ctx.fill()
     }
     ctx.lineWidth = 1.5 * px
-    ctx.strokeStyle = col
+    ctx.strokeStyle = ACCENT
     ctx.stroke()
     ctx.save()
     ctx.translate(q.u, q.v)
-    ctx.strokeStyle = col
+    ctx.strokeStyle = ACCENT
     ctx.lineWidth = 1.8 * px
     ctx.lineCap = 'round'
     draw()
@@ -315,7 +322,7 @@ export function drawProtractor(
     ctx.lineTo(-k, k)
     ctx.stroke()
   })
-  handle(H.settings, hot === 'settings', () => drawGear(ctx, px, col))
+  handle(H.settings, hot === 'settings', () => drawGear(ctx, px, ACCENT))
   handle(H.rotate, hot === 'rotate', () => {
     const k = 6 * px
     ctx.beginPath()

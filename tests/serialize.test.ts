@@ -12,8 +12,8 @@ const plane = {
   kind: 'plane' as const, xMin: -10, xMax: 10, yMin: -10, yMax: 10, unit: 24, labelStep: 1, grid: false
 }
 
-test('the format version is 9; a board is stamped with the lowest version that can show it', () => {
-  assert.equal(FORMAT_VERSION, 9)
+test('the format version is 10; a board is stamped with the lowest version that can show it', () => {
+  assert.equal(FORMAT_VERSION, 10)
   // Nothing from version 7 on the board: apps that only know version 6 can still open it.
   const f = serializeBoard({ items: [{ ...plane, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
   assert.equal(f.version, 6)
@@ -171,4 +171,23 @@ test('school paper patterns need version 9 and read back, on paper and on the ch
     assert.equal(deserializeBoard(f).background, bg)
   }
   assert.equal(serializeBoard({ items: [], background: 'grid', camera: cam }).version, 6)
+})
+
+test('turned images, texts and formulas need version 10 and keep their turn', () => {
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const img = { type: 'image' as const, id: 'i1', z: 1, src: 'data:image/png;base64,AA', x: 0, y: 0, w: 100, h: 50, rot: Math.PI / 2, bbox: { minX: 25, minY: -25, maxX: 75, maxY: 75 } }
+  const text = { type: 'text' as const, id: 't1', z: 2, x: 0, y: 200, text: 'Hi', size: 20, color: '#1e1e1e', rot: -0.3, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }
+  const f = serializeBoard({ items: [img, text], background: 'dots', camera: cam })
+  assert.equal(f.version, 10)
+  // Text is laid out with a canvas when read, so only the image is read back here.
+  assert.equal((f.items[1] as { rot?: number }).rot, -0.3)
+  const back = deserializeBoard({ ...f, items: [f.items[0]] }).items
+  assert.equal(back[0].type === 'image' && back[0].rot, Math.PI / 2)
+  // A quarter turn swaps the bounds' width and height around the same centre.
+  const b = back[0].bbox
+  assert.ok(Math.abs(b.minX - 25) < 1e-9 && Math.abs(b.maxX - 75) < 1e-9 && Math.abs(b.minY + 25) < 1e-9 && Math.abs(b.maxY - 75) < 1e-9)
+  // Not turned: no `rot` written, and the board stays readable by older versions.
+  const plain = serializeBoard({ items: [{ ...img, rot: undefined, bbox: { minX: 0, minY: 0, maxX: 100, maxY: 50 } }], background: 'dots', camera: cam })
+  assert.equal(plain.version, 6)
+  assert.equal('rot' in plain.items[0], false)
 })
