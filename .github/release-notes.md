@@ -2,7 +2,12 @@
 
 ![Inkboard](https://raw.githubusercontent.com/yaroslavyushchenko/inkboard/main/docs/images/hero.png)
 
-## What's new in 0.11.0
+## What's new in 0.11.1
+
+- **Sharp PDF exports:** the dots, grid and lines of the paper are now real vector shapes in the PDF.
+  They stay crisp at any zoom instead of looking soft, and dots no longer smear into dashes.
+
+## Also in 0.11.0
 
 - **Turn anything:** select ink, shapes, pictures, text or formulas and drag the ↻ handle on the right
   of the frame. Hold Shift for 15° steps. Double-click the handle to turn it back upright.

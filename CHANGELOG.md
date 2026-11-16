@@ -3,6 +3,13 @@
 All notable changes to Inkboard. Downloads for every version are on the
 [Releases page](https://github.com/yaroslavyushchenko/inkboard/releases).
 
+## [0.11.1] (2026-11-16)
+
+### Fixed
+- PDF export: the paper pattern (dots, grid, lines, school rows) was printed as a small blurry picture
+  repeated over the page, so it looked soft and dots smeared into dashes when zoomed in. It is now
+  drawn as vector shapes.
+
 ## [0.11.0] (2026-11-16)
 
 ### Added
