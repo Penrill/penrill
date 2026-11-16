@@ -109,7 +109,7 @@ export function AboutSection() {
   return (
     <>
       <div className="popover-title section">{t('settings.about')}</div>
-      <div className="about-row">
+      <div className="settings-group about-row">
         <span className="about-version">Inkboard {version}</span>
         {s.status !== 'store' && s.status !== 'web' && (
         <button className="text-btn outline" disabled={s.status === 'checking' || s.status === 'downloading'} onClick={() => void platform.update.check()}>

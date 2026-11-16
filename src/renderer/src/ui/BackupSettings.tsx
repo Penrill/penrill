@@ -10,7 +10,7 @@ export function BackupSettings() {
   return (
     <>
       <div className="popover-title section">{t('settings.backup')}</div>
-      <div className="backup-row">
+      <div className="settings-group backup-row">
         <span className="backup-path" title={backupDir ?? undefined}>
           {backupDir ?? t('settings.backupOff')}
         </span>

@@ -25,9 +25,9 @@ export function PenSettings() {
   return (
     <>
       <div className="popover-title section">{t('pen.title')}</div>
-      <div className="pen-buttons">
+      <div className="settings-group pen-buttons">
         {BUTTONS.map((b) => (
-          <label key={b.key} className="pen-row">
+          <label key={b.key} className="settings-row pen-row">
             <span>{t(b.label)}</span>
             <select value={penButtons[b.key]} onChange={(e) => setPenButton(b.key, e.target.value as PenAction)}>
               {ACTIONS.map((a) => (

@@ -15,39 +15,39 @@ export function BoardSettings() {
   return (
     <>
       <div className="popover-title section">{t('settings.board')}</div>
-      <div className="settings-label">{t('settings.wheel')}</div>
-      <div className="lang-options">
-        {(['scroll', 'zoom'] as WheelMode[]).map((m) => (
-          <button key={m} className={`lang-option ${wheel === m ? 'active' : ''}`} onClick={() => prefsStore.setState({ wheelMode: m })}>
-            {t(m === 'scroll' ? 'settings.wheelScroll' : 'settings.wheelZoom')}
-          </button>
-        ))}
-      </div>
-      {canSnap && (
-      <div className="feature-list">
-        <label className="feature-row">
-          <input type="checkbox" checked={snap} onChange={(e) => prefsStore.setState({ shapeSnap: e.target.checked })} />
-          <span>
-            <span className="feature-name">{t('settings.shapeSnap')}</span>
-          </span>
-        </label>
-      </div>
-      )}
-      {canSnap && snap && (
-        <div className="line-row size-row">
-          <span className="line-label">{t('settings.shapeSnapDelay')}</span>
-          <input
-            type="range"
-            min={SNAP_DELAY.min}
-            max={SNAP_DELAY.max}
-            step={100}
-            value={delay}
-            aria-label={t('settings.shapeSnapDelay')}
-            onChange={(e) => prefsStore.setState({ shapeSnapDelay: Number(e.target.value) })}
-          />
-          <span className="size-value">{t('settings.seconds', { n: lang === 'uk' ? seconds.replace('.', ',') : seconds })}</span>
+      <div className="settings-group">
+        <div className="settings-row">
+          <span>{t('settings.wheel')}</span>
+          <div className="lang-options">
+            {(['scroll', 'zoom'] as WheelMode[]).map((m) => (
+              <button key={m} className={`lang-option ${wheel === m ? 'active' : ''}`} onClick={() => prefsStore.setState({ wheelMode: m })}>
+                {t(m === 'scroll' ? 'settings.wheelScroll' : 'settings.wheelZoom')}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
+        {canSnap && (
+          <label className="settings-row">
+            <span>{t('settings.shapeSnap')}</span>
+            <input type="checkbox" role="switch" className="switch-input" checked={snap} onChange={(e) => prefsStore.setState({ shapeSnap: e.target.checked })} />
+          </label>
+        )}
+        {canSnap && snap && (
+          <div className="settings-row size-row">
+            <span className="line-label">{t('settings.shapeSnapDelay')}</span>
+            <input
+              type="range"
+              min={SNAP_DELAY.min}
+              max={SNAP_DELAY.max}
+              step={100}
+              value={delay}
+              aria-label={t('settings.shapeSnapDelay')}
+              onChange={(e) => prefsStore.setState({ shapeSnapDelay: Number(e.target.value) })}
+            />
+            <span className="size-value">{t('settings.seconds', { n: lang === 'uk' ? seconds.replace('.', ',') : seconds })}</span>
+          </div>
+        )}
+      </div>
     </>
   )
 }

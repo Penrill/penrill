@@ -34,13 +34,11 @@ export function ExperimentalSettings() {
   return (
     <>
       <div className="popover-title section">{t('settings.experimental')}</div>
-      <div className="feature-list">
+      <div className="settings-group">
         {FEATURE_IDS.map((id) => (
-          <label key={id} className="feature-row">
-            <input type="checkbox" checked={flags[id]} onChange={(e) => void setFlag(id, e.target.checked)} />
-            <span>
-              <span className="feature-name">{t(`feature.${id}` as MessageKey)}</span>
-            </span>
+          <label key={id} className="settings-row">
+            <span>{t(`feature.${id}` as MessageKey)}</span>
+            <input type="checkbox" role="switch" className="switch-input" checked={flags[id]} onChange={(e) => void setFlag(id, e.target.checked)} />
           </label>
         ))}
       </div>
