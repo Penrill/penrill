@@ -3,6 +3,30 @@
 All notable changes to Inkboard. Downloads for every version are on the
 [Releases page](https://github.com/yaroslavyushchenko/inkboard/releases).
 
+## [0.11.0] (2026-11-16)
+
+### Added
+- Turn any selection with the ↻ handle right of its frame (Shift: 15° steps); double-click the handle
+  to turn it back upright. Coordinate planes, locked items and a lone straight line have no handle.
+- Board files version 10: images, text and formulas keep their turn (`rot`); boards without them keep
+  the lowest version that shows them.
+
+### Changed
+- Paper or chalkboard is chosen on its own, independent of the interface theme; the Chalkboard
+  experimental flag is gone. The surface choice shows picture tiles.
+- Background picker: blank, dots, grid and lines shown; math grid, handwriting and slanted rows under More.
+- Ruler, set squares, protractor and compass share one look: see-through bodies, faint single units,
+  buttons dimmed until the pointer is on the instrument, chalk colours on the chalkboard, clearer tips.
+  The protractor opens a little smaller and has no 0 and 180 labels at the ends of its baseline.
+- Turn angles (ruler and set square turning, line end editing) read signed, up to ±180°.
+- PNG and PDF exports are always on white paper.
+- Interface: settings popover with sections, segmented controls and switches; one button family and one
+  hover and selected look everywhere; Tailwind colour tokens and better dark theme contrast; one blue
+  for the interface and the board.
+
+### Fixed
+- In the web version, labels, icons and thumbnails could be selected or dragged out.
+
 ## [0.10.1] (2026-11-14)
 
 ### Changed

@@ -2,7 +2,26 @@
 
 ![Inkboard](https://raw.githubusercontent.com/yaroslavyushchenko/inkboard/main/docs/images/hero.png)
 
-## What's new in 0.10.1
+## What's new in 0.11.0
+
+- **Turn anything:** select ink, shapes, pictures, text or formulas and drag the ↻ handle on the right
+  of the frame. Hold Shift for 15° steps. Double-click the handle to turn it back upright.
+- **Board colour on its own:** pick white paper or the green chalkboard in Background, whatever the
+  interface theme. The chalkboard no longer needs the experimental switch.
+- **Tidier Background picker:** blank, dots, grid and lines up front; math grid, handwriting and
+  slanted rows under **More**.
+- **Calmer drawing instruments:** the ruler, set squares, protractor and compass are see-through, with
+  fainter single millimetres and degrees. Their buttons stay dim until you point at the instrument.
+  On the chalkboard they use chalk colours.
+- Angles read the way people count them: a turn down shows as −20°, not 340°.
+- PNG and PDF exports are always on white paper, even from the chalkboard.
+- **Refreshed interface:** settings in clear sections with switches, one consistent look for buttons and
+  selected items, and a dark theme with better contrast.
+
+Boards with turned pictures, text or formulas are saved as format version 10 and need Inkboard 0.11.0
+or newer. Other boards still open in older versions.
+
+## Also in 0.10.1
 
 - The ruler, set squares, protractor and compass share one dropdown on the toolbar, with their keys shown.
 - Toolbar buttons show the key that picks the tool.
