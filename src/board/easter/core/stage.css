@@ -1,26 +1,13 @@
-/* The stage every show plays on (stage.tsx). `--life` is the egg's length. */
-
-.egg {
+/* The canvas every show plays on (Stage.tsx). */
+.egg-stage {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
   cursor: pointer;
-  font-family: system-ui, sans-serif;
-  animation: egg-life var(--life) ease forwards;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
-.egg-pass {
+.egg-stage.egg-pass {
   pointer-events: none;
-}
-
-@keyframes egg-life {
-  0%, 92% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-@keyframes egg-fade-in {
-  from { opacity: 0; }
 }

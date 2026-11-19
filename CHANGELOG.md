@@ -3,6 +3,12 @@
 All notable changes to Inkboard. Downloads for every version are on the
 [Releases page](https://github.com/yaroslavyushchenko/inkboard/releases).
 
+## 0.12.1
+
+- Easter egg shows redrawn as vector art on a canvas, with light, particles and physics.
+- New easter eggs set off by drawing: a round freehand circle, seven ink colours, 500 strokes, a big wipe.
+- Easter eggs rebuilt as one pattern: a medal, any number of trigger strategies and a show.
+
 ## 0.12.0
 
 - Opt-in achievements with medals on the All boards screen.

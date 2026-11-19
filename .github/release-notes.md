@@ -2,7 +2,12 @@
 
 ![Inkboard](https://raw.githubusercontent.com/yaroslavyushchenko/inkboard/main/docs/images/hero.png)
 
-## What's new in 0.12.0: Achievements and easter eggs
+## What's new in 0.12.1: Easter eggs, redrawn
+
+- **Every easter egg redrawn.** The shows are now painted as vector art with light, glow and real physics (coins, confetti, sparks, rain), instead of emoji and simple animations.
+- **More ways to find them.** Besides formula answers and typed words, eggs now hide in drawing too: a freehand circle that comes out round, seven ink colours on one board, a board's 500th stroke, wiping a lot off at once.
+
+## Also in 0.12.0: Achievements and easter eggs
 
 - **Achievements, if you want them.** A grey medal on the All boards screen (or a switch at the bottom of the settings) turns on collecting achievements. Nothing plays until you do.
 - **Hidden easter eggs.** Special formula answers, old game cheat codes typed on a board, zooming to the very edge, working at 3 a.m. and more. Each plays once and leaves a medal on the All boards screen.

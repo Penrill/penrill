@@ -3,7 +3,7 @@ import { Popover } from '../../ui/Popover'
 import { EGGS } from '../eggs'
 import { pick, useUk } from '../core/lang'
 import { setAchievementsOn, useAchievements } from '../core/store'
-import type { Egg } from '../core/types'
+import type { Egg } from '../core/egg'
 import './medals.css'
 
 /** A medal: a ribbon and a disc with the egg's icon, or a grey one with `mark` while locked. */

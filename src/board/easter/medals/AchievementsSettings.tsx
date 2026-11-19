@@ -1,6 +1,6 @@
 import { EGGS } from '../eggs'
 import { pick, useUk } from '../core/lang'
-import { play } from '../core/stage'
+import { play } from '../core/play'
 import { setAchievementsOn, setRepeat, setRepeatMany, toggleRepeatMenu, useAchievements } from '../core/store'
 
 /**

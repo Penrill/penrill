@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { EGGS } from '../eggs'
 import { pick, useUk } from '../core/lang'
 import { onUnlockToast } from '../core/store'
-import type { Egg } from '../core/types'
+import type { Egg } from '../core/egg'
 import { Medal } from './Medals'
 
 /** "Achievement unlocked!": slides in for a few seconds; a click sends it away. */

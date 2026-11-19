@@ -1,5 +1,5 @@
 import { usePrefs } from '../../store'
-import type { Text } from './types'
+import type { Text } from './egg'
 
 export function useUk(): boolean {
   return usePrefs((s) => s.lang) === 'uk'
