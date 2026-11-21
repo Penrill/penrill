@@ -26,7 +26,8 @@ npm run typecheck && npm test && npm run build   # run before every commit
   enforces. The main process (`src/main`) handles the
   board library, files and updates.
 - The landing page lives in `site/`. `npm run build:site` builds it into `dist/site` and
-  prerenders one static HTML page per language, so search engines see the whole text.
+  prerenders one static HTML page per language, so search engines see the whole text. It is built
+  from Tailwind's Oatmeal template: see `site/src/components/README.md` before adding a section.
 - The logo is drawn in `scripts/icons/logo.mjs`, with its colours in `PALETTES`. `npm run icons`
   regenerates `build/icon.svg`, the app, site and web icons and the social preview
   (`npm run icons -- --palette blue` for another palette). Commit the generated files.
