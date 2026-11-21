@@ -22,7 +22,6 @@ const SAVE_DELAY_MS = 5000
 const HOME_TITLES: Record<HomeTab, MessageKey> = {
   boards: 'home.title',
   templates: 'tpl.title',
-  shared: 'share.library',
   deleted: 'home.recentlyDeleted',
   sync: 'home.sync'
 }
@@ -110,10 +109,7 @@ class BoardLibrary {
     const bytes = await encodeBoard({ items, background: bg, camera: this.editor.camera })
     const thumb = await renderThumbnail(items, bg, this.editor.features)
     const entry = await platform.library.replaceTemplate(id, bytes, thumb)
-    // Drop the cached preview so the new one is shown.
-    const old = this.templateUrls.get(id)
-    if (old) URL.revokeObjectURL(old)
-    this.templateUrls.delete(id)
+    this.forgetTemplateThumb(id)
     await this.refreshLibrary()
     return !!entry
   }
@@ -131,6 +127,13 @@ class BoardLibrary {
   async deleteTemplate(id: string): Promise<void> {
     await platform.library.deleteTemplate(id)
     await this.refreshLibrary()
+  }
+
+  /** Drops the cached preview of a template whose content changed, so the new one is shown. */
+  forgetTemplateThumb(id: string): void {
+    const old = this.templateUrls.get(id)
+    if (old) URL.revokeObjectURL(old)
+    this.templateUrls.delete(id)
   }
 
   private templateUrls = new Map<string, string | null>()

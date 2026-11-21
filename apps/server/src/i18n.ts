@@ -1,0 +1,503 @@
+import { create } from 'zustand'
+
+const en = {
+  'app.product': 'Penrill Server',
+  'app.loading': 'Loading…',
+  'app.offline': 'The server cannot be reached. Check that it is running, then try again.',
+  'app.retry': 'Try again',
+  'app.failed': 'That did not work. Reload the page and try again.',
+  'app.copy': 'Copy',
+  'app.copied': 'Copied',
+  'app.save': 'Save',
+  'app.cancel': 'Cancel',
+  'app.saved': 'Saved.',
+  'app.never': 'Never',
+  'app.language': 'Українською',
+  'app.menu': 'Menu',
+
+  'nav.home': 'Home',
+  'nav.devices': 'Your devices',
+  'nav.manage': 'Manage',
+  'nav.people': 'People',
+  'nav.templates': 'Templates',
+  'nav.allDevices': 'Devices',
+  'nav.server': 'Server',
+  'nav.signOut': 'Sign out',
+
+  'role.owner': 'Owner',
+  'role.admin': 'Admin',
+  'role.member': 'Member',
+
+  'field.username': 'Username',
+  'field.password': 'Password',
+  'field.newPassword': 'New password',
+  'field.passwordHint': 'At least 10 characters.',
+  'field.usernameHint': 'Lowercase letters, digits, - and _.',
+
+  'error.wrong': 'Wrong username or password.',
+  'error.taken': 'That username is taken.',
+  'error.expired': 'This link has expired or was already used.',
+  'error.invalid': 'Use 3 to 32 lowercase letters, digits, - or _ for the username, and at least 10 characters for the password.',
+  'error.email': 'Enter an email address, such as you@example.com.',
+  'error.serverName': 'Use 1 to 64 characters for the name.',
+  'error.password': 'The current password is wrong, or the new one is shorter than 10 characters.',
+  'error.shortPassword': 'Use at least 10 characters.',
+  'error.owner': 'The owner’s role cannot change, and the owner cannot be disabled.',
+  'error.429': 'Too many tries. Wait a minute and try again.',
+
+  'login.title': 'Sign in',
+  'login.intro': 'Use your account on this server.',
+  'login.submit': 'Sign in',
+  'login.help': 'No account? Ask whoever runs this server for an invite link. Forgot your password? They can send you a reset link.',
+
+  'setup.title': 'Set up your server',
+  'setup.needLink': 'Open this page through the setup link from your server. Only someone with that link can become the owner, so nobody else on your network can take the server over.',
+  'setup.run': 'On the server, run:',
+  'setup.runHint': 'It prints a link and a QR code. Open the link in this browser, or scan the code with your phone.',
+  'setup.installed': 'Just installed the package? The same link was printed at the end of the installation.',
+  'setup.expired': 'That setup link has expired or was already used. Get a new one below.',
+  'setup.intro': 'Create the owner account. Others join later through invite links you create.',
+  'setup.serverName': 'Server name',
+  'setup.serverNameHint': 'Shown in Penrill when people connect, for example “Lyceum 7”.',
+  'setup.username': 'Your username',
+  'setup.email': 'Email',
+  'setup.emailHint': 'Only for notices about this server, such as updates and security fixes. You sign in with your username, not your email.',
+  'setup.submit': 'Create owner account',
+  'setup.done': 'Your server is ready. Connect Penrill to it below.',
+
+  'invite.title': 'Join this server',
+  'invite.intro': 'Create your account. Then connect Penrill and your boards sync here.',
+  'invite.usernameHint': 'Lowercase letters, digits, - and _. Others see it when you share.',
+  'invite.submit': 'Create account',
+  'invite.badTitle': 'This invite does not work',
+  'invite.bad': 'It has expired or was already used. Ask for a new one.',
+  'invite.welcome': 'Welcome, {name}. Connect Penrill to this server below.',
+
+  'reset.title': 'New password for {name}',
+  'reset.intro': 'Devices connected before will need to be connected again.',
+  'reset.submit': 'Set password',
+  'reset.badTitle': 'This link does not work',
+  'reset.done': 'Password changed. Sign in with the new one; your devices need to be connected again.',
+
+  'link.title': 'Connect a device',
+  'link.intro': 'Enter the code Penrill shows.',
+  'link.code': 'Code',
+  'link.continue': 'Continue',
+  'link.missing': 'No device is waiting with this code. It may have expired; start again in Penrill.',
+  'link.ask': 'Connect {device}?',
+  'link.askText': 'It will sync boards with your account {user}. Check that Penrill shows the same code:',
+  'link.app': 'App',
+  'link.from': 'From',
+  'link.asked': 'Asked',
+  'link.allow': 'Allow',
+  'link.deny': 'Deny',
+  'link.notYou': 'Did not start this in Penrill yourself? Deny it.',
+  'link.doneTitle': 'Done',
+  'link.allowed': '{device} is connected. You can close this page and go back to Penrill.',
+  'link.denied': '{device} was not connected.',
+  'link.home': 'Go to the server’s home page',
+
+  'home.welcome': 'Welcome, {name}',
+  'home.intro': 'This server keeps Penrill boards in sync across devices and lets people share boards and templates with each other. Everything stays on this machine.',
+  'home.people': 'People',
+  'home.devices': 'Devices',
+  'home.boards': 'Boards',
+  'home.templates': 'Shared templates',
+  'home.start': 'Get started',
+  'home.done': 'Done',
+  'home.connectTitle': 'Connect Penrill',
+  'home.connectText': 'In Penrill, open Sync › Your server and enter this address. Penrill then asks you to allow it here, in this browser.',
+  'home.address': 'Server address',
+  'home.pin': 'This server uses its own certificate. Penrill shows its fingerprint when you connect: it should start with {pin}.',
+  'home.scan': 'On a tablet or phone, scan the code. Or connect with a link, which opens Penrill already pointed here.',
+  'home.connectLink': 'Connect with a link',
+  'home.connected': '{n} connected',
+  'home.inviteTitle': 'Invite people',
+  'home.inviteText': 'Nobody can sign up on their own. Create an invite link for one person, or one link for a whole class or team, and send it to them.',
+  'home.shareTitle': 'Share boards and templates',
+  'home.shareText': 'In Penrill, open a template’s menu and choose Share…: everyone on this server, or one folder such as a class, can add it. It stays one template, so when its author changes it, everyone gets the change.',
+
+  'devices.title': 'Your devices',
+  'devices.intro': 'Devices where Penrill syncs with your account {name}. Disconnect one you no longer use or lost: it stops syncing at once.',
+  'devices.empty': 'No devices yet',
+  'devices.emptyHint': 'Connect Penrill from the home page.',
+  'devices.device': 'Device',
+  'devices.person': 'Person',
+  'devices.connected': 'Connected',
+  'devices.lastUsed': 'Last used',
+  'devices.disconnect': 'Disconnect',
+  'devices.confirm': 'Disconnect {device}? It stops syncing at once.',
+  'devices.disconnected': 'Device disconnected.',
+  'devices.passwordTitle': 'Password',
+  'devices.passwordText': 'Used to sign in on this page and to allow new devices. Penrill itself never asks for it.',
+  'devices.current': 'Current password',
+  'devices.change': 'Change password',
+  'devices.changed': 'Password changed.',
+  'devices.count': '{n} devices',
+  'devices.countOne': '1 device',
+
+  'people.title': 'People',
+  'people.intro': 'Who can use this server. Nobody can sign up on their own: send an invite link. Members sync and share boards and templates; admins also manage this server.',
+  'people.invite': 'Invite people',
+  'people.for': 'For',
+  'people.one': 'One person',
+  'people.five': 'Up to 5 people',
+  'people.class': 'Up to 30 people (a class)',
+  'people.hundred': 'Up to 100 people',
+  'people.as': 'As',
+  'people.days': 'Link works for',
+  'people.day1': '1 day',
+  'people.day7': '7 days',
+  'people.day30': '30 days',
+  'people.create': 'Create invite link',
+  'people.inviteLink': 'Invite link. Send it to the person who should join:',
+  'people.resetLink': 'Password reset link for {name}, valid for one hour:',
+  'people.linkHint': 'Shown only now. Anyone with the link can use it, so send it directly to the people it is for.',
+  'people.open': 'Open invite links',
+  'people.placesLeft': 'Places left',
+  'people.until': 'Works until',
+  'people.createdBy': 'Created by',
+  'people.noLimit': 'No limit',
+  'people.delete': 'Delete',
+  'people.deleted': 'Invite deleted.',
+  'people.accounts': 'Accounts',
+  'people.name': 'Name',
+  'people.role': 'Role',
+  'people.roleOf': 'Role of {name}',
+  'people.disabled': 'Disabled',
+  'people.reset': 'Reset password',
+  'people.disable': 'Disable',
+  'people.enable': 'Enable',
+  'people.isRole': '{name} is now {role}.',
+  'people.wasDisabled': '{name} is disabled and signed out everywhere.',
+  'people.wasEnabled': '{name} can sign in again.',
+  'people.confirmDisable': 'Disable {name}? They are signed out everywhere and cannot sign in until you enable them again.',
+
+  'templates.title': 'Shared templates',
+  'templates.intro': 'Templates people share here, with everyone or with one folder such as a class. Each one stays a single template: when its author changes it in Penrill, everyone who added it gets the change. Others can duplicate it to make their own version.',
+  'templates.empty': 'No shared templates yet',
+  'templates.emptyHint': 'In Penrill, open a template’s menu on the Templates page and choose Share…',
+  'templates.template': 'Template',
+  'templates.author': 'Author',
+  'templates.sharedWith': 'Shared with',
+  'templates.everyone': 'Everyone',
+  'templates.changed': 'Changed',
+  'templates.stop': 'Stop sharing',
+  'templates.confirm': 'Stop sharing “{name}”? People who added it keep their last version.',
+  'templates.stopped': '“{name}” is no longer shared.',
+
+  'allDevices.intro': 'Every device connected to this server. Disconnecting one stops it syncing at once; its owner can connect it again by signing in.',
+  'allDevices.empty': 'No devices are connected yet.',
+
+  'server.intro': 'This server and its data.',
+  'server.address': 'Address',
+  'server.reachable': 'Reachable',
+  'server.lan': 'From this network',
+  'server.local': 'From this machine only',
+  'server.certificate': 'Certificate',
+  'server.certificateText': 'Its own, fingerprint {pin}',
+  'server.version': 'Version',
+  'server.orphans': '{n} without an owner',
+  'server.nameTitle': 'Name',
+  'server.nameText': 'Shown in Penrill when people connect, and at the top of these pages.',
+  'server.renamed': 'Renamed.',
+  'server.emailTitle': 'Contact email',
+  'server.emailText': 'Where notices about this server go, such as updates and security fixes. Nobody signs in with it.',
+  'server.emailSaved': 'Email saved.',
+  'server.backupTitle': 'Backup',
+  'server.backupText': 'One archive with every board, image, template and account. Keep it somewhere other than this server.',
+  'server.backup': 'Download backup',
+
+  'boards.title': 'Boards without an owner',
+  'boards.intro': 'Boards from server versions before accounts. Give each one to someone, and it shows up in their Penrill.',
+  'boards.none': 'Every board has an owner.',
+  'boards.board': 'Board',
+  'boards.lastChange': 'Last change',
+  'boards.giveTo': 'Give to',
+  'boards.ownerOf': 'New owner of {name}',
+  'boards.give': 'Give',
+  'boards.given': 'The board now belongs to {name}.',
+
+  'notFound.title': 'Nothing here',
+  'notFound.text': 'This page does not exist on this server.'
+}
+
+export type MessageKey = keyof typeof en
+
+const uk: Record<MessageKey, string> = {
+  'app.product': 'Penrill Server',
+  'app.loading': 'Завантаження…',
+  'app.offline': 'Сервер недоступний. Перевірте, що він працює, і спробуйте ще раз.',
+  'app.retry': 'Спробувати ще раз',
+  'app.failed': 'Не вдалося. Перезавантажте сторінку й спробуйте ще раз.',
+  'app.copy': 'Копіювати',
+  'app.copied': 'Скопійовано',
+  'app.save': 'Зберегти',
+  'app.cancel': 'Скасувати',
+  'app.saved': 'Збережено.',
+  'app.never': 'Ніколи',
+  'app.language': 'In English',
+  'app.menu': 'Меню',
+
+  'nav.home': 'Головна',
+  'nav.devices': 'Ваші пристрої',
+  'nav.manage': 'Керування',
+  'nav.people': 'Люди',
+  'nav.templates': 'Шаблони',
+  'nav.allDevices': 'Пристрої',
+  'nav.server': 'Сервер',
+  'nav.signOut': 'Вийти',
+
+  'role.owner': 'Власник',
+  'role.admin': 'Адміністратор',
+  'role.member': 'Учасник',
+
+  'field.username': 'Ім’я користувача',
+  'field.password': 'Пароль',
+  'field.newPassword': 'Новий пароль',
+  'field.passwordHint': 'Щонайменше 10 символів.',
+  'field.usernameHint': 'Малі латинські літери, цифри, - та _.',
+
+  'error.wrong': 'Неправильне ім’я користувача або пароль.',
+  'error.taken': 'Це ім’я користувача вже зайняте.',
+  'error.expired': 'Термін дії посилання минув, або ним уже скористалися.',
+  'error.invalid': 'Ім’я користувача: від 3 до 32 малих латинських літер, цифр, - або _. Пароль: щонайменше 10 символів.',
+  'error.email': 'Введіть адресу електронної пошти, наприклад you@example.com.',
+  'error.serverName': 'Назва має містити від 1 до 64 символів.',
+  'error.password': 'Поточний пароль неправильний, або новий коротший за 10 символів.',
+  'error.shortPassword': 'Щонайменше 10 символів.',
+  'error.owner': 'Роль власника не змінюється, і власника не можна вимкнути.',
+  'error.429': 'Забагато спроб. Зачекайте хвилину й спробуйте знову.',
+
+  'login.title': 'Вхід',
+  'login.intro': 'Використайте свій обліковий запис на цьому сервері.',
+  'login.submit': 'Увійти',
+  'login.help': 'Немає облікового запису? Попросіть запрошення в того, хто керує цим сервером. Забули пароль? Вам можуть надіслати посилання для скидання.',
+
+  'setup.title': 'Налаштування сервера',
+  'setup.needLink': 'Відкрийте цю сторінку за посиланням налаштування з вашого сервера. Власником може стати лише той, хто має це посилання, тож ніхто інший у вашій мережі не захопить сервер.',
+  'setup.run': 'На сервері виконайте:',
+  'setup.runHint': 'Команда виведе посилання і QR-код. Відкрийте посилання в цьому браузері або відскануйте код телефоном.',
+  'setup.installed': 'Щойно встановили пакет? Те саме посилання було виведено наприкінці встановлення.',
+  'setup.expired': 'Термін дії посилання налаштування минув, або ним уже скористалися. Отримайте нове нижче.',
+  'setup.intro': 'Створіть обліковий запис власника. Інші приєднаються пізніше за запрошеннями, які ви створите.',
+  'setup.serverName': 'Назва сервера',
+  'setup.serverNameHint': 'Її видно в Penrill під час підключення, наприклад «Ліцей 7».',
+  'setup.username': 'Ваше ім’я користувача',
+  'setup.email': 'Електронна пошта',
+  'setup.emailHint': 'Лише для повідомлень про цей сервер, як-от оновлення та виправлення безпеки. Ви входите за іменем користувача, а не за поштою.',
+  'setup.submit': 'Створити власника',
+  'setup.done': 'Сервер готовий. Підключіть до нього Penrill нижче.',
+
+  'invite.title': 'Приєднатися до сервера',
+  'invite.intro': 'Створіть обліковий запис. Потім підключіть Penrill, і ваші дошки синхронізуватимуться тут.',
+  'invite.usernameHint': 'Малі латинські літери, цифри, - та _. Його бачать інші, коли ви ділитеся.',
+  'invite.submit': 'Створити обліковий запис',
+  'invite.badTitle': 'Це запрошення не працює',
+  'invite.bad': 'Термін дії минув, або ним уже скористалися. Попросіть нове.',
+  'invite.welcome': 'Вітаємо, {name}. Підключіть Penrill до цього сервера нижче.',
+
+  'reset.title': 'Новий пароль для {name}',
+  'reset.intro': 'Пристрої, підключені раніше, потрібно буде підключити знову.',
+  'reset.submit': 'Встановити пароль',
+  'reset.badTitle': 'Це посилання не працює',
+  'reset.done': 'Пароль змінено. Увійдіть з новим; пристрої потрібно підключити знову.',
+
+  'link.title': 'Підключити пристрій',
+  'link.intro': 'Введіть код, який показує Penrill.',
+  'link.code': 'Код',
+  'link.continue': 'Далі',
+  'link.missing': 'Жоден пристрій не чекає з цим кодом. Можливо, час минув; почніть знову в Penrill.',
+  'link.ask': 'Підключити {device}?',
+  'link.askText': 'Пристрій синхронізуватиме дошки з вашим обліковим записом {user}. Перевірте, що Penrill показує той самий код:',
+  'link.app': 'Застосунок',
+  'link.from': 'Звідки',
+  'link.asked': 'Запит',
+  'link.allow': 'Дозволити',
+  'link.deny': 'Відхилити',
+  'link.notYou': 'Ви не починали це в Penrill самі? Відхиліть.',
+  'link.doneTitle': 'Готово',
+  'link.allowed': '{device} підключено. Можете закрити цю сторінку й повернутися до Penrill.',
+  'link.denied': '{device} не підключено.',
+  'link.home': 'На головну сервера',
+
+  'home.welcome': 'Вітаємо, {name}',
+  'home.intro': 'Цей сервер синхронізує дошки Penrill між пристроями й дає людям ділитися дошками та шаблонами. Усе зберігається на цьому комп’ютері.',
+  'home.people': 'Люди',
+  'home.devices': 'Пристрої',
+  'home.boards': 'Дошки',
+  'home.templates': 'Спільні шаблони',
+  'home.start': 'З чого почати',
+  'home.done': 'Готово',
+  'home.connectTitle': 'Підключіть Penrill',
+  'home.connectText': 'У Penrill відкрийте «Синхронізація › Ваш сервер» і введіть цю адресу. Потім Penrill попросить дозволити підключення тут, у цьому браузері.',
+  'home.address': 'Адреса сервера',
+  'home.pin': 'Цей сервер має власний сертифікат. Під час підключення Penrill показує його відбиток: він має починатися з {pin}.',
+  'home.scan': 'На планшеті чи телефоні відскануйте код. Або підключіться за посиланням, яке відкриє Penrill уже з цією адресою.',
+  'home.connectLink': 'Підключитися за посиланням',
+  'home.connected': 'Підключено: {n}',
+  'home.inviteTitle': 'Запросіть людей',
+  'home.inviteText': 'Самостійно зареєструватися не можна. Створіть запрошення для однієї людини або одне посилання для всього класу чи команди й надішліть його.',
+  'home.shareTitle': 'Діліться дошками та шаблонами',
+  'home.shareText': 'У Penrill відкрийте меню шаблону й виберіть «Поділитися…»: його зможуть додати всі на цьому сервері або один каталог, наприклад клас. Це залишається одним шаблоном: коли автор його змінює, зміни отримують усі.',
+
+  'devices.title': 'Ваші пристрої',
+  'devices.intro': 'Пристрої, на яких Penrill синхронізується з вашим обліковим записом {name}. Від’єднайте той, яким більше не користуєтеся чи який загубили: синхронізація зупиниться одразу.',
+  'devices.empty': 'Пристроїв ще немає',
+  'devices.emptyHint': 'Підключіть Penrill з головної сторінки.',
+  'devices.device': 'Пристрій',
+  'devices.person': 'Людина',
+  'devices.connected': 'Підключено',
+  'devices.lastUsed': 'Востаннє',
+  'devices.disconnect': 'Від’єднати',
+  'devices.confirm': 'Від’єднати {device}? Синхронізація зупиниться одразу.',
+  'devices.disconnected': 'Пристрій від’єднано.',
+  'devices.passwordTitle': 'Пароль',
+  'devices.passwordText': 'Потрібен для входу на цю сторінку й для дозволу нових пристроїв. Сам Penrill ніколи його не питає.',
+  'devices.current': 'Поточний пароль',
+  'devices.change': 'Змінити пароль',
+  'devices.changed': 'Пароль змінено.',
+  'devices.count': 'Пристроїв: {n}',
+  'devices.countOne': '1 пристрій',
+
+  'people.title': 'Люди',
+  'people.intro': 'Хто може користуватися цим сервером. Самостійно зареєструватися не можна: надішліть запрошення. Учасники синхронізують дошки й діляться дошками та шаблонами; адміністратори ще й керують сервером.',
+  'people.invite': 'Запросити людей',
+  'people.for': 'Для',
+  'people.one': 'Однієї людини',
+  'people.five': 'До 5 людей',
+  'people.class': 'До 30 людей (клас)',
+  'people.hundred': 'До 100 людей',
+  'people.as': 'Як',
+  'people.days': 'Посилання діє',
+  'people.day1': '1 день',
+  'people.day7': '7 днів',
+  'people.day30': '30 днів',
+  'people.create': 'Створити запрошення',
+  'people.inviteLink': 'Посилання-запрошення. Надішліть його тому, хто має приєднатися:',
+  'people.resetLink': 'Посилання для скидання пароля {name}, діє одну годину:',
+  'people.linkHint': 'Показується лише зараз. Ним може скористатися будь-хто, тож надсилайте його лише тим, для кого воно.',
+  'people.open': 'Активні запрошення',
+  'people.placesLeft': 'Залишилося місць',
+  'people.until': 'Діє до',
+  'people.createdBy': 'Створив',
+  'people.noLimit': 'Без обмежень',
+  'people.delete': 'Видалити',
+  'people.deleted': 'Запрошення видалено.',
+  'people.accounts': 'Облікові записи',
+  'people.name': 'Ім’я',
+  'people.role': 'Роль',
+  'people.roleOf': 'Роль {name}',
+  'people.disabled': 'Вимкнено',
+  'people.reset': 'Скинути пароль',
+  'people.disable': 'Вимкнути',
+  'people.enable': 'Увімкнути',
+  'people.isRole': '{name} тепер: {role}.',
+  'people.wasDisabled': '{name} вимкнено, усі сеанси завершено.',
+  'people.wasEnabled': '{name} знову може входити.',
+  'people.confirmDisable': 'Вимкнути {name}? Усі сеанси буде завершено, і увійти не вийде, доки ви не ввімкнете обліковий запис знову.',
+
+  'templates.title': 'Спільні шаблони',
+  'templates.intro': 'Шаблони, якими тут діляться з усіма або з одним каталогом, наприклад класом. Кожен залишається одним шаблоном: коли автор змінює його в Penrill, зміни отримують усі, хто його додав. Інші можуть зробити дублікат, щоб мати власну версію.',
+  'templates.empty': 'Спільних шаблонів ще немає',
+  'templates.emptyHint': 'У Penrill відкрийте меню шаблону на сторінці «Шаблони» й виберіть «Поділитися…»',
+  'templates.template': 'Шаблон',
+  'templates.author': 'Автор',
+  'templates.sharedWith': 'Для кого',
+  'templates.everyone': 'Усі',
+  'templates.changed': 'Змінено',
+  'templates.stop': 'Припинити поширення',
+  'templates.confirm': 'Припинити поширення «{name}»? Ті, хто його додав, збережуть останню версію.',
+  'templates.stopped': '«{name}» більше не поширюється.',
+
+  'allDevices.intro': 'Усі пристрої, підключені до цього сервера. Від’єднаний пристрій одразу перестає синхронізуватися; власник може підключити його знову, увійшовши.',
+  'allDevices.empty': 'Жоден пристрій ще не підключено.',
+
+  'server.intro': 'Цей сервер і його дані.',
+  'server.address': 'Адреса',
+  'server.reachable': 'Доступний',
+  'server.lan': 'З цієї мережі',
+  'server.local': 'Лише з цього комп’ютера',
+  'server.certificate': 'Сертифікат',
+  'server.certificateText': 'Власний, відбиток {pin}',
+  'server.version': 'Версія',
+  'server.orphans': 'Без власника: {n}',
+  'server.nameTitle': 'Назва',
+  'server.nameText': 'Її видно в Penrill під час підключення і вгорі цих сторінок.',
+  'server.renamed': 'Назву змінено.',
+  'server.emailTitle': 'Контактна пошта',
+  'server.emailText': 'Куди надходять повідомлення про цей сервер, як-от оновлення та виправлення безпеки. Для входу вона не використовується.',
+  'server.emailSaved': 'Пошту збережено.',
+  'server.backupTitle': 'Резервна копія',
+  'server.backupText': 'Один архів з усіма дошками, зображеннями, шаблонами й обліковими записами. Зберігайте його деінде, не на цьому сервері.',
+  'server.backup': 'Завантажити копію',
+
+  'boards.title': 'Дошки без власника',
+  'boards.intro': 'Дошки з версій сервера до появи облікових записів. Передайте кожну комусь, і вона з’явиться в їхньому Penrill.',
+  'boards.none': 'Усі дошки мають власника.',
+  'boards.board': 'Дошка',
+  'boards.lastChange': 'Остання зміна',
+  'boards.giveTo': 'Передати',
+  'boards.ownerOf': 'Новий власник {name}',
+  'boards.give': 'Передати',
+  'boards.given': 'Дошка тепер належить {name}.',
+
+  'notFound.title': 'Тут нічого немає',
+  'notFound.text': 'На цьому сервері немає такої сторінки.'
+}
+
+export type Lang = 'en' | 'uk'
+
+const KEY = 'penrill-server-lang'
+
+function detect(): Lang {
+  try {
+    const saved = localStorage.getItem(KEY)
+    if (saved === 'en' || saved === 'uk') return saved
+  } catch {
+    // Private windows may refuse storage; the browser language still works.
+  }
+  return navigator.language.toLowerCase().startsWith('uk') ? 'uk' : 'en'
+}
+
+export const useLang = create<{ lang: Lang }>(() => ({ lang: detect() }))
+
+export function setLang(lang: Lang): void {
+  try {
+    localStorage.setItem(KEY, lang)
+  } catch {
+    // Stays for this visit only.
+  }
+  document.documentElement.lang = lang
+  useLang.setState({ lang })
+}
+
+export type T = (key: MessageKey, vars?: Record<string, string | number>) => string
+
+export function translate(lang: Lang, key: MessageKey, vars?: Record<string, string | number>): string {
+  let text = (lang === 'uk' ? uk : en)[key]
+  if (vars) for (const [name, value] of Object.entries(vars)) text = text.replaceAll(`{${name}}`, String(value))
+  return text
+}
+
+export function useT(): T {
+  const lang = useLang((s) => s.lang)
+  return (key, vars) => translate(lang, key, vars)
+}
+
+/** Dates as people read them in the chosen language. */
+export function useDates(): { day: (iso: string) => string; time: (iso: string) => string; dayTime: (iso: string) => string } {
+  const lang = useLang((s) => s.lang)
+  const locale = lang === 'uk' ? 'uk-UA' : 'en-GB'
+  return {
+    day: (iso) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }),
+    time: (iso) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
+    dayTime: (iso) => new Date(iso).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  }
+}
+
+/** Server error codes and statuses that have their own words; anything else is a generic failure. */
+export function errorKey(code: string): MessageKey {
+  const key = `error.${code}` as MessageKey
+  return key in en ? key : 'app.failed'
+}

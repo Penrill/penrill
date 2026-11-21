@@ -1,5 +1,5 @@
 export interface HttpRequest {
-  method: 'GET' | 'PUT' | 'POST'
+  method: 'GET' | 'PUT' | 'POST' | 'DELETE'
   path: string
   query?: Record<string, string>
   body?: Uint8Array | string

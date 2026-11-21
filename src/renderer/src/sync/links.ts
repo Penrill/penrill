@@ -53,3 +53,21 @@ export function linkedBoards(): [string, Link][] {
 export const scopeOf = (link: Link) => JSON.stringify([link.origin, link.user, link.remote])
 
 export const newRemoteId = () => crypto.randomUUID().replaceAll('-', '')
+
+/** Starts syncing a board of this device with the account on `origin`. */
+export function linkBoard(localId: string, origin: string): void {
+  const user = account(origin)?.name
+  if (user && !activeLink(localId)) saveLink(localId, { origin, user, remote: newRemoteId(), seq: null, published: false })
+}
+
+const NEW_PREFIX = 'penrill-sync-new:'
+
+/** Whether boards made from now on sync by themselves. On unless turned off for this server. */
+export function syncsNewBoards(origin: string): boolean {
+  return localStorage.getItem(NEW_PREFIX + origin) !== 'off'
+}
+
+export function setSyncsNewBoards(origin: string, on: boolean): void {
+  localStorage.setItem(NEW_PREFIX + origin, on ? 'on' : 'off')
+  linksChanged()
+}

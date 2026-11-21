@@ -19,22 +19,19 @@ import { account, rememberAccount, useAccounts } from '../../sync/accounts'
 import { ApiError } from '../../sync/api'
 import { clientFor } from '../../sync/clients'
 import { connectFlow, useConnect, type ConnectState } from '../../sync/connect'
-import { useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
-import { linkedBoards, useLinks } from '../../sync/links'
+import { useRemoteBoards } from '../../sync/librarySync'
 import { PageHeader } from './parts'
+import { FoldersSection } from './Folders'
+import { askWhichBoards, ChooseBoards, isChoosingBoards, SyncedBoards } from './SyncBoards'
 
 const SELF_HOST_URL = 'https://github.com/Penrill/penrill-server'
 
 type Preference = ReturnType<typeof storagePreference>
 
-/** Is the saved server answering, and how many boards are synced with it. */
+/** Is the saved server answering. */
 function Connection({ origin }: { origin: string }) {
   const t = useT()
   const catalog = useRemoteBoards()
-  const states = useSyncStatus((s) => s.states)
-  useLinks((s) => s.version)
-  const linked = linkedBoards().filter(([, link]) => link.origin === origin)
-  const problems = linked.filter(([id]) => states[id] === 'denied' || states[id] === 'offline').length
   const known = catalog.origin === origin
   return (
     <>
@@ -45,11 +42,6 @@ function Connection({ origin }: { origin: string }) {
         ) : (
           <Badge>{t('storage.connecting')}</Badge>
         )}
-      </DescriptionDetails>
-      <DescriptionTerm>{t('sync.boards')}</DescriptionTerm>
-      <DescriptionDetails className="flex flex-wrap items-center gap-2">
-        {linked.length}
-        {problems > 0 && <Badge color="amber">{t('sync.problem', { n: problems })}</Badge>}
       </DescriptionDetails>
     </>
   )
@@ -107,6 +99,8 @@ function Connected({ pref, name, onChange }: { pref: Preference; name: string; o
       </div>
       {!hostedCloud && <Text className="mt-4">{t('sync.disconnectHint')}</Text>}
       {failed && <Text className="mt-4 text-red-600! dark:text-red-500!">{t('storage.error')}</Text>}
+      <SyncedBoards origin={pref.origin} />
+      {pref.source === 'server' && <FoldersSection origin={pref.origin} />}
     </>
   )
 }
@@ -306,12 +300,14 @@ export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () =>
   useAccounts((s) => s.version)
   const state = useConnect()
   const session = pref.source !== 'device' ? account(pref.origin) : null
+  const [, chosen] = useState(0)
 
   // A finished connection changes where boards go: let the home screen pick that up, once per connection.
   const handled = useRef<ConnectState | null>(null)
   useEffect(() => {
     if (state.step !== 'connected' || handled.current === state) return
     handled.current = state
+    askWhichBoards(state.origin)
     onChange()
   }, [state, onChange])
 
@@ -322,15 +318,14 @@ export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () =>
         <Divider className="my-10" soft />
         {state.step !== 'idle' && state.step !== 'connected' ? (
           <Progress state={state} />
+        ) : session && isChoosingBoards(pref.origin) ? (
+          <ChooseBoards
+            origin={pref.origin}
+            server={pref.source === 'cloud' ? t(cloudLabel) : pref.origin}
+            onDone={() => chosen((n) => n + 1)}
+          />
         ) : session ? (
-          <>
-            {state.step === 'connected' && state.origin === pref.origin && (
-              <Text className="mb-6">
-                <Badge color="green">{t('sync.connected', { server: state.server, user: state.user })}</Badge>
-              </Text>
-            )}
-            <Connected pref={pref} name={session.name} onChange={onChange} />
-          </>
+          <Connected pref={pref} name={session.name} onChange={onChange} />
         ) : hostedCloud ? null : (
           <Choices />
         )}

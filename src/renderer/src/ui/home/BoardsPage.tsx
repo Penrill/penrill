@@ -8,11 +8,12 @@ import {
   FolderOpenIcon,
   MapPinIcon,
   PencilIcon,
+  ShareIcon,
   TagIcon,
   TrashIcon,
   XMarkIcon
 } from '@heroicons/react/16/solid'
-import { CloudIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, Squares2X2Icon, TrashIcon as TrashOutline } from '@heroicons/react/20/solid'
+import { CloudIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, Squares2X2Icon, TrashIcon as TrashOutline, UserIcon } from '@heroicons/react/20/solid'
 import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '@penrill/ui/dropdown'
@@ -31,8 +32,9 @@ import { account } from '../../sync/accounts'
 import type { RemoteBoard } from '../../sync/api'
 import { syncCoordinator } from '../../sync/coordinator'
 import { openRemote, remoteBoard, useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
-import { activeLink, linkFor, newRemoteId, removeLink, saveLink, useLinks } from '../../sync/links'
+import { activeLink, linkBoard, linkFor, removeLink, useLinks, type Link } from '../../sync/links'
 import { BoardTagsDialog, ConfirmAlert, RenameDialog } from './dialogs'
+import { canShareBoard, ShareBoardDialog } from './Folders'
 import { Card, CardBadges, CardGrid, CardMeta, CardTitle, EmptyState, PageHeader, Picture, Section, TagDot, tagBadgeColor, useImageUrl } from './parts'
 
 const lib = platform.library
@@ -58,6 +60,14 @@ export function useDeviceBoards(): BoardEntry[] {
   })
 }
 
+/** Whose a synced board is, when it is someone else's (shared with this account in a folder). */
+function useOwner(link: Link | null): string | null {
+  const rows = useRemoteBoards((s) => s.rows)
+  if (!link) return null
+  const owner = rows.find((r) => r.id === link.remote)?.owner
+  return owner && owner !== link.user ? owner : null
+}
+
 function CardMenu({ children }: { children: ReactNode }) {
   const t = useT()
   return (
@@ -75,11 +85,12 @@ function CardMenu({ children }: { children: ReactNode }) {
 function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
   const t = useT()
   const lang = usePrefs((s) => s.lang)
-  const [dialog, setDialog] = useState<'rename' | 'tags' | 'purge' | null>(null)
+  const [dialog, setDialog] = useState<'rename' | 'tags' | 'purge' | 'share' | null>(null)
   const status = useSyncStatus((s) => s.states[entry.id])
   useLinks((s) => s.version)
   const link = activeLink(entry.id)
   const destination = storagePreference()
+  const owner = useOwner(link)
   const deleted = !!entry.deletedAt
   const thumb = useImageUrl(() => boardLibrary.thumbUrl(entry), [entry])
   const run = (fn: () => Promise<unknown>) => () => void fn().then(refresh)
@@ -127,12 +138,24 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
           {!link && account(destination.origin) && (
             <DropdownItem
               onClick={run(async () => {
-                saveLink(entry.id, { origin: destination.origin, user: account(destination.origin)!.name, remote: newRemoteId(), seq: null, published: false })
+                linkBoard(entry.id, destination.origin)
                 await syncCoordinator.refresh()
               })}
             >
               <CloudArrowUpIcon />
-              <DropdownLabel>{t(destination.source === 'cloud' ? 'storage.moveCloud' : 'storage.moveServer')}</DropdownLabel>
+              <DropdownLabel>{t('sync.startBoard')}</DropdownLabel>
+            </DropdownItem>
+          )}
+          {canShareBoard(link, owner) && (
+            <DropdownItem onClick={() => setDialog('share')}>
+              <ShareIcon />
+              <DropdownLabel>{t('folders.shareMenu')}</DropdownLabel>
+            </DropdownItem>
+          )}
+          {link && (
+            <DropdownItem title={t('sync.stopBoardHint')} onClick={run(async () => removeLink(entry.id))}>
+              <CloudIcon />
+              <DropdownLabel>{t('sync.stopBoard')}</DropdownLabel>
             </DropdownItem>
           )}
           <DropdownItem onClick={run(() => boardLibrary.saveAsFile(entry.id))}>
@@ -170,10 +193,16 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
               {folder}
             </Badge>
           )}
+          {owner && (
+            <Badge title={t('home.ownerHint', { owner })}>
+              <UserIcon className="size-3" />
+              {owner}
+            </Badge>
+          )}
           {link && (
-            <Badge color={status === 'denied' ? 'red' : status === 'offline' ? 'amber' : 'sky'} title={t(`storage.${status ?? 'pending'}`)}>
+            <Badge color={status === 'denied' ? 'red' : status === 'offline' ? 'amber' : 'zinc'} title={t(`storage.${status ?? 'pending'}`)}>
               {status === 'denied' ? <ExclamationTriangleIcon className="size-3" /> : <CloudIcon className="size-3" />}
-              {placeName(link.origin, t)}
+              {status === 'denied' || status === 'offline' ? t(`storage.${status}`) : t('sync.badge')}
             </Badge>
           )}
           {link && status === 'denied' && (
@@ -200,6 +229,7 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
         onSave={(name) => void boardLibrary.renameBoard(entry.id, name)}
       />
       {dialog === 'tags' && <BoardTagsDialog open entry={entry} tags={tags} onClose={close} />}
+      {dialog === 'share' && canShareBoard(link, owner) && <ShareBoardDialog entry={entry} link={link} onClose={close} />}
       <ConfirmAlert
         open={dialog === 'purge'}
         message={t('card.confirmDeleteForever', { title: entry.title })}
@@ -258,10 +288,12 @@ function RemoteCard({ origin, row }: { origin: string; row: RemoteBoard }) {
       <CardTitle>{row.title}</CardTitle>
       <CardMeta>{t('home.edited', { when: relativeTime(lang, Date.parse(row.updated)) })}</CardMeta>
       <CardBadges>
-        <Badge color="sky">
-          <CloudIcon className="size-3" />
-          {placeName(origin, t)}
-        </Badge>
+        {row.owner && row.owner !== account(origin)?.name && (
+          <Badge title={t('home.ownerHint', { owner: row.owner })}>
+            <UserIcon className="size-3" />
+            {row.owner}
+          </Badge>
+        )}
       </CardBadges>
     </Card>
   )

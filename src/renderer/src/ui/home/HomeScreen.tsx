@@ -6,8 +6,7 @@ import {
   PlusIcon,
   RectangleStackIcon,
   Squares2X2Icon,
-  TrashIcon,
-  UserGroupIcon
+  TrashIcon
 } from '@heroicons/react/20/solid'
 import { LinkNavigation } from '@penrill/ui/link'
 import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from '@penrill/ui/navbar'
@@ -39,7 +38,6 @@ import { useRemoteBoards } from '../../sync/librarySync'
 import { BoardsPage, DeletedPage, placeName, useDeviceBoards } from './BoardsPage'
 import { ManageTagsDialog } from './dialogs'
 import { TagDot } from './parts'
-import { SharedPage } from './SharedPage'
 import { SyncPage } from './SyncPage'
 import { TemplatesPage } from './TemplatesPage'
 
@@ -75,8 +73,7 @@ function SyncState({ origin }: { origin: string }) {
 }
 
 /**
- * The home screen: a sidebar with the library's pages (boards, templates, the shared library,
- * recently deleted), tags to filter boards by, and sync and settings at the bottom.
+ * The home screen: a sidebar with the library's pages (boards, templates, recently deleted), tags to filter boards by, and sync and settings at the bottom.
  */
 export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, 'open' | 'onClose'> }) {
   const t = useT()
@@ -114,15 +111,14 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
   }, [])
 
   const signedIn = !!account(pref.origin)
-  const page = tab === 'shared' && !signedIn ? 'boards' : tab
   const live = boards.filter((b) => !b.deletedAt)
   const deletedCount = boards.length - live.length
   const back = current && live.some((b) => b.id === current.id) ? current : null
+  const page = tab
   const tag = page === 'boards' ? (tags.find((x) => x.id === tagId) ?? null) : null
 
   let content: ReactNode
-  if (page === 'templates') content = <TemplatesPage shared={signedIn} />
-  else if (page === 'shared') content = <SharedPage key={pref.origin} origin={pref.origin} />
+  if (page === 'templates') content = <TemplatesPage />
   else if (page === 'deleted') content = <DeletedPage />
   else if (page === 'sync') content = <SyncPage key={pref.origin + pref.source} pref={pref} onChange={() => setPref(storagePreference())} />
   else content = <BoardsPage tag={tag} onClearTag={() => setTagId(null)} origin={pref.origin} />
@@ -154,12 +150,6 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
             <SidebarLabel>{t('tpl.title')}</SidebarLabel>
             <Count n={templates.length} />
           </SidebarItem>
-          {signedIn && (
-            <SidebarItem href={homePath('shared')} current={page === 'shared'}>
-              <UserGroupIcon />
-              <SidebarLabel>{t('share.library')}</SidebarLabel>
-            </SidebarItem>
-          )}
           <SidebarItem href={homePath('deleted')} current={page === 'deleted'}>
             <TrashIcon />
             <SidebarLabel>{t('home.recentlyDeleted')}</SidebarLabel>
@@ -233,7 +223,7 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
 
   return (
     <LinkNavigation value={navigation}>
-      <div data-catalyst className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
+      <div data-catalyst className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-white lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
         <SidebarLayout navbar={navbar} sidebar={sidebar} openLabel={t('home.openMenu')} closeLabel={t('home.closeMenu')}>
           {content}
         </SidebarLayout>

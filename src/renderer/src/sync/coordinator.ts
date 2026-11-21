@@ -10,7 +10,7 @@ import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { EditorDocument, type TitlePort } from './editorDocument'
 import { LibrarySync, publishBoard, setStatus, statusFor, type SyncStatus } from './librarySync'
-import { activeLink, linksChanged, newRemoteId, saveLink, scopeOf, useLinks, type Link } from './links'
+import { activeLink, linkBoard, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
 import { outboxFor } from './outbox'
 import { Presence } from './presence'
 import { webSocketTransport } from './transport'
@@ -202,8 +202,7 @@ class SyncCoordinator {
 
   private linkNew(localId: string): void {
     const { origin } = storagePreference()
-    const user = origin ? account(origin)?.name : undefined
-    if (origin && user) saveLink(localId, { origin, user, remote: newRemoteId(), seq: null, published: false })
+    if (origin && syncsNewBoards(origin)) linkBoard(localId, origin)
   }
 
   private async renamedClosed(localId: string, title: string): Promise<void> {

@@ -33,11 +33,17 @@ interface BoardWorkspaceProps {
   fixedLanguage?: boolean
   /** Hide the Experimental features section (the desktop app keeps flags out of the way). */
   hideExperimental?: boolean
+  /**
+   * Another screen (the app's home screen) lies over the whole board: the board stays loaded for a
+   * quick way back, but is hidden and out of reach, so scrolling past the edge of that screen
+   * doesn't show it.
+   */
+  covered?: boolean
   children?: ReactNode
 }
 
 export function BoardWorkspace({
-  editor, fileActions, menu, extraTools, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, children
+  editor, fileActions, menu, extraTools, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
 }: BoardWorkspaceProps) {
   useAppTheme()
   useEffect(() => {
@@ -56,6 +62,7 @@ export function BoardWorkspace({
   return (
     <EditorProvider editor={editor}>
     <div className="app">
+      <div className={covered ? 'invisible contents' : 'contents'} inert={covered}>
       <Board fileActions={fileActions} />
       <TextEditor />
       <FormulaEditor />
@@ -100,6 +107,7 @@ export function BoardWorkspace({
       <NoticeArea />
       <InstrumentTip />
       <ShortcutsDialog fileActions={!!fileActions} />
+      </div>
       {children}
     </div>
     </EditorProvider>

@@ -8,7 +8,7 @@ import { platform } from './platform'
  */
 export type Route = { view: 'home'; tab: HomeTab } | { view: 'board'; id: string }
 
-const TABS: readonly HomeTab[] = ['boards', 'templates', 'shared', 'deleted', 'sync']
+const TABS: readonly HomeTab[] = ['boards', 'templates', 'deleted', 'sync']
 
 /** The address bar follows the app only in a browser. */
 const urlRouting = platform.platform === 'web'

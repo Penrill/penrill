@@ -46,6 +46,7 @@ export function App() {
       selectionActions={() => <SaveSelectionTemplate />}
       storageSettings={settings.storageSettings}
       about={settings.about}
+      covered={view === 'home'}
     >
       {view === 'board' && <BoardCursors />}
       <UpdateBanner />

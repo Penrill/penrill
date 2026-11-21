@@ -23,13 +23,24 @@ export interface RemoteBoard {
   title: string
   seq: number
   updated: string
+  /** Who made it. Empty for boards from before accounts, missing on servers before 0.3. */
+  owner?: string
 }
 
 export interface Community {
   folders: { id: string; name: string; owner: string }[]
   members: { folder: string; name: string }[]
   boards: (RemoteBoard & { folder: string })[]
-  templates: { id: string; name: string; author: string; folder: string }[]
+  templates: SharedTemplate[]
+}
+
+/** A template shared on a server. `updated` changes whenever its author edits it. */
+export interface SharedTemplate {
+  id: string
+  name: string
+  author: string
+  folder: string
+  updated: number
 }
 
 export interface BoardContent {
@@ -186,8 +197,16 @@ export class PenrillClient {
     await this.call({ method: 'POST', path: '/api/share-board', ...jsonBody({ folder, board }) })
   }
 
-  async publishTemplate(folder: string, name: string, bytes: Uint8Array): Promise<void> {
-    await this.call({ method: 'POST', path: '/api/templates', query: { name, folder }, body: bytes, contentType: 'application/json' })
+  publishTemplate(folder: string, name: string, bytes: Uint8Array): Promise<SharedTemplate> {
+    return this.json({ method: 'POST', path: '/api/templates', query: { name, folder }, body: bytes, contentType: 'application/json' })
+  }
+
+  updateTemplate(id: string, name: string, bytes: Uint8Array): Promise<SharedTemplate> {
+    return this.json({ method: 'PUT', path: `/api/templates/${id}`, query: { name }, body: bytes, contentType: 'application/json' })
+  }
+
+  async removeTemplate(id: string): Promise<void> {
+    await this.call({ method: 'DELETE', path: `/api/templates/${id}` })
   }
 
   async template(id: string): Promise<Uint8Array> {

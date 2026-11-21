@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { LibraryState } from '../../shared/library'
 
 /** The home screen's pages. */
-export type HomeTab = 'boards' | 'templates' | 'shared' | 'deleted' | 'sync'
+export type HomeTab = 'boards' | 'templates' | 'deleted' | 'sync'
 
 /**
  * State of the desktop app around the board: which screen is shown, which board is open, saving and

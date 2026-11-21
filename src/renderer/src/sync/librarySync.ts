@@ -11,16 +11,20 @@ import type { BoardEntry } from '../../../shared/library'
 import { boardLibrary } from '../boardLibrary'
 import { platform } from '../platform'
 import { account } from './accounts'
-import { ApiError, isAccessError, isAuthError, isPermanent, type BoardContent, type RemoteBoard } from './api'
+import { ApiError, isAccessError, isAuthError, isPermanent, type BoardContent, type Community, type RemoteBoard } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { linkedBoards, saveLink, scopeOf, type Link } from './links'
 import { outboxFor } from './outbox'
+import { refreshTemplates } from './templates'
 import { fromWire, toWire } from './wire'
 
 export type SyncStatus = 'synced' | 'pending' | 'offline' | 'denied'
 
 export const useSyncStatus = create<{ states: Record<string, SyncStatus> }>(() => ({ states: {} }))
+
+/** What the server shares with this account: folders, their boards, and templates. */
+export const useCommunity = create<{ origin: string; catalog: Community | null }>(() => ({ origin: '', catalog: null }))
 
 export const useRemoteBoards = create<{ origin: string; rows: RemoteBoard[]; error: boolean }>(() => ({ origin: '', rows: [], error: false }))
 
@@ -49,6 +53,13 @@ export async function remoteBoard(origin: string, remote: string) {
   const snapshot = await client.snapshot(remote)
   const items = itemsOf(await assetCodec(client, remote).decodeItems(snapshot.items))
   return { snapshot, items, background: isBackgroundKind(snapshot.background) ? snapshot.background : 'dots' as const }
+}
+
+/** Reloads the server's folders, their members and shared boards and templates. */
+export async function refreshCommunity(origin: string): Promise<void> {
+  const catalog = await clientFor(origin).community()
+  useCommunity.setState({ origin, catalog })
+  await refreshTemplates(origin, catalog.templates)
 }
 
 export async function openRemote(origin: string, row: RemoteBoard): Promise<void> {
@@ -121,7 +132,10 @@ export class LibrarySync {
       return
     }
     this.lastProblem = ''
-    if (origin === this.listedOrigin()) useRemoteBoards.setState({ origin, rows, error: false })
+    if (origin === this.listedOrigin()) {
+      useRemoteBoards.setState({ origin, rows, error: false })
+      await this.community(origin)
+    }
     const seqs = new Map(rows.map(row => [row.id, row.seq]))
     for (const [localId, link] of boards) {
       if (this.isLive(localId)) continue
@@ -175,6 +189,14 @@ export class LibrarySync {
     if (state.title !== entry.title) await platform.library.rename(localId, state.title)
     saveLink(localId, { ...link, seq: snapshot.seq }, true)
     await boardLibrary.refreshLibrary()
+  }
+
+  private async community(origin: string): Promise<void> {
+    try {
+      await refreshCommunity(origin)
+    } catch (error) {
+      this.problem(origin, error)
+    }
   }
 
   private problem(origin: string, error: unknown): void {
