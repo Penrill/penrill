@@ -4,79 +4,80 @@ import { useT } from '../../../board/i18n'
 import type { UpdateState } from '../../../shared/platform'
 import { platform } from '../platform'
 import { useApp } from '../appState'
+import { Notice, NoticeButton } from '../../../board/ui/notices'
+import { Button } from '@penrill/ui/button'
+import { Text } from '@penrill/ui/text'
 
-/** Bottom-left notice when a new version is downloading / ready / available. */
+/**
+ * Update notices, in the bottom-left notice area: "updated to X" once after an update, and "X is
+ * ready" or "X is available" when there is something to do. Each goes away by itself after a
+ * while (the update still installs on the next start); the download itself shows only in
+ * Settings, under About.
+ */
 export function UpdateBanner() {
   const t = useT()
   const [s, setS] = useState<UpdateState>({ status: 'idle' })
-  const [hidden, setHidden] = useState<string | null>(null)
+  const [hidden, setHidden] = useState<string[]>([])
   useEffect(() => {
     void platform.update.getState().then(setS)
     platform.update.onState(setS)
   }, [])
-  const key = `${s.status}:${s.version}`
-  // "Updated to X": shown once after the app starts with a new version.
+  const hide = (key: string) => () => setHidden((h) => [...h, key])
   const justUpdated = useApp((st) => st.justUpdatedTo)
-  if (justUpdated && hidden !== `updated:${justUpdated}`) {
+  if (justUpdated && !hidden.includes(`updated:${justUpdated}`)) {
     return (
-      <div className="panel update-banner success">
-        <span>{t('update.updated', { version: justUpdated })}</span>
-        <button className="text-btn" onClick={() => void platform.update.openDownload()}>
-          {t('update.whatsNew')}
-        </button>
-        <button className="text-btn" onClick={() => setHidden(`updated:${justUpdated}`)}>
-          {t('common.close')}
-        </button>
-      </div>
+      <Notice
+        tone="success"
+        timeout={10000}
+        onClose={hide(`updated:${justUpdated}`)}
+        actions={<NoticeButton onClick={() => void platform.update.openDownload()}>{t('update.whatsNew')}</NoticeButton>}
+      >
+        {t('update.updated', { version: justUpdated })}
+      </Notice>
     )
   }
-  if (hidden === key) return null
-  if (s.status === 'downloading') {
-    return (
-      <div className="panel update-banner">
-        <span className="save-spinner" />
-        <span>
-          {t('update.downloading', { version: s.version ?? '' })} {s.percent ?? 0}%
-        </span>
-      </div>
-    )
-  }
+  const key = `${s.status}:${s.version}`
+  if (hidden.includes(key)) return null
   if (s.status === 'ready') {
     return (
-      <div className="panel update-banner">
-        <span>{t('update.ready', { version: s.version ?? '' })}</span>
-        <button className="text-btn" onClick={() => setHidden(key)}>
-          {t('update.later')}
-        </button>
-        <button
-          className="text-btn primary"
-          onClick={async () => {
-            await boardLibrary.flush(true)
-            await platform.update.install()
-          }}
-        >
-          {t('update.restart')}
-        </button>
-      </div>
+      <Notice
+        timeout={15000}
+        onClose={hide(key)}
+        actions={
+          <NoticeButton
+            primary
+            onClick={async () => {
+              await boardLibrary.flush(true)
+              await platform.update.install()
+            }}
+          >
+            {t('update.restart')}
+          </NoticeButton>
+        }
+      >
+        {t('update.ready', { version: s.version ?? '' })}
+      </Notice>
     )
   }
   if (s.status === 'available' && s.manual) {
     return (
-      <div className="panel update-banner">
-        <span>{t('update.available', { version: s.version ?? '' })}</span>
-        <button className="text-btn" onClick={() => setHidden(key)}>
-          {t('update.later')}
-        </button>
-        <button className="text-btn primary" onClick={() => void platform.update.openDownload()}>
-          {t('update.download')}
-        </button>
-      </div>
+      <Notice
+        timeout={15000}
+        onClose={hide(key)}
+        actions={
+          <NoticeButton primary onClick={() => void platform.update.openDownload()}>
+            {t('update.download')}
+          </NoticeButton>
+        }
+      >
+        {t('update.available', { version: s.version ?? '' })}
+      </Notice>
     )
   }
   return null
 }
 
-/** "About" block for the settings popover: version + manual check. */
+/** Settings, About: the version, a manual check and what the updater is doing. */
 export function AboutSection() {
   const t = useT()
   const [version, setVersion] = useState('')
@@ -107,17 +108,16 @@ export function AboutSection() {
                 ? t('update.error')
                 : ''
   return (
-    <>
-      <div className="popover-title section">{t('settings.about')}</div>
-      <div className="settings-group about-row">
-        <span className="about-version">Penrill {version}</span>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm/6 font-medium text-zinc-950 dark:text-white">Penrill {version}</span>
         {s.status !== 'store' && s.status !== 'web' && (
-        <button className="text-btn outline" disabled={s.status === 'checking' || s.status === 'downloading'} onClick={() => void platform.update.check()}>
-          {t('update.check')}
-        </button>
+          <Button outline disabled={s.status === 'checking' || s.status === 'downloading'} onClick={() => void platform.update.check()}>
+            {t('update.check')}
+          </Button>
         )}
       </div>
-      {status && <p className="settings-hint">{status}</p>}
-    </>
+      {status && <Text>{status}</Text>}
+    </div>
   )
 }

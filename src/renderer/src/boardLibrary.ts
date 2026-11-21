@@ -4,10 +4,11 @@ import { builtinModules } from '../../board/modules'
 import { renderPng, renderSvg, renderThumbnail } from '../../board/engine/export'
 import { withSurface } from '../../board/engine/surface'
 import { decodeBoard, encodeBoard, type BoardData } from '../../board/engine/serialize'
-import { translate } from '../../board/i18n'
+import { translate, type MessageKey } from '../../board/i18n'
 import { prefsStore } from '../../board/store'
 import { platform } from './platform'
-import { useApp } from './appState'
+import { useApp, type HomeTab } from './appState'
+import { parseRoute, startRouter, type Route } from './router'
 import { moveStorageKey } from '../../shared/legacyStorage'
 
 /**
@@ -16,6 +17,14 @@ import { moveStorageKey } from '../../shared/legacyStorage'
  * right away.
  */
 const SAVE_DELAY_MS = 5000
+/** The window title of each page of the home screen. */
+const HOME_TITLES: Record<HomeTab, MessageKey> = {
+  boards: 'home.title',
+  templates: 'tpl.title',
+  shared: 'share.library',
+  deleted: 'home.recentlyDeleted',
+  sync: 'home.sync'
+}
 /** Thumbnails are re-rendered at most this often while editing (always on leaving a board). */
 const THUMB_INTERVAL_MS = 10_000
 
@@ -46,7 +55,7 @@ class BoardLibrary {
       if (s.lang !== prev.lang) this.updateTitle()
     })
     useApp.subscribe((s, prev) => {
-      if (s.board !== prev.board || s.view !== prev.view) this.updateTitle()
+      if (s.board !== prev.board || s.view !== prev.view || s.homeTab !== prev.homeTab) this.updateTitle()
       // The board only reacts to keys and shows its panels while it is on screen.
       if (s.view !== prev.view) editor.session.setState({ active: s.view === 'board' })
     })
@@ -220,8 +229,8 @@ class BoardLibrary {
   }
 
   private updateTitle(): void {
-    const { board, view } = useApp.getState()
-    const name = view === 'home' || !board ? this.editor.t('home.title') : board.title
+    const { board, view, homeTab } = useApp.getState()
+    const name = view === 'home' || !board ? this.editor.t(HOME_TITLES[homeTab]) : board.title
     platform.setTitle(`${name} · Penrill`)
   }
 
@@ -251,6 +260,7 @@ class BoardLibrary {
     // Guard against double start (React StrictMode runs effects twice in development).
     if (this.started) return
     this.started = true
+    const opened = startRouter((route) => this.show(route))
     platform.onOpenBoard((id) => void this.refreshLibrary().then(() => this.openBoard(id)))
     void this.noticeUpdate()
     platform.onFlushRequest(() => this.flush(true))
@@ -258,7 +268,28 @@ class BoardLibrary {
     await this.refreshLibrary()
     const pending = await platform.library.takePendingOpen()
     if (pending && await this.openBoard(pending)) return
-    await this.goHome()
+    await this.show(opened)
+  }
+
+  /** Show a screen: a board (the home screen if it can't be opened) or a page of the home screen. */
+  async show(route: Route): Promise<void> {
+    const { view, board } = useApp.getState()
+    if (route.view === 'board') {
+      if (board?.id === route.id) {
+        // Still loaded behind the home screen: just bring it back.
+        useApp.setState({ view: 'board' })
+        return
+      }
+      if (await this.openBoard(route.id)) return
+      route = { view: 'home', tab: 'boards' }
+    }
+    if (view === 'home') useApp.setState({ homeTab: route.tab })
+    else await this.goHome(route.tab)
+  }
+
+  /** Follow an in-app link (an address made by the router). */
+  navigate(href: string): void {
+    void this.show(parseRoute(href))
   }
 
   /** Open a board from the library. Returns false if it couldn't be loaded. */
@@ -331,12 +362,22 @@ class BoardLibrary {
     void this.refreshLibrary()
   }
 
-  async goHome(): Promise<void> {
+  async goHome(tab: HomeTab = 'boards'): Promise<void> {
     this.leaving()
     this.editor.clearSelection()
     await this.flush(true)
     await this.refreshLibrary()
-    useApp.setState({ view: 'home' })
+    useApp.setState({ view: 'home', homeTab: tab })
+  }
+
+  /** A new board with a template already on it. */
+  async newBoardFromTemplate(id: string): Promise<void> {
+    const { tool, setTool } = this.editor.session.getState()
+    await this.newBoard()
+    await this.insertTemplate(id)
+    // Ready to write on, with the tool that was in hand.
+    this.editor.clearSelection()
+    setTool(tool)
   }
 
   async renameBoard(id: string, title: string): Promise<void> {

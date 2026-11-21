@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react'
+import type { ReactNode, SVGProps } from 'react'
 
 const base = (p: SVGProps<SVGSVGElement>): SVGProps<SVGSVGElement> => ({
   width: 22,
@@ -12,10 +12,23 @@ const base = (p: SVGProps<SVGSVGElement>): SVGProps<SVGSVGElement> => ({
   ...p
 })
 
-/** Vertical pen like the ones in Whiteboard's ink toolbar; the tip and band take the ink colour. */
-export function PenIcon({ color, highlighter }: { color: string; highlighter?: boolean }) {
-  return (
+/** Lays a vertical (26 × 44) drawing on its side, tip to the right, for the pen tray. */
+function Upright({ lying, children }: { lying?: boolean; children: ReactNode }) {
+  return lying ? (
+    <svg width="40" height="24" viewBox="0 0 44 26" aria-hidden>
+      <g transform="translate(0 26) rotate(-90)">{children}</g>
+    </svg>
+  ) : (
     <svg width="24" height="38" viewBox="0 0 26 44" aria-hidden>
+      {children}
+    </svg>
+  )
+}
+
+/** A pen; the tip and band take the ink colour. `lying`: on its side, tip to the right. */
+export function PenIcon({ color, highlighter, lying }: { color: string; highlighter?: boolean; lying?: boolean }) {
+  return (
+    <Upright lying={lying}>
       {highlighter ? (
         <>
           <path d="M8 4 h10 v24 l-2 6 h-6 l-2 -6 z" fill="#f4f4f6" stroke="#8a8d96" strokeWidth="1.2" />
@@ -29,15 +42,15 @@ export function PenIcon({ color, highlighter }: { color: string; highlighter?: b
           <rect x="9" y="20" width="8" height="5" fill={color} />
         </>
       )}
-    </svg>
+    </Upright>
   )
 }
 
-export const EraserIcon = () => (
-  <svg width="24" height="38" viewBox="0 0 26 44" aria-hidden>
+export const EraserIcon = ({ lying }: { lying?: boolean }) => (
+  <Upright lying={lying}>
     <path d="M7 6 h12 v22 h-12 z" fill="#f4f4f6" stroke="#8a8d96" strokeWidth="1.2" />
     <path d="M7 28 h12 v10 a2 2 0 0 1 -2 2 h-8 a2 2 0 0 1 -2 -2 z" fill="#ff8fa3" stroke="#8a8d96" strokeWidth="1.2" />
-  </svg>
+  </Upright>
 )
 
 export const ChevronDownIcon = (p: SVGProps<SVGSVGElement>) => (

@@ -8,15 +8,22 @@
 - **Board files are now `.penrill`.** Your `.inkboard` files still open, by double-click or with *Open*.
 - **New website:** [penrill.com](https://penrill.com/), with the web app at [penrill.com/app](https://penrill.com/app/).
 
-## What's new in 0.12.1: Easter eggs, redrawn
+## A calmer board
 
-- **Every easter egg redrawn.** The shows are now painted as vector art with light, glow and real physics (coins, confetti, sparks, rain), instead of emoji and simple animations.
-- **More ways to find them.** Besides formula answers and typed words, eggs now hide in drawing too: a freehand circle that comes out round, seven ink colours on one board, a board's 500th stroke, wiping a lot off at once.
+- **Drawing tools on the left.** The pens, highlighter and eraser lie in a tray, and the one in use slides out. Select, the hand, the laser and undo / redo are on the same rail.
+- **Colours and widths one tap away.** The strip at the top shows only what the tool in use can change.
+- **Things to put on the board at the bottom, with their names:** text, formulas, shapes, graphs, drawing instruments, images and templates.
+- **Settings in one window, in sections.** Under *Tools* you can hide buttons you don't use; their keys keep working.
+- **Short tips that go away by themselves**, in the bottom-left corner, clear of the tools.
 
-## Also in 0.12.0: Achievements and easter eggs
+## A new home screen
 
-- **Achievements, if you want them.** A grey medal on the All boards screen (or a switch at the bottom of the settings) turns on collecting achievements. Nothing plays until you do.
-- **Hidden easter eggs.** Special formula answers, old game cheat codes typed on a board, zooming to the very edge, working at 3 a.m. and more. Each plays once and leaves a medal on the All boards screen.
+- **Boards, templates and sync in one place.** A sidebar lists all boards, templates, recently deleted boards and your tags. Each card shows a preview, when the board was last edited, its tags and where it syncs to.
+- **Start from a template:** click a template to get a new board with it already on it.
+- **Sync on its own page:** choose this device, Penrill Cloud or your own server, and sign in there.
+- **Every board has its own address** in the web app (`penrill.com/app/board/…`), so reloading, bookmarks and the browser's Back button work.
+- Achievements and easter eggs are removed.
+
 
 ## Also in 0.11.1
 

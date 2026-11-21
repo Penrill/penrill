@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from '../../../board/i18n'
 import { StampIcon } from '../../../board/ui/icons'
+import { InsertButton } from '../../../board/ui/chrome'
 import { Dialog, DialogTitle, DialogBody, DialogActions } from '@penrill/ui/dialog'
 import { Button } from '@penrill/ui/button'
 import { Input } from '@penrill/ui/input'
@@ -31,7 +32,7 @@ export function TemplatesMenu() {
   const [editing, setEditing] = useState<string | null>(null)
   return (
     <>
-      <button className="icon-btn" title={t('tpl.title')} aria-haspopup="dialog" onClick={() => setOpen(true)}><StampIcon /></button>
+      <InsertButton icon={<StampIcon />} label={t('tpl.title')} aria-haspopup="dialog" onClick={() => setOpen(true)} />
       <Dialog open={open} onClose={() => { setOpen(false); setEditing(null) }} size="2xl">
       <DialogTitle>{t('tpl.title')}</DialogTitle>
       <DialogBody>

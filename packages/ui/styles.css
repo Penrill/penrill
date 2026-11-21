@@ -1,4 +1,4 @@
-@layer theme, utilities;
+@layer theme, base, legacy, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @source "./src";
@@ -6,3 +6,43 @@
 [data-headlessui-portal] [role=dialog] { position: fixed; inset: 0; z-index: 1500; }
 
 [data-headlessui-portal] [role=menu] { z-index: 1510; }
+
+/* Catalyst is written for Tailwind's preflight, which the board's own stylesheet doesn't use. Screens
+   built from Catalyst (marked data-catalyst) and Headless UI's dialogs and menus get the part of it
+   these components rely on. Zero specificity and the lowest layer: any class wins over it. */
+@layer base {
+  :where([data-catalyst], [data-headlessui-portal]) :where(h1, h2, h3, h4, h5, h6) {
+    margin: 0;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(p, dl, dd, figure, blockquote, pre) {
+    margin: 0;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(ul, ol, menu) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(fieldset) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(legend) {
+    padding: 0;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(hr) {
+    height: 0;
+    margin: 0;
+    border: 0;
+    color: inherit;
+  }
+  :where([data-catalyst], [data-headlessui-portal]) :where(input, select, textarea, button) {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+}
+

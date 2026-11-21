@@ -1,52 +1,14 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { BUILTIN_GRAPHS, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
 import { lineSvgPath } from '../engine/ink'
 import { MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, shapeParts, type ShapeKind } from '@penrill/core/shapes'
 import type { GraphItem, GraphParams } from '@penrill/core/types'
 import { useT, type MessageKey } from '../i18n'
 import { usePrefs, prefsStore } from '../store'
-import { AxesIcon, ChevronDownIcon, CompassIcon, PolygonIcon, ProtractorIcon, RulerIcon, SetSquare45Icon, SetSquare60Icon, ShapesIcon } from './icons'
+import { CompassIcon, PolygonIcon, ProtractorIcon, RulerIcon, SetSquare45Icon, SetSquare60Icon } from './icons'
 import { shortcutKey } from '../shortcuts'
-import { Popover } from './Popover'
+import { PanelTitle } from './chrome'
 import { useEditor, useSession } from '../editorContext'
-
-/** Toolbar button that opens a popover below the toolbar. */
-export function MenuButton({
-  icon,
-  title,
-  active,
-  children,
-  open,
-  setOpen
-}: {
-  icon: ReactNode
-  title: string
-  active?: boolean
-  children: ReactNode
-  open: boolean
-  setOpen: (v: boolean) => void
-}) {
-  const close = useCallback(() => setOpen(false), [setOpen])
-  return (
-    <div className="menu-anchor">
-      <button
-        data-popover-anchor
-        className={`icon-btn menu-btn ${active ? 'active' : ''} ${open ? 'open' : ''}`}
-        title={title}
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-      >
-        {icon}
-        <ChevronDownIcon className="menu-caret" />
-      </button>
-      {open && (
-        <Popover onClose={close} className="insert-popover" fit="below" toolbar>
-          {children}
-        </Popover>
-      )}
-    </div>
-  )
-}
 
 /** Tiny SVG preview of a shape, drawn with the real outline code. */
 export function ShapePreview({ kind, base }: { kind: ShapeKind; base?: number }) {
@@ -112,17 +74,17 @@ export function BaseRow({ kind, value, onChange }: { kind: ShapeKind; value: num
   )
 }
 
-export function ShapesMenu() {
+/** Contents of the insert bar's Shapes flyout: pick a shape, then drag it out on the board. */
+export function ShapesPanel({ close }: { close: () => void }) {
   const editor = useEditor()
   const t = useT()
-  const [open, setOpen] = useState(false)
   const tool = useSession((s) => s.tool)
   const shape = useSession((s) => s.shape)
   const bases = usePrefs((s) => s.shapeBases)
   const baseOf = (k: ShapeKind): number | undefined => (SHAPE_BASES[k] ? (bases[k] ?? SHAPE_BASES[k]!.def) : undefined)
   return (
-    <MenuButton icon={<ShapesIcon />} title={t('shapes.title')} active={tool === 'shape'} open={open} setOpen={setOpen}>
-      <div className="popover-title">{t('shapes.title')}</div>
+    <>
+      <PanelTitle>{t('shapes.title')}</PanelTitle>
       {[SHAPES_2D, SHAPES_3D].map((list, i) => (
         <div key={i} className={`shape-grid ${i ? 'solids' : ''}`}>
           {list.map((k) => (
@@ -133,7 +95,7 @@ export function ShapesMenu() {
               onClick={() => {
                 editor.session.setState({ tool: 'shape', shape: k })
                 // Solids with a choice of base keep the menu open so the base can be picked.
-                if (!SHAPE_BASES[k]) setOpen(false)
+                if (!SHAPE_BASES[k]) close()
               }}
             >
               <ShapePreview kind={k} base={baseOf(k)} />
@@ -148,15 +110,13 @@ export function ShapesMenu() {
           onChange={(n) => prefsStore.setState((s) => ({ shapeBases: { ...s.shapeBases, [shape]: n } }))}
         />
       )}
-    </MenuButton>
+    </>
   )
 }
 
-/** Ruler, set squares, protractor and compass in one dropdown; each row shows its key. */
-export function InstrumentsMenu() {
+/** Ruler, set squares, protractor and compass: each row turns one on or off and shows its key. */
+export function useInstrumentRows() {
   const editor = useEditor()
-  const t = useT()
-  const [open, setOpen] = useState(false)
   const ruler = useSession((s) => s.ruler !== null)
   const square = useSession((s) => s.setSquare?.kind ?? null)
   const protractor = useSession((s) => s.protractor !== null)
@@ -168,9 +128,15 @@ export function InstrumentsMenu() {
     { id: 'protractor', label: 'instruments.protractor', icon: <ProtractorIcon />, on: protractor, toggle: () => editor.toggleProtractor() },
     { id: 'compass', label: 'toolbar.compass', icon: <CompassIcon />, on: compass, toggle: () => editor.toggleCompass() }
   ]
+  return rows
+}
+
+export function InstrumentsPanel({ close }: { close: () => void }) {
+  const t = useT()
+  const rows = useInstrumentRows()
   return (
-    <MenuButton icon={<RulerIcon />} title={t('toolbar.instruments')} active={rows.some((r) => r.on)} open={open} setOpen={setOpen}>
-      <div className="popover-title">{t('toolbar.instruments')}</div>
+    <>
+      <PanelTitle>{t('toolbar.instruments')}</PanelTitle>
       <div className="instrument-list">
         {rows.map((r) => (
           <button
@@ -180,7 +146,7 @@ export function InstrumentsMenu() {
             aria-keyshortcuts={shortcutKey(r.id)}
             onClick={() => {
               r.toggle()
-              setOpen(false)
+              close()
             }}
           >
             {r.icon}
@@ -189,7 +155,7 @@ export function InstrumentsMenu() {
           </button>
         ))}
       </div>
-    </MenuButton>
+    </>
   )
 }
 
@@ -229,18 +195,17 @@ function GraphCard({ preset, label, onInsert, onDelete }: { preset: GraphPreset;
   )
 }
 
-export function GraphMenu() {
+export function GraphPanel({ close }: { close: () => void }) {
   const editor = useEditor()
   const t = useT()
-  const [open, setOpen] = useState(false)
   const mine = usePrefs((s) => s.graphPresets)
   const insert = (params: GraphParams): void => {
     editor.insertGraph(params)
-    setOpen(false)
+    close()
   }
   return (
-    <MenuButton icon={<AxesIcon />} title={t('graph.title')} open={open} setOpen={setOpen}>
-      <div className="popover-title">{t('graph.title')}</div>
+    <>
+      <PanelTitle>{t('graph.title')}</PanelTitle>
       <div className="graph-grid">
         {BUILTIN_GRAPHS.map((p) => (
           <GraphCard key={p.id} preset={p} label={presetLabel(p, t)} onInsert={() => insert(p.params)} />
@@ -248,7 +213,7 @@ export function GraphMenu() {
       </div>
       {mine.length > 0 && (
         <>
-          <div className="popover-title section">{t('graph.mine')}</div>
+          <PanelTitle className="mt-3">{t('graph.mine')}</PanelTitle>
           <div className="graph-grid">
             {mine.map((p) => (
               <GraphCard
@@ -266,7 +231,7 @@ export function GraphMenu() {
       <button
         className="menu-item"
         onClick={() => {
-          setOpen(false)
+          close()
           editor.session.setState({ graphDialog: { mode: 'insert', params: BUILTIN_GRAPHS[3].params } })
         }}
       >
@@ -275,7 +240,7 @@ export function GraphMenu() {
       <button
         className="menu-item"
         onClick={() => {
-          setOpen(false)
+          close()
           // Insert a plane right away and open the formula panel beside it.
           const id = editor.insertGraph(BUILTIN_GRAPHS[3].params)
           editor.session.setState({ fnPanel: { id, session: Date.now() } })
@@ -283,7 +248,7 @@ export function GraphMenu() {
       >
         <span>{t('graph.functionGraph')}</span>
       </button>
-    </MenuButton>
+    </>
   )
 }
 

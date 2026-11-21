@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import type { LibraryState } from '../../shared/library'
 
+/** The home screen's pages. */
+export type HomeTab = 'boards' | 'templates' | 'shared' | 'deleted' | 'sync'
+
 /**
  * State of the desktop app around the board: which screen is shown, which board is open, saving and
  * updates. The board itself never reads it: it only gets told whether it's on screen (Session.active).
@@ -8,6 +11,8 @@ import type { LibraryState } from '../../shared/library'
 export interface AppState {
   /** Which screen is shown: the board or the home screen with all boards. */
   view: 'board' | 'home'
+  /** The page of the home screen that is shown (or comes back when going home). */
+  homeTab: HomeTab
   /** The open board. */
   board: { id: string; title: string; kind: 'draft' | 'file'; filePath?: string } | null
   saveStatus: 'saved' | 'pending' | 'saving' | 'error'
@@ -19,6 +24,7 @@ export interface AppState {
 
 export const useApp = create<AppState>()(() => ({
   view: 'board',
+  homeTab: 'boards',
   board: null,
   saveStatus: 'saved',
   library: { boards: [], tags: [], templates: [], lastOpenedId: null, backupDir: null },

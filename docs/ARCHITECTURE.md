@@ -64,7 +64,7 @@ Three stores, each with one owner:
 
 | Store | Where | What | Lifetime |
 |---|---|---|---|
-| Preferences | `src/board/store.ts` (`prefsStore`, `usePrefs`) | pens, colours, language, theme, toolbar layout | shared by all boards, saved between launches |
+| Preferences | `src/board/store.ts` (`prefsStore`, `usePrefs`) | pens, colours, language, theme, which tool buttons show | shared by all boards, saved between launches |
 | Session | `src/board/session.ts` (`editor.session`, `useSession`) | tool, selection, camera, instruments, text or formula being edited | one per open board |
 | App | `src/renderer/src/appState.ts` (`useApp`) | screen, open board, save status, library, updates | the desktop app only |
 

@@ -73,7 +73,7 @@ depend on them. New shortcuts: add to `shortcuts.ts`, this file, the test and bo
 
 ## While typing text
 
-Text tool: **T** button in the toolbar (no keyboard shortcut, because T is the protractor).
+Text tool: *Text* in the bar at the bottom (no keyboard shortcut, because T is the protractor).
 
 | Keys | Action |
 |---|---|

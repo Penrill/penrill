@@ -8,6 +8,13 @@ All notable changes to Penrill (called Inkboard up to 0.12). Downloads for every
 - Inkboard is renamed to Penrill. Installed apps update in place and keep their boards and settings.
 - Board files are saved as `.penrill`; `.inkboard` files still open.
 - The website and the web app moved to https://penrill.com.
+- New board layout: drawing tools on a rail on the left, the tool's colours and widths at the top,
+  things to insert at the bottom, settings in one window with sections.
+- Tips and update notices sit in the bottom-left corner and close by themselves.
+- New home screen with a sidebar: boards, templates, recently deleted, tags, sync and settings.
+- A template can start a new board.
+- The web app gives every board and home page its own address.
+- Achievements and easter eggs are removed.
 
 ## 0.12.1
 

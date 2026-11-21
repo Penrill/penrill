@@ -64,7 +64,8 @@ lesson needs. Local boards work offline without an account. Sign in to a specifi
 **Organising**
 - Lasso and brush selection: move, scale, duplicate, group, lock
 - Templates: save part of a board and reuse it in other lessons
-- **All boards** screen with previews, search, pins and colour tags (e.g. a class or a subject)
+- Home screen with all boards (previews, search, pins, colour tags such as a class or a subject),
+  templates that start a new board, recently deleted boards and sync
 
 <p align="center"><img src="docs/images/home.png" alt="The All boards screen: board previews with pins and colour tags" width="900"></p>
 
@@ -102,14 +103,14 @@ After that Penrill updates itself on Windows, with the AppImage and from the Sna
 | Zoom | Ctrl + wheel, touchpad pinch, two-finger pinch, Ctrl + / Ctrl − / Ctrl+0 |
 | Tools | 1 / 2 / 3 pens, H highlighter, E eraser |
 | Undo / Redo | Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z) |
-| Insert image | Ctrl+V, drag a file in, or the toolbar button |
+| Insert image | Ctrl+V, drag a file in, or *Image* at the bottom |
 | Lasso select | V; Del deletes, Ctrl+D duplicates, Ctrl+C / Ctrl+V copy & paste |
 | Brush select | C: touch items with the circle to add them; mouse wheel = circle size; Ctrl / Alt + drag removes |
 | Straight line | hold Shift while drawing |
 | Group / ungroup | Ctrl+G / Ctrl+Shift+G |
 | Change a line's angle / length | select it (V or M) and drag one of its round end handles |
 | Stretch a shape | select it and drag a side handle; *Shape* on the selection bar changes kind / base |
-| Text | **T** button in the toolbar: click and type, Esc when done; double-click text to edit; select words (or right-click) for colour / size / bold / italic / underline |
+| Text | *Text* at the bottom: click and type, Esc when done; double-click text to edit; select words (or right-click) for colour / size / bold / italic / underline |
 | Protractor | T: draw from the centre for an angle, along the edge for an arc (its degrees are written next to it) |
 | Compass | K: drag ↔ to set the radius, then drag the pencil around the needle (a full turn = circle) |
 | Lock / unlock | *Lock* on the selection bar |
@@ -175,8 +176,8 @@ npm run dev:web
 dotnet run --project ../penrill-server/src/Penrill.Server    # in another terminal
 ```
 
-1. Open [the library](http://localhost:5174/app/). In Settings choose where to save new boards.
-   Select Self-hosted and enter the server origin, or select Local test cloud. Register or sign in on that instance.
+1. Open [the library](http://localhost:5174/app/) and go to **Sync** in its sidebar
+   ([localhost:5174/app/sync](http://localhost:5174/app/sync)). Select Self-hosted and enter the server origin, or select Local test cloud. Register or sign in on that instance.
 2. Create a board and draw. Changes sync automatically to the selected service.
 3. To draw together, share the board in a folder, add another account on the same service, and open the board as that user in a second browser profile.
    A WebSocket streams named cursors and pen or highlighter samples as you draw. The server checks board membership before joining the room.
@@ -218,4 +219,4 @@ release also becomes available under the MIT license two years after it comes ou
 
 Versions up to and including 0.9.2 were released under GPL-3.0-or-later and stay under that license.
 
-Open **Shared library** on the home screen to create folders and add members by their username on that instance. Members can edit shared boards and import shared templates. Publish a local template to a folder for members only, or to the marketplace for all accounts on that server.
+Open **Shared library** in the home screen's sidebar (shown once you are signed in) to create folders and add members by their username on that instance. Members can edit shared boards and import shared templates. Publish a local template to a folder for members only, or to the marketplace for all accounts on that server.

@@ -1,0 +1,6 @@
+/* The app's Tailwind build: the shared UI kit (packages/ui) plus the classes the board and the app
+   screens use. The board's older stylesheet (src/board/styles.css) sits in the `legacy` layer
+   below these utilities. */
+@import '@penrill/ui/styles.css';
+@source '../../board';
+@source './';

@@ -1,8 +1,9 @@
 import type { BBox, Camera } from '@penrill/core/types'
 
 const MARGIN = 16
-/** Keep clear of the top toolbar. */
-const topMin = (): number => Math.max(84, (document.querySelector('.toolbar')?.getBoundingClientRect().bottom ?? 0) + MARGIN)
+/** Keep clear of the bars at the top of the window and of the drawing rail on the left. */
+const topMin = (): number => Math.max(72, (document.querySelector('[data-chrome="top"]')?.getBoundingClientRect().bottom ?? 0) + MARGIN)
+const leftMin = (): number => Math.max(MARGIN, (document.querySelector('[data-chrome="rail"] > *')?.getBoundingClientRect().right ?? 0) + MARGIN)
 
 /**
  * Where a floating card goes beside a board object (world bbox): to its right if it fits, else to its
@@ -15,8 +16,9 @@ export function dockBeside(b: BBox, cam: Camera, panelW: number, height: number)
   const W = window.innerWidth
   const H = window.innerHeight
   let left: number
-  if (sx1 + MARGIN + panelW <= W - MARGIN) left = Math.max(MARGIN, sx1 + MARGIN)
-  else if (sx0 - MARGIN - panelW >= MARGIN) left = Math.min(W - MARGIN - panelW, sx0 - MARGIN - panelW)
+  const minLeft = leftMin()
+  if (sx1 + MARGIN + panelW <= W - MARGIN) left = Math.max(minLeft, sx1 + MARGIN)
+  else if (sx0 - MARGIN - panelW >= minLeft) left = Math.min(W - MARGIN - panelW, sx0 - MARGIN - panelW)
   else left = W - MARGIN - panelW
   const top = Math.max(topMin(), Math.min(sy0, H - MARGIN - height))
   return { left, top }
@@ -37,8 +39,8 @@ export interface Fit {
   side: 'above' | 'below'
 }
 
-/** The part of the window floating cards may use (below the top toolbar). */
-export const screenArea = (): { w: number; h: number; top: number } => ({ w: window.innerWidth, h: window.innerHeight, top: topMin() })
+/** The part of the window floating cards may use (below the top bars, right of the rail). */
+export const screenArea = (): { w: number; h: number; top: number; left: number } => ({ w: window.innerWidth, h: window.innerHeight, top: topMin(), left: leftMin() })
 
 /**
  * Where a floating box (w × h) goes next to an anchor rectangle so that all of it stays on screen:
@@ -50,7 +52,7 @@ export function fitBox(
   anchor: ScreenRect,
   w: number,
   h: number,
-  area: { w: number; h: number; top: number },
+  area: { w: number; h: number; top: number; left?: number },
   prefer: 'above' | 'below' = 'above',
   gap = 8,
   margin = 8
@@ -72,6 +74,8 @@ export function fitBox(
   let top = side === 'above' ? aTop - gap - shown : aBottom + gap
   top = Math.max(minTop, Math.min(top, maxBottom - shown))
   const cx = (anchor.left + anchor.right) / 2
-  const left = Math.max(margin, Math.min(cx - w / 2, area.w - margin - w))
+  // Clear of the rail when there is room for it; a box too wide for that still gets the margin.
+  const minLeft = area.left === undefined ? margin : Math.max(margin, Math.min(area.left, area.w - margin - w))
+  const left = Math.max(minLeft, Math.min(cx - w / 2, area.w - margin - w))
   return { left, top, maxHeight: Math.min(maxHeight, room), side }
 }

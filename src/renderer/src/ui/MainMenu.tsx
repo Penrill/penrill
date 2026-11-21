@@ -4,13 +4,15 @@ import {
 } from '@heroicons/react/24/outline'
 import { activeLink, useLinks } from '../sync/links'
 import { useSyncStatus } from '../sync/librarySync'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import * as Headless from '@headlessui/react'
+import { Dropdown, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownShortcut } from '@penrill/ui/dropdown'
+import { useEffect, useRef, useState } from 'react'
 import { boardLibrary } from '../boardLibrary'
 import { useT } from '../../../board/i18n'
 import { platform } from '../platform'
 import { HomeIcon, MenuIcon } from '../../../board/ui/icons'
-import { Popover } from '../../../board/ui/Popover'
-import { useSession } from '../../../board/editorContext'
+import { Bar, FlyoutPanel, ToolButton } from '../../../board/ui/chrome'
+import { useEditor, useSession } from '../../../board/editorContext'
 import { useApp } from '../appState'
 
 /** Inline-editable board title. */
@@ -31,7 +33,8 @@ function BoardTitle() {
   return editing ? (
     <input
       ref={input}
-      className="board-name-input"
+      aria-label={t('menu.rename')}
+      className="h-9 w-56 min-w-0 rounded-lg border border-zinc-950/10 bg-white px-2.5 text-sm/6 font-semibold text-zinc-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
@@ -42,7 +45,8 @@ function BoardTitle() {
     />
   ) : (
     <button
-      className="board-name"
+      type="button"
+      className="h-9 max-w-64 min-w-0 truncate rounded-lg px-2 text-sm/6 font-semibold text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/10"
       title={t('menu.rename')}
       onClick={() => {
         setValue(board.title)
@@ -60,8 +64,6 @@ function SaveStatus() {
   const board = useApp((s) => s.board)
   const remote = useSyncStatus(s => board ? s.states[board.id] : undefined)
   useLinks(s => s.version)
-  const [open, setOpen] = useState(false)
-  const close = useCallback(() => setOpen(false), [])
   if (!board) return null
 
   const link = activeLink(board.id)
@@ -79,90 +81,81 @@ function SaveStatus() {
   const description = [label, link?.origin, localText, where].filter(Boolean).join('\n')
 
   return (
-    <div className="menu-anchor">
-      <button
-        type="button"
-        data-popover-anchor
-        className={`icon-btn board-sync-status${warning ? ' warning' : ''}`}
-        title={description}
-        aria-label={description}
-        aria-expanded={open}
-        onClick={() => setOpen(value => !value)}
+    <Headless.Popover className="flex">
+      <Headless.PopoverButton
+        as={ToolButton}
+        label={description}
+        className={warning ? 'text-amber-600! dark:text-amber-400!' : undefined}
       >
-        <Icon width={19} height={19} aria-hidden="true" />
-      </button>
-      {open && (
-        <Popover onClose={close} fit="below" className="board-sync-detail">
-          <strong>{label}</strong>
-          {link && <span>{link.origin}</span>}
-          <span>{localText}</span>
-          <span>{where}</span>
-          {link && state === 'denied' && <span>{t('storage.deniedHelp')}</span>}
-        </Popover>
-      )}
-    </div>
+        <Icon width={20} height={20} aria-hidden="true" />
+      </Headless.PopoverButton>
+      <FlyoutPanel anchor="bottom start" className="flex max-w-80 flex-col gap-1 text-sm/5 text-zinc-600 dark:text-zinc-300">
+        <strong className="font-semibold text-zinc-950 dark:text-white">{label}</strong>
+        {link && <span>{link.origin}</span>}
+        <span>{localText}</span>
+        <span className="break-all">{where}</span>
+        {link && state === 'denied' && <span>{t('storage.deniedHelp')}</span>}
+      </FlyoutPanel>
+    </Headless.Popover>
   )
 }
 
-/** Top-left: all-boards button, menu, editable board name and save status. */
+/** Top left: all boards, the board menu, the board's name (click to rename) and where it is saved. */
 export function MainMenu() {
   const t = useT()
+  const editor = useEditor()
   const board = useApp((s) => s.board)
   const hasSelection = useSession((s) => s.selectedIds.length > 0)
   const appVersion = useApp((s) => s.appVersion)
-  const [open, setOpen] = useState(false)
-  const close = useCallback(() => setOpen(false), [])
-  const run = (fn: () => unknown) => () => {
-    setOpen(false)
-    void fn()
-  }
+  const keys = (display: string): string[] => display.split('+')
   return (
-    <div className="main-menu">
-      <div className="main-menu-bar">
-        <button className="icon-btn" title={`${t('menu.home')} (Ctrl+H)`} onClick={() => void boardLibrary.goHome()}>
-          <HomeIcon />
-        </button>
-        <button data-popover-anchor className="icon-btn" title={t('menu.title')} onClick={() => setOpen((o) => !o)}>
+    <Bar className="flex min-w-0 items-center gap-0.5">
+      <ToolButton label={t('menu.home')} shortcut="Ctrl+H" onClick={() => void boardLibrary.goHome()}>
+        <HomeIcon />
+      </ToolButton>
+      <Dropdown>
+        <Headless.MenuButton as={ToolButton} label={t('menu.title')}>
           <MenuIcon />
-        </button>
-        <BoardTitle />
-        <SaveStatus />
-      </div>
-      {open && (
-        <Popover onClose={close} className="menu-popover">
-          <button className="menu-item" onClick={run(() => boardLibrary.newBoard())}>
-            <span>{t('menu.newBoard')}</span>
-            <kbd>Ctrl+N</kbd>
-          </button>
-          <button className="menu-item" onClick={run(() => boardLibrary.goHome())}>
-            <span>{t('menu.home')}</span>
-            <kbd>Ctrl+H</kbd>
-          </button>
-          <button className="menu-item" onClick={run(() => boardLibrary.openFile())}>
-            <span>{t('menu.openFile')}</span>
-            <kbd>Ctrl+O</kbd>
-          </button>
-          <div className="menu-sep" />
-          <button className="menu-item" onClick={run(() => boardLibrary.saveAsFile())}>
-            <span>{t('menu.saveAsFile')}</span>
-            <kbd>Ctrl+Shift+S</kbd>
-          </button>
+        </Headless.MenuButton>
+        <DropdownMenu anchor="bottom start" className="z-[80] min-w-64 bg-white! backdrop-blur-none! dark:bg-zinc-800!">
+          <DropdownItem onClick={() => void boardLibrary.newBoard()}>
+            <DropdownLabel>{t('menu.newBoard')}</DropdownLabel>
+            <DropdownShortcut keys={keys('Ctrl+N')} />
+          </DropdownItem>
+          <DropdownItem onClick={() => void boardLibrary.goHome()}>
+            <DropdownLabel>{t('menu.home')}</DropdownLabel>
+            <DropdownShortcut keys={keys('Ctrl+H')} />
+          </DropdownItem>
+          <DropdownItem onClick={() => void boardLibrary.openFile()}>
+            <DropdownLabel>{t('menu.openFile')}</DropdownLabel>
+            <DropdownShortcut keys={keys('Ctrl+O')} />
+          </DropdownItem>
+          <DropdownDivider />
+          <DropdownItem onClick={() => void boardLibrary.saveAsFile()}>
+            <DropdownLabel>{t('menu.saveAsFile')}</DropdownLabel>
+            <DropdownShortcut keys={keys('Ctrl+Shift+S')} />
+          </DropdownItem>
           {board?.kind === 'file' && platform.capabilities.showInFolder && (
-            <button className="menu-item" onClick={run(() => platform.library.showInFolder(board.id))}>
-              <span>{t('menu.showInFolder')}</span>
-            </button>
+            <DropdownItem onClick={() => void platform.library.showInFolder(board.id)}>
+              <DropdownLabel>{t('menu.showInFolder')}</DropdownLabel>
+            </DropdownItem>
           )}
-          <div className="menu-sep" />
-          <button className="menu-item" onClick={run(() => boardLibrary.exportBoard('png'))}>
-            <span>{t(hasSelection ? 'menu.exportSelPng' : 'menu.exportPng')}</span>
-          </button>
-          <button className="menu-item" onClick={run(() => boardLibrary.exportBoard('pdf'))}>
-            <span>{t(hasSelection ? 'menu.exportSelPdf' : 'menu.exportPdf')}</span>
-          </button>
-          <div className="menu-sep" />
-          <div className="menu-version">Penrill {appVersion}</div>
-        </Popover>
-      )}
-    </div>
+          <DropdownItem onClick={() => void boardLibrary.exportBoard('png')}>
+            <DropdownLabel>{t(hasSelection ? 'menu.exportSelPng' : 'menu.exportPng')}</DropdownLabel>
+          </DropdownItem>
+          <DropdownItem onClick={() => void boardLibrary.exportBoard('pdf')}>
+            <DropdownLabel>{t(hasSelection ? 'menu.exportSelPdf' : 'menu.exportPdf')}</DropdownLabel>
+          </DropdownItem>
+          <DropdownDivider />
+          <DropdownItem onClick={() => editor.session.setState({ shortcutsOpen: true })}>
+            <DropdownLabel>{t('shortcuts.title')}</DropdownLabel>
+          </DropdownItem>
+          <DropdownDivider />
+          <DropdownHeader className="text-xs/5 text-zinc-500 dark:text-zinc-400">Penrill {appVersion}</DropdownHeader>
+        </DropdownMenu>
+      </Dropdown>
+      <BoardTitle />
+      <SaveStatus />
+    </Bar>
   )
 }
