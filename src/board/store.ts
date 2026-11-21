@@ -150,6 +150,8 @@ export interface Prefs {
   background: BackgroundKind
   lang: Lang
   theme: ThemePref
+  /** The board surface follows the interface theme: chalkboard when it is dark, paper when light. */
+  linkBoardToTheme: boolean
   /** Protractor angle snapping. */
   instruments: InstrumentPrefs
   /** Instrument tips the user closed ("protractor", "compass"); they don't show again. */
@@ -187,6 +189,7 @@ export const prefsStore = createStore<Prefs>()(
       background: 'dots',
       lang: detectLanguage(),
       theme: 'system',
+      linkBoardToTheme: true,
       instruments: DEFAULT_INSTRUMENTS,
       hiddenTips: [],
       toolbarLayout: null,
@@ -212,6 +215,8 @@ export const prefsStore = createStore<Prefs>()(
           ...(Array.isArray(p.pens) ? { pens: p.pens.map((pen) => (pen?.color?.toLowerCase() === '#ffffff' ? { ...pen, color: '#1e1e1e' } : pen)) } : {}),
           ...(p.textStyle?.color?.toLowerCase() === '#ffffff' ? { textStyle: { ...p.textStyle, color: '#1e1e1e' } } : {}),
           theme: THEME_PREFS.includes(p.theme as ThemePref) ? (p.theme as ThemePref) : 'system',
+          // On for new users; people who already had settings keep the board they picked by hand.
+          linkBoardToTheme: typeof p.linkBoardToTheme === 'boolean' ? p.linkBoardToTheme : Object.keys(p).length === 0,
           eraserMode: p.eraserMode === 'point' ? 'point' : 'stroke',
           eraserRadius: typeof p.eraserRadius === 'number' && p.eraserRadius >= 4 && p.eraserRadius <= 120 ? p.eraserRadius : current.eraserRadius,
           wheelMode: p.wheelMode === 'zoom' ? 'zoom' : 'scroll',
@@ -238,6 +243,7 @@ export const prefsStore = createStore<Prefs>()(
         background: s.background,
         lang: s.lang,
         theme: s.theme,
+        linkBoardToTheme: s.linkBoardToTheme,
         graphPresets: s.graphPresets,
         shapeBases: s.shapeBases,
         selectRadius: s.selectRadius,

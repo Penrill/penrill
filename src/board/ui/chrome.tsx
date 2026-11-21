@@ -140,16 +140,23 @@ export function Segmented<T extends string>({
   options,
   onChange,
   label,
-  className
+  className,
+  disabled
 }: {
   value: T
   options: { value: T; label: string; icon?: ReactNode; title?: string }[]
   onChange: (value: T) => void
   label: string
   className?: string
+  disabled?: boolean
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className={clsx(className, 'flex shrink-0 rounded-[10px] bg-zinc-950/5 p-0.5 dark:bg-white/5')}>
+    <div
+      role="radiogroup"
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      className={clsx(className, 'flex shrink-0 rounded-[10px] bg-zinc-950/5 p-0.5 transition-opacity dark:bg-white/5', disabled && 'opacity-50')}
+    >
       {options.map((o) => (
         <button
           key={o.value}
@@ -157,12 +164,13 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           title={o.title ?? o.label}
+          disabled={disabled}
           onClick={() => onChange(o.value)}
           className={clsx(
             'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-sm/5 font-medium whitespace-nowrap transition-colors',
             value === o.value
               ? 'bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-950/10 dark:bg-zinc-600 dark:text-white dark:ring-white/10'
-              : 'text-zinc-600 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white'
+              : 'text-zinc-600 enabled:hover:text-zinc-950 dark:text-zinc-300 dark:enabled:hover:text-white'
           )}
         >
           {o.icon}

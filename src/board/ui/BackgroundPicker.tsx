@@ -90,7 +90,7 @@ export function PaperPanel() {
   return (
     <div className="paper-panel">
       <PanelTitle>{t('settings.background')}</PanelTitle>
-      {/* The surface is chosen on its own, independent of the interface theme. */}
+      {/* Picking a surface by hand ends "board follows the interface theme" (Settings → General). */}
       <div className="surface-options" role="radiogroup" aria-label={t('settings.surface')}>
         {[false, true].map((c) => (
           <button
@@ -99,7 +99,10 @@ export function PaperPanel() {
             aria-checked={chalk === c}
             title={t(c ? 'surface.chalkboard' : 'surface.paper')}
             className={`surface-option ${chalk === c ? 'active' : ''}`}
-            onClick={() => setBackground(withSurface(background, c))}
+            onClick={() => {
+              prefsStore.setState({ linkBoardToTheme: false })
+              setBackground(withSurface(background, c))
+            }}
           >
             <span className="surface-swatch" style={{ background: c ? CHALKBOARD_COLOR : '#fff' }}>
               {/* A short stroke in the ink colour that board shows: dark on paper, chalk white on green. */}

@@ -108,6 +108,11 @@ const en = {
   'theme.system': 'System',
   'theme.light': 'Light',
   'theme.dark': 'Dark',
+  'settings.appearance': 'Appearance',
+  'settings.interface': 'Interface',
+  'settings.linkBoard': 'Board follows the interface theme',
+  'settings.unlinkBoard': 'Choose the board separately',
+  'settings.linkedHint': 'Chalkboard with the dark theme, paper with the light one.',
   'settings.experimental': 'Experimental features',
   'feature.darkTheme': 'Dark theme',
 
@@ -588,6 +593,11 @@ const uk: Record<MessageKey, string> = {
   'theme.system': 'Як у системі',
   'theme.light': 'Світла',
   'theme.dark': 'Темна',
+  'settings.appearance': 'Вигляд',
+  'settings.interface': 'Інтерфейс',
+  'settings.linkBoard': 'Дошка за темою інтерфейсу',
+  'settings.unlinkBoard': 'Обирати дошку окремо',
+  'settings.linkedHint': 'Крейдова дошка в темній темі, папір у світлій.',
   'settings.experimental': 'Експериментальні функції',
   'feature.darkTheme': 'Темна тема',
 

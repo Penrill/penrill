@@ -1,5 +1,5 @@
 import * as Headless from '@headlessui/react'
-import { BeakerIcon, Cog6ToothIcon, InformationCircleIcon, PencilIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
+import { BeakerIcon, Cog6ToothIcon, InformationCircleIcon, LinkIcon, LinkSlashIcon, PencilIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { Dialog, DialogTitle } from '@penrill/ui/dialog'
 import { Select } from '@penrill/ui/select'
 import { Switch } from '@penrill/ui/switch'
@@ -8,6 +8,7 @@ import { Text } from '@penrill/ui/text'
 import clsx from 'clsx'
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { FEATURE_IDS } from '../../shared/features'
+import { isChalk, withSurface } from '../engine/surface'
 import { useEditor } from '../editorContext'
 import { useFeatures } from '../features'
 import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
@@ -38,16 +39,88 @@ function Group({ title, description, children }: { title?: ReactNode; descriptio
 }
 
 const THEMES: ThemePref[] = ['system', 'light', 'dark']
+type Surface = 'paper' | 'chalk'
+
+/**
+ * Interface theme and board surface, one above the other, with a chain button bracketing the pair:
+ * linked, the board follows the theme (chalkboard when dark, paper when light, so with "System" it
+ * switches together with the OS).
+ */
+function AppearanceSettings() {
+  const t = useT()
+  const theme = usePrefs((s) => s.theme)
+  const background = usePrefs((s) => s.background)
+  const linked = usePrefs((s) => s.linkBoardToTheme)
+  const darkTheme = useFeatures((s) => s.flags.darkTheme)
+  const surface: Surface = isChalk(background) ? 'chalk' : 'paper'
+  const boardControl = (
+    <Segmented
+      label={t('settings.board')}
+      value={surface}
+      disabled={darkTheme && linked}
+      onChange={(next) => prefsStore.getState().setBackground(withSurface(background, next === 'chalk'))}
+      options={[
+        { value: 'paper', label: t('surface.paper') },
+        { value: 'chalk', label: t('surface.chalkboard') }
+      ]}
+    />
+  )
+  if (!darkTheme) {
+    return (
+      <Group title={t('settings.appearance')}>
+        <Row label={t('settings.board')}>{boardControl}</Row>
+      </Group>
+    )
+  }
+  const line = linked ? 'border-blue-500/60 dark:border-blue-400/60' : 'border-zinc-950/15 dark:border-white/15'
+  const label = 'text-sm/6 font-medium text-zinc-950 select-none dark:text-white'
+  return (
+    <Group title={t('settings.appearance')}>
+      <div className="grid grid-cols-[1fr_auto_2rem] grid-rows-[3.5rem_3.5rem] items-center gap-x-2">
+        <span className={label}>{t('settings.interface')}</span>
+        <div className="flex justify-end">
+          <Segmented
+            label={t('settings.interface')}
+            value={theme}
+            onChange={(next) => prefsStore.getState().setTheme(next)}
+            options={THEMES.map((th) => ({ value: th, label: t(`theme.${th}` as MessageKey) }))}
+          />
+        </div>
+        {/* The bracket runs from the middle of one row to the middle of the other. */}
+        <div className="col-start-3 row-span-2 row-start-1 flex h-full flex-col items-center py-7">
+          <span className={clsx('w-[calc(50%+0.5px)] flex-1 self-start rounded-tr-md border-t border-r transition-colors', line)} />
+          <button
+            type="button"
+            aria-pressed={linked}
+            aria-label={t(linked ? 'settings.unlinkBoard' : 'settings.linkBoard')}
+            title={t(linked ? 'settings.unlinkBoard' : 'settings.linkBoard')}
+            onClick={() => prefsStore.setState({ linkBoardToTheme: !linked })}
+            className={clsx(
+              'my-1 flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+              linked
+                ? 'bg-blue-600/10 text-blue-600 hover:bg-blue-600/15 dark:bg-blue-400/15 dark:text-blue-400 dark:hover:bg-blue-400/20'
+                : 'text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200'
+            )}
+          >
+            {linked ? <LinkIcon className="size-4" /> : <LinkSlashIcon className="size-4" />}
+          </button>
+          <span className={clsx('w-[calc(50%+0.5px)] flex-1 self-start rounded-br-md border-r border-b transition-colors', line)} />
+        </div>
+        <span className={label}>{t('settings.board')}</span>
+        <div className="flex justify-end">{boardControl}</div>
+      </div>
+      {linked && <Text className="pb-1">{t('settings.linkedHint')}</Text>}
+    </Group>
+  )
+}
 
 function GeneralSettings({ fixedLanguage }: { fixedLanguage?: boolean }) {
   const t = useT()
   const lang = usePrefs((s) => s.lang)
-  const theme = usePrefs((s) => s.theme)
-  const darkTheme = useFeatures((s) => s.flags.darkTheme)
   return (
     <>
-      <Group>
-        {!fixedLanguage && (
+      {!fixedLanguage && (
+        <Group>
           <Row label={t('settings.language')}>
             <Select value={lang} onChange={(e) => prefsStore.getState().setLang(e.target.value as Lang)}>
               {(Object.keys(LANGUAGES) as Lang[]).map((l) => (
@@ -57,18 +130,9 @@ function GeneralSettings({ fixedLanguage }: { fixedLanguage?: boolean }) {
               ))}
             </Select>
           </Row>
-        )}
-        {darkTheme && (
-          <Row label={t('settings.theme')}>
-            <Segmented
-              label={t('settings.theme')}
-              value={theme}
-              onChange={(next) => prefsStore.getState().setTheme(next)}
-              options={THEMES.map((th) => ({ value: th, label: t(`theme.${th}` as MessageKey) }))}
-            />
-          </Row>
-        )}
-      </Group>
+        </Group>
+      )}
+      <AppearanceSettings />
     </>
   )
 }
