@@ -9,8 +9,8 @@ import { isAccessError, isAuthError } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { EditorDocument, type TitlePort } from './editorDocument'
-import { LibrarySync, publishBoard, setStatus, statusFor, type SyncStatus } from './librarySync'
-import { activeLink, linkBoard, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
+import { LibrarySync, publishBoard, serverCopyState, setStatus, statusFor, type SyncStatus } from './librarySync'
+import { activeLink, forgetServerCopy, linkBoard, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
 import { outboxFor } from './outbox'
 import { Presence } from './presence'
 import { webSocketTransport } from './transport'
@@ -161,6 +161,8 @@ class SyncCoordinator {
       onState: state => {
         const status = sessionStatus(state)
         if (status) setStatus(localId, status)
+        // Deleted on the server while open here: the board stays on this device, without sync.
+        if (state.status === 'no-access') void serverCopyState(link).then(state => state === 'gone' && forgetServerCopy(localId), () => undefined)
       },
       onPeers: peers => presence.setPeers(peers),
       onSignal: (peer, data) => presence.receive(peer, data)

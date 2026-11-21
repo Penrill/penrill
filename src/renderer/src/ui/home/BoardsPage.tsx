@@ -1,9 +1,11 @@
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
   ArrowUpTrayIcon,
   CloudArrowUpIcon,
   DocumentDuplicateIcon,
   EllipsisHorizontalIcon,
+  EyeSlashIcon,
   FolderIcon,
   FolderOpenIcon,
   MapPinIcon,
@@ -32,7 +34,7 @@ import { account } from '../../sync/accounts'
 import type { RemoteBoard } from '../../sync/api'
 import { syncCoordinator } from '../../sync/coordinator'
 import { openRemote, remoteBoard, useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
-import { activeLink, linkBoard, linkFor, removeLink, useLinks, type Link } from '../../sync/links'
+import { activeLink, allLinks, forgetServerCopy, hiddenRemotes, hideRemote, linkBoard, linkFor, removeFromServer, stopSyncing, useLinks, type Link } from '../../sync/links'
 import { BoardTagsDialog, ConfirmAlert, RenameDialog } from './dialogs'
 import { canShareBoard, ShareBoardDialog } from './Folders'
 import { Card, CardBadges, CardGrid, CardMeta, CardTitle, EmptyState, PageHeader, Picture, Section, TagDot, tagBadgeColor, useImageUrl } from './parts'
@@ -153,7 +155,10 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
             </DropdownItem>
           )}
           {link && (
-            <DropdownItem title={t('sync.stopBoardHint')} onClick={run(async () => removeLink(entry.id))}>
+            <DropdownItem title={t('sync.stopBoardHint')} onClick={run(async () => {
+                stopSyncing(entry.id)
+                await syncCoordinator.refresh()
+              })}>
               <CloudIcon />
               <DropdownLabel>{t('sync.stopBoard')}</DropdownLabel>
             </DropdownItem>
@@ -206,7 +211,10 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
             </Badge>
           )}
           {link && status === 'denied' && (
-            <Button plain className="-my-1 text-xs!" title={t('storage.deniedHelp')} onClick={run(async () => removeLink(entry.id))}>
+            <Button plain className="-my-1 text-xs!" title={t('storage.deniedHelp')} onClick={run(async () => {
+              forgetServerCopy(entry.id)
+              await syncCoordinator.refresh()
+            })}>
               {t('storage.keepLocal')}
             </Button>
           )}
@@ -235,7 +243,11 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
         message={t('card.confirmDeleteForever', { title: entry.title })}
         confirm={t('card.deleteForever')}
         onClose={close}
-        onConfirm={() => void lib.purge(entry.id).then(refresh)}
+        onConfirm={() => {
+          // Deleting for good also takes the board off the server.
+          if (linkFor(entry.id)) removeFromServer(entry.id)
+          void lib.purge(entry.id).then(refresh).then(() => syncCoordinator.refresh())
+        }}
       />
     </>
   )
@@ -283,12 +295,31 @@ function RemoteCard({ origin, row }: { origin: string; row: RemoteBoard }) {
   const t = useT()
   const lang = usePrefs((s) => s.lang)
   const open = (): void => void openRemote(origin, row).catch(() => window.alert(t('storage.error')))
+  const user = account(origin)?.name
+  const menu = (
+    <CardMenu>
+      <DropdownItem onClick={open}>
+        <ArrowDownTrayIcon />
+        <DropdownLabel>{t('home.download')}</DropdownLabel>
+      </DropdownItem>
+      {user && (
+        <DropdownItem title={t('home.hideRemoteHint')} onClick={() => hideRemote(origin, user, row.id)}>
+          <EyeSlashIcon />
+          <DropdownLabel>{t('home.hideRemote')}</DropdownLabel>
+        </DropdownItem>
+      )}
+    </CardMenu>
+  )
   return (
-    <Card label={row.title} picture={<RemotePicture origin={origin} row={row} />} onOpen={open}>
+    <Card label={row.title} picture={<RemotePicture origin={origin} row={row} />} onOpen={open} menu={menu}>
       <CardTitle>{row.title}</CardTitle>
       <CardMeta>{t('home.edited', { when: relativeTime(lang, Date.parse(row.updated)) })}</CardMeta>
       <CardBadges>
-        {row.owner && row.owner !== account(origin)?.name && (
+        <Badge title={t('home.onServerHint')}>
+          <CloudIcon className="size-3" />
+          {t('home.onServer')}
+        </Badge>
+        {row.owner && row.owner !== user && (
           <Badge title={t('home.ownerHint', { owner: row.owner })}>
             <UserIcon className="size-3" />
             {row.owner}
@@ -315,9 +346,12 @@ export function BoardsPage({ tag, onClearTag, origin }: { tag: Tag | null; onCle
     return { pinned: live.filter((b) => b.pinned), rest: live.filter((b) => !b.pinned) }
   }, [boards, q, tag])
 
-  // Boards on the server this device hasn't downloaded yet, among the others by date.
-  const known = new Set(boards.filter((b) => !b.deletedAt).map((b) => activeLink(b.id)).filter((l) => l?.origin === origin).map((l) => l?.remote))
-  const remote = account(origin) && catalog.origin === origin && !tag ? catalog.rows.filter((r) => !known.has(r.id) && r.title.toLowerCase().includes(q)) : []
+  // Boards on the server this device never had, among the others by date. A board in the trash,
+  // deleted from it or no longer synced here is not offered again.
+  useLinks((s) => s.version)
+  const user = account(origin)?.name
+  const known = user ? new Set([...allLinks().filter(([, l]) => l.origin === origin && l.user === user).map(([, l]) => l.remote), ...hiddenRemotes(origin, user)]) : new Set<string>()
+  const remote = user && catalog.origin === origin && !tag ? catalog.rows.filter((r) => !known.has(r.id) && r.title.toLowerCase().includes(q)) : []
   const cards = [
     ...rest.map((entry) => ({ key: entry.id, updated: entry.updatedAt, card: <BoardCard key={entry.id} entry={entry} tags={tags} /> })),
     ...remote.map((row) => ({ key: 'remote-' + row.id, updated: Date.parse(row.updated), card: <RemoteCard key={'remote-' + row.id} origin={origin} row={row} /> }))

@@ -168,6 +168,11 @@ export class PenrillClient {
     }
   }
 
+  /** Removes one of this account's boards from the server; devices still syncing it find it gone. */
+  async deleteBoard(id: string): Promise<void> {
+    await this.call({ method: 'DELETE', path: `/api/boards/${id}` })
+  }
+
   async submit(id: string, change: Change): Promise<number> {
     return (await this.json<{ seq: number }>({ method: 'POST', path: `/api/boards/${id}/changes`, ...jsonBody(change) })).seq
   }

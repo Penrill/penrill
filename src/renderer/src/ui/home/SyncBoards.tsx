@@ -12,7 +12,7 @@ import { boardLibrary } from '../../boardLibrary'
 import { cloudOrigin } from '../../storagePreference'
 import { syncCoordinator } from '../../sync/coordinator'
 import { useSyncStatus } from '../../sync/librarySync'
-import { activeLink, linkBoard, removeLink, setSyncsNewBoards, syncsNewBoards, useLinks } from '../../sync/links'
+import { activeLink, linkBoard, setSyncsNewBoards, stopSyncing, syncsNewBoards, useLinks } from '../../sync/links'
 import { useDeviceBoards } from './BoardsPage'
 import { Picture, useImageUrl } from './parts'
 
@@ -118,7 +118,7 @@ export function SyncedBoards({ origin }: { origin: string }) {
   const synced = boards.filter((b) => activeLink(b.id)).length
   const set = (id: string, on: boolean): void => {
     if (on) linkBoard(id, origin)
-    else removeLink(id)
+    else stopSyncing(id)
     void syncCoordinator.refresh()
   }
   return (

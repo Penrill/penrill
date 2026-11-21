@@ -14,8 +14,8 @@ import { account } from './accounts'
 import { ApiError, isAccessError, isAuthError, isPermanent, type BoardContent, type Community, type RemoteBoard } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
-import { linkedBoards, saveLink, scopeOf, type Link } from './links'
-import { outboxFor } from './outbox'
+import { allLinks, deletionDone, forgetServerCopy, linkedBoards, pendingDeletions, removeFromServer, saveLink, scopeOf, type Link } from './links'
+import { clearOutbox, outboxFor } from './outbox'
 import { refreshTemplates } from './templates'
 import { fromWire, toWire } from './wire'
 
@@ -60,6 +60,21 @@ export async function refreshCommunity(origin: string): Promise<void> {
   const catalog = await clientFor(origin).community()
   useCommunity.setState({ origin, catalog })
   await refreshTemplates(origin, catalog.templates)
+}
+
+/**
+ * Where a board missing from the server's list stands: just made (the list is older), deleted by its
+ * owner, or no longer shared with this account. Network trouble throws.
+ */
+export async function serverCopyState(link: Link): Promise<'here' | 'gone' | 'denied'> {
+  try {
+    await clientFor(link.origin).snapshot(link.remote)
+    return 'here'
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return 'gone'
+    if (isAccessError(error) || isAuthError(error)) return 'denied'
+    throw error
+  }
 }
 
 export async function openRemote(origin: string, row: RemoteBoard): Promise<void> {
@@ -110,6 +125,8 @@ export class LibrarySync {
 
   private async pass(): Promise<void> {
     const entries = new Map((await platform.library.list()).boards.map(entry => [entry.id, entry]))
+    this.followTrash(entries)
+    await this.deleteServerCopies()
     const byOrigin = new Map<string, [string, Link][]>()
     for (const [localId, link] of linkedBoards()) {
       if (!entries.has(localId) || entries.get(localId)!.deletedAt) continue
@@ -119,6 +136,39 @@ export class LibrarySync {
     if (listed && account(listed) && !byOrigin.has(listed)) byOrigin.set(listed, [])
     if (listed && !account(listed)) useRemoteBoards.setState({ origin: listed, rows: [], error: false })
     await Promise.all([...byOrigin].map(([origin, boards]) => this.syncOrigin(origin, boards, entries)))
+  }
+
+  /**
+   * Boards deleted for good on this device (by hand or after their time in the trash) take their
+   * server copy with them. Only boards this device saw in its trash count: a library that comes up
+   * empty for another reason must not empty the server.
+   */
+  private followTrash(entries: Map<string, BoardEntry>): void {
+    for (const [localId, link] of allLinks()) {
+      const entry = entries.get(localId)
+      if (!entry) {
+        if (link.trashed) removeFromServer(localId)
+      } else if (!!entry.deletedAt !== !!link.trashed) {
+        saveLink(localId, { ...link, trashed: entry.deletedAt ? true : undefined }, true)
+      }
+    }
+  }
+
+  private async deleteServerCopies(): Promise<void> {
+    for (const [localId, link] of pendingDeletions()) {
+      if (account(link.origin)?.name !== link.user) continue
+      try {
+        if (link.published) await clientFor(link.origin).deleteBoard(link.remote)
+      } catch (error) {
+        // Not this account's board (403) or already gone (404): nothing left to delete.
+        if (!isAccessError(error)) {
+          this.problem(link.origin, error)
+          continue
+        }
+      }
+      await clearOutbox(scopeOf(link)).catch(() => undefined)
+      deletionDone(localId)
+    }
   }
 
   private async syncOrigin(origin: string, boards: [string, Link][], entries: Map<string, BoardEntry>): Promise<void> {
@@ -168,8 +218,14 @@ export class LibrarySync {
       }
     }
     const seq = seqs.get(link.remote)
-    if (seq === undefined && link.seq !== null && link.published) return 'denied'
-    if (seq !== link.seq) await this.pull(localId, link, entry)
+    if (seq === undefined && link.seq !== null && link.published) {
+      const state = await serverCopyState(link)
+      if (state === 'gone') {
+        forgetServerCopy(localId)
+        return 'synced'
+      }
+      if (state === 'denied') return 'denied'
+    } else if (seq !== link.seq) await this.pull(localId, link, entry)
     if (!this.isLive(localId)) await outbox.prune()
     return 'synced'
   }

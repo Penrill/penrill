@@ -15,7 +15,7 @@ export interface HttpResponse {
 
 const LOOPBACK = ['localhost', '127.0.0.1', '[::1]']
 const API_PATH = /^\/api\/[A-Za-z0-9/_-]*$/
-const METHODS = new Set(['GET', 'PUT', 'POST'])
+const METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE'])
 const TIMEOUT_MS = 20_000
 
 export function serverOrigin(address: string): string {

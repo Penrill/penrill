@@ -45,6 +45,13 @@ function eachRow(store: IDBObjectStore, scope: string, visit: (row: Row, cursor:
   }
 }
 
+/** Drops every change kept for a board whose server copy is gone. */
+export function clearOutbox(scope: string): Promise<void> {
+  return write(store => eachRow(store, scope, (_row, cursor) => {
+    cursor.delete()
+  }))
+}
+
 export function outboxFor(scope: string): BoardOutbox {
   return {
     async list(): Promise<OutboxEntry[]> {
