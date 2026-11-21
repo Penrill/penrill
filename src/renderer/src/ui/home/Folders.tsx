@@ -1,4 +1,4 @@
-import { FolderIcon, FolderPlusIcon, ShareIcon, UserPlusIcon } from '@heroicons/react/16/solid'
+import { FolderIcon, FolderPlusIcon, ShareIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@penrill/ui/dialog'
@@ -147,6 +147,74 @@ export function canShareBoard(link: Link | null, owner: string | null): link is 
   return !!link && !owner && !!link.published && account(link.origin)?.name === link.user
 }
 
+/** People let in to draw on one board by username: the owner adds and removes them here. */
+function PeopleSection({ link }: { link: Link }) {
+  const t = useT()
+  const [people, setPeople] = useState<string[] | null>(null)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const load = (): Promise<void> => clientFor(link.origin).boardPeople(link.remote).then(setPeople)
+  useEffect(() => {
+    void load().catch(() => setFailed(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [link.origin, link.remote])
+
+  const change = async (action: () => Promise<void>): Promise<boolean> => {
+    setBusy(true)
+    setFailed(false)
+    try {
+      await action()
+      await load()
+      return true
+    } catch {
+      setFailed(true)
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+  const add = (e: FormEvent): void => {
+    e.preventDefault()
+    void change(() => clientFor(link.origin).addBoardPerson(link.remote, name.trim())).then((ok) => ok && setName(''))
+  }
+
+  return (
+    <div>
+      <Subheading className="m-0">{t('people.title')}</Subheading>
+      {people && people.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {people.map((p) => (
+            <Badge key={p}>
+              {p}
+              <button
+                type="button"
+                disabled={busy}
+                aria-label={t('people.remove', { name: p })}
+                title={t('people.remove', { name: p })}
+                className="-mr-1 rounded-sm opacity-60 hover:opacity-100"
+                onClick={() => void change(() => clientFor(link.origin).removeBoardPerson(link.remote, p))}
+              >
+                <XMarkIcon className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+      <form className="mt-3 flex items-center gap-2" onSubmit={add}>
+        <div className="flex-1">
+          <Input required disabled={busy} aria-label={t('share.username')} placeholder={t('share.username')} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <Button type="submit" outline disabled={busy}>
+          <UserPlusIcon />
+          {t('folders.add')}
+        </Button>
+      </form>
+      {failed && <Text className="mt-2 text-red-600! dark:text-red-500!">{t('people.failed')}</Text>}
+    </div>
+  )
+}
+
 /** Puts one of this person's synced boards into a folder, so its members see it among their boards. */
 export function ShareBoardDialog({ entry, link, onClose }: { entry: BoardEntry; link: Link; onClose: () => void }) {
   const t = useT()
@@ -165,8 +233,11 @@ export function ShareBoardDialog({ entry, link, onClose }: { entry: BoardEntry; 
   return (
     <Dialog open onClose={onClose} size="md">
       <DialogTitle>{t('folders.shareTitle', { name: entry.title })}</DialogTitle>
-      <DialogDescription>{t('folders.shareHint')}</DialogDescription>
+      <DialogDescription>{t('people.hint')}</DialogDescription>
       <DialogBody>
+        <PeopleSection link={link} />
+        <Subheading className="mt-6 m-0">{t('folders.title')}</Subheading>
+        <Text className="mt-1 mb-3">{t('folders.shareHint')}</Text>
         {sharedIn.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-1.5">
             <Text className="m-0">{t('folders.sharedIn')}</Text>

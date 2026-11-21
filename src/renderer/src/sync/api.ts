@@ -198,6 +198,19 @@ export class PenrillClient {
     await this.call({ method: 'POST', path: '/api/members', ...jsonBody({ folder, name }) })
   }
 
+  /** Names of the people the owner let in to draw on this board. */
+  boardPeople(id: string): Promise<string[]> {
+    return this.json({ method: 'GET', path: `/api/boards/${id}/people` })
+  }
+
+  async addBoardPerson(id: string, name: string): Promise<void> {
+    await this.call({ method: 'POST', path: `/api/boards/${id}/people`, ...jsonBody({ name }) })
+  }
+
+  async removeBoardPerson(id: string, name: string): Promise<void> {
+    await this.call({ method: 'DELETE', path: `/api/boards/${id}/people/${encodeURIComponent(name)}` })
+  }
+
   async shareBoard(folder: string, board: string): Promise<void> {
     await this.call({ method: 'POST', path: '/api/share-board', ...jsonBody({ folder, board }) })
   }
