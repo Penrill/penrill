@@ -27,6 +27,8 @@ interface BoardWorkspaceProps {
   menu?: ReactNode
   /** The app's templates button, shown in the insert bar. */
   extraTools?: ReactNode
+  /** Top right, before the board's background and settings: the app's way to share the board. */
+  share?: ReactNode
   selectionActions?: (side: 'above' | 'below') => ReactNode
   storageSettings?: ReactNode
   about?: ReactNode
@@ -43,7 +45,7 @@ interface BoardWorkspaceProps {
 }
 
 export function BoardWorkspace({
-  editor, fileActions, menu, extraTools, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
+  editor, fileActions, menu, extraTools, share, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
 }: BoardWorkspaceProps) {
   useAppTheme()
   useEffect(() => {
@@ -78,7 +80,8 @@ export function BoardWorkspace({
         <div className="col-span-2 row-start-2 flex min-w-0 justify-center lg:col-span-1 lg:col-start-2 lg:row-start-1">
           <ToolOptions />
         </div>
-        <div className="col-start-2 row-start-1 flex justify-end lg:col-start-3">
+        <div className="col-start-2 row-start-1 flex items-start justify-end gap-2 lg:col-start-3">
+          {share}
           <BoardActions
             storageSettings={storageSettings}
             about={about}

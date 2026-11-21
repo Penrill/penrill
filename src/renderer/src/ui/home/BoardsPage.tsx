@@ -34,9 +34,9 @@ import { account } from '../../sync/accounts'
 import type { RemoteBoard } from '../../sync/api'
 import { syncCoordinator } from '../../sync/coordinator'
 import { openRemote, remoteBoard, useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
-import { activeLink, allLinks, forgetServerCopy, hiddenRemotes, hideRemote, linkBoard, linkFor, removeFromServer, stopSyncing, useLinks, type Link } from '../../sync/links'
+import { activeLink, allLinks, forgetServerCopy, hiddenRemotes, hideRemote, linkBoard, linkFor, removeFromServer, stopSyncing, useLinks } from '../../sync/links'
 import { BoardTagsDialog, ConfirmAlert, RenameDialog } from './dialogs'
-import { canShareBoard, ShareBoardDialog } from './Folders'
+import { canShareBoard, ShareBoardDialog, useOwner } from '../share/ShareBoard'
 import { Card, CardBadges, CardGrid, CardMeta, CardTitle, EmptyState, PageHeader, Picture, Section, TagDot, tagBadgeColor, useImageUrl } from './parts'
 
 const lib = platform.library
@@ -60,14 +60,6 @@ export function useDeviceBoards(): BoardEntry[] {
     const link = linkFor(b.id)
     return !link || account(link.origin)?.name === link.user
   })
-}
-
-/** Whose a synced board is, when it is someone else's (shared with this account in a folder). */
-function useOwner(link: Link | null): string | null {
-  const rows = useRemoteBoards((s) => s.rows)
-  if (!link) return null
-  const owner = rows.find((r) => r.id === link.remote)?.owner
-  return owner && owner !== link.user ? owner : null
 }
 
 function CardMenu({ children }: { children: ReactNode }) {
@@ -237,7 +229,7 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
         onSave={(name) => void boardLibrary.renameBoard(entry.id, name)}
       />
       {dialog === 'tags' && <BoardTagsDialog open entry={entry} tags={tags} onClose={close} />}
-      {dialog === 'share' && canShareBoard(link, owner) && <ShareBoardDialog entry={entry} link={link} onClose={close} />}
+      {dialog === 'share' && <ShareBoardDialog boardId={entry.id} title={entry.title} onClose={close} />}
       <ConfirmAlert
         open={dialog === 'purge'}
         message={t('card.confirmDeleteForever', { title: entry.title })}

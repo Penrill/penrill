@@ -278,7 +278,7 @@ class BoardLibrary {
     const connect = (link: string) => {
       try {
         const target = parseConnectTarget(link)
-        if (target.join) return joinFlow.start(target.origin, target.join)
+        if (target.join) return void joinFlow.start(target.origin, target.join)
       } catch {
         // Not a connect link: the connect flow reports it.
       }

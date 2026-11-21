@@ -211,18 +211,26 @@ export class PenrillClient {
     await this.call({ method: 'DELETE', path: `/api/boards/${id}/people/${encodeURIComponent(name)}` })
   }
 
-  /** The token of this board's draw link, made on first use. */
-  async boardLinkToken(id: string): Promise<string> {
-    return (await this.json<{ token: string }>({ method: 'GET', path: `/api/boards/${id}/link` })).token
+  /** The token of this board's draw link, or null while the link is off. */
+  async boardLink(id: string): Promise<string | null> {
+    return (await this.json<{ token: string | null }>({ method: 'GET', path: `/api/boards/${id}/link` })).token
+  }
+
+  /** Turns the draw link on; the token stays the same until it is turned off. */
+  async turnOnBoardLink(id: string): Promise<string> {
+    return (await this.json<{ token: string }>({ method: 'POST', path: `/api/boards/${id}/link` })).token
   }
 
   async turnOffBoardLink(id: string): Promise<void> {
     await this.call({ method: 'DELETE', path: `/api/boards/${id}/link` })
   }
 
-  /** Opens a draw link: the server makes a guest account that can reach only that board. */
-  join(token: string, name: string): Promise<{ name: string; token: string; board: string }> {
-    return this.json({ method: 'POST', path: '/api/join', ...jsonBody({ token, name }) }, false)
+  /**
+   * Opens a draw link. With an account on this device the server just adds the board to it (and
+   * answers no token); without one it makes a guest account, named after `name`, for that board.
+   */
+  join(link: string, name: string | null): Promise<{ name: string; token: string | null; board: string }> {
+    return this.json({ method: 'POST', path: '/api/join', ...jsonBody({ token: link, name }) }, name === null)
   }
 
   async shareBoard(folder: string, board: string): Promise<void> {

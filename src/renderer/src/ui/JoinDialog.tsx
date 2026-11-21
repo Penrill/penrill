@@ -12,8 +12,7 @@ export function JoinDialog() {
   const t = useT()
   const state = useJoin()
   const [name, setName] = useState('')
-  if (state.step === 'idle') return null
-  const blocked = state.step === 'ask' && state.failed === 'signedIn'
+  if (state.step === 'idle' || (state.step === 'joining' && !state.asked)) return null
   const busy = state.step === 'joining'
   const submit = (e: FormEvent): void => {
     e.preventDefault()
@@ -23,27 +22,23 @@ export function JoinDialog() {
     <Dialog open onClose={joinFlow.close} size="sm">
       <form onSubmit={submit}>
         <DialogTitle>{t('join.title')}</DialogTitle>
-        <DialogDescription>{t(blocked ? 'join.signedIn' : 'join.hint')}</DialogDescription>
-        {!blocked && (
-          <DialogBody>
-            <Field disabled={busy}>
-              <Label>{t('join.name')}</Label>
-              <Input autoFocus required maxLength={32} value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            {state.step === 'ask' && state.failed && state.failed !== 'signedIn' && (
-              <Text className="mt-4 text-red-600! dark:text-red-500!">{t(state.failed === 'unknown' ? 'join.unknown' : 'join.failed')}</Text>
-            )}
-          </DialogBody>
-        )}
+        <DialogDescription>{t('join.hint')}</DialogDescription>
+        <DialogBody>
+          <Field disabled={busy}>
+            <Label>{t('join.name')}</Label>
+            <Input autoFocus required maxLength={32} value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          {state.step === 'ask' && state.failed && (
+            <Text className="mt-4 text-red-600! dark:text-red-500!">{t(state.failed === 'unknown' ? 'join.unknown' : 'join.failed')}</Text>
+          )}
+        </DialogBody>
         <DialogActions>
           <Button plain onClick={joinFlow.close}>
-            {t(blocked ? 'common.close' : 'common.cancel')}
+            {t('common.cancel')}
           </Button>
-          {!blocked && (
-            <Button type="submit" color="blue" disabled={busy || !name.trim()}>
-              {t('join.button')}
-            </Button>
-          )}
+          <Button type="submit" color="blue" disabled={busy || !name.trim()}>
+            {t('join.button')}
+          </Button>
         </DialogActions>
       </form>
     </Dialog>

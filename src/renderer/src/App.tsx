@@ -9,6 +9,7 @@ import { JoinDialog } from './ui/JoinDialog'
 import { HomeScreen } from './ui/home/HomeScreen'
 import { MainMenu } from './ui/MainMenu'
 import { SaveSelectionTemplate } from './ui/SaveSelectionTemplate'
+import { ShareButton } from './ui/share/ShareBoard'
 import { TemplatesMenu } from './ui/TemplatesMenu'
 import { AboutSection, UpdateBanner } from './ui/UpdateBanner'
 import { useApp } from './appState'
@@ -44,6 +45,7 @@ export function App() {
       fileActions={fileActions}
       menu={<MainMenu />}
       extraTools={<TemplatesMenu />}
+      share={<ShareButton />}
       selectionActions={() => <SaveSelectionTemplate />}
       storageSettings={settings.storageSettings}
       about={settings.about}
