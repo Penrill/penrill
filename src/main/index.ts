@@ -1,5 +1,5 @@
 import { sendHttp } from '../shared/http'
-import { app, BrowserWindow, dialog, ipcMain, Menu, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,7 @@ import { initFeatures } from './features'
 import { safeFileName, writeDurable } from './fsutil'
 import { Library } from './library'
 import { initUpdater } from './updater'
+import { connectArg, Connections, deviceName, discover, openExternal, probe, registerScheme } from './connect'
 import { BOARD_EXT, BOARD_EXTS, isBoardFileName } from '../shared/boardFile'
 
 const FILE_FILTERS = [{ name: 'Penrill', extensions: BOARD_EXTS }]
@@ -19,6 +20,9 @@ app.setPath('userData', process.env['PENRILL_USER_DATA'] || process.env['INKBOAR
 
 let mainWindow: BrowserWindow | null = null
 let library: Library
+let connections: Connections
+/** penrill:// connect links that arrived before the page could take them. */
+const pendingLinks: string[] = []
 /** Set right before an update installs: the page already saved, skip the close handshake. */
 let installingUpdate = false
 /** Board files passed on the command line / via "Open with" before the window was ready. */
@@ -32,6 +36,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', (_e, argv) => {
+    const link = connectArg(argv)
+    if (link) deliverLink(link)
     const path = boardArg(argv)
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -47,6 +53,20 @@ app.on('open-file', (e, path) => {
   if (mainWindow && library) void openPathInApp(path)
   else pendingPaths.push(path)
 })
+
+// macOS delivers penrill:// links via an event (also before `ready`).
+app.on('open-url', (e, url) => {
+  e.preventDefault()
+  deliverLink(url)
+})
+
+function deliverLink(link: string): void {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+    mainWindow.webContents.send('connect:link', link)
+  } else pendingLinks.push(link)
+}
 
 async function openPathInApp(path: string): Promise<void> {
   try {
@@ -93,10 +113,22 @@ async function svgToPdf(svg: string, width: number, height: number): Promise<Uin
 
 function registerIpc(): void {
   const h = ipcMain.handle.bind(ipcMain)
-  h('server:http', (event, origin, request) => {
+  const fromApp = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): void => {
     if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('Unexpected sender')
-    return sendHttp(origin, request)
+  }
+  h('server:http', (event, origin, request) => {
+    fromApp(event)
+    return sendHttp(origin, request, net.fetch.bind(net) as typeof fetch)
   })
+  ipcMain.on('connect:init', (event) => {
+    event.returnValue = { deviceName: deviceName(), accounts: connections.accounts }
+  })
+  h('connect:probe', (event, origin: string) => (fromApp(event), probe(origin)))
+  h('connect:trust', (event, origin: string, pin: string) => (fromApp(event), connections.trust(origin, pin)))
+  h('connect:open', (event, url: string) => (fromApp(event), openExternal(url)))
+  h('connect:discover', (event) => (fromApp(event), discover()))
+  h('connect:save-account', (event, origin: string, value) => (fromApp(event), connections.saveAccount(origin, value)))
+  h('connect:take-pending', (event) => (fromApp(event), pendingLinks.splice(0)))
 
   h('library:list', () => library.list())
   h('library:thumb', (_e, id: string) => library.thumb(id))
@@ -247,6 +279,11 @@ app.whenReady().then(async () => {
 
   const argPath = boardArg(process.argv)
   if (argPath) pendingPaths.push(argPath)
+  connections = new Connections(userData)
+  await connections.init()
+  registerScheme()
+  const argLink = connectArg(process.argv)
+  if (argLink) pendingLinks.push(argLink)
 
   registerIpc()
   initUpdater(

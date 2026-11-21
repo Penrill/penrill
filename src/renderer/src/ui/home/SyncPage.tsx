@@ -1,22 +1,24 @@
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/16/solid'
-import { CloudIcon, ComputerDesktopIcon, ServerStackIcon } from '@heroicons/react/20/solid'
+import { CloudIcon, ServerStackIcon, SignalIcon } from '@heroicons/react/20/solid'
 import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
 import { DescriptionDetails, DescriptionList, DescriptionTerm } from '@penrill/ui/description-list'
 import { Divider } from '@penrill/ui/divider'
-import { Description, ErrorMessage, Field, FieldGroup, Fieldset, Label, Legend } from '@penrill/ui/fieldset'
+import { Description, Field, Label } from '@penrill/ui/fieldset'
 import { Subheading } from '@penrill/ui/heading'
 import { Input } from '@penrill/ui/input'
-import { Radio, RadioField, RadioGroup } from '@penrill/ui/radio'
 import { Text, TextLink } from '@penrill/ui/text'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useT, type MessageKey } from '../../../../board/i18n'
-import { serverOrigin } from '../../../../shared/http'
+import { shortPin } from '../../../../shared/connect'
+import type { FoundServer } from '../../../../shared/platform'
 import { boardLibrary } from '../../boardLibrary'
-import { cloudLabel, cloudOrigin, hostedCloud, storagePreference, type StorageSource } from '../../storagePreference'
+import { platform } from '../../platform'
+import { cloudLabel, cloudOrigin, hostedCloud, setStoragePreference, storagePreference } from '../../storagePreference'
 import { account, rememberAccount, useAccounts } from '../../sync/accounts'
 import { ApiError } from '../../sync/api'
 import { clientFor } from '../../sync/clients'
+import { connectFlow, useConnect, type ConnectState } from '../../sync/connect'
 import { useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
 import { linkedBoards, useLinks } from '../../sync/links'
 import { PageHeader } from './parts'
@@ -53,241 +55,286 @@ function Connection({ origin }: { origin: string }) {
   )
 }
 
-function SignedIn({ origin, name, live, busy, onSignOut }: { origin: string; name: string; live: boolean; busy: boolean; onSignOut: () => void }) {
+/** Signed in: who, where, how sync is doing, and the way out. */
+function Connected({ pref, name, onChange }: { pref: Preference; name: string; onChange: () => void }) {
   const t = useT()
-  return (
-    <>
-      <DescriptionList className="mt-4">
-        <DescriptionTerm>{t('share.account')}</DescriptionTerm>
-        <DescriptionDetails>{name}</DescriptionDetails>
-        <DescriptionTerm>{t('sync.server')}</DescriptionTerm>
-        <DescriptionDetails className="break-all">{origin}</DescriptionDetails>
-        {live && <Connection origin={origin} />}
-      </DescriptionList>
-      <div className="mt-6">
-        <Button outline disabled={busy} onClick={onSignOut}>
-          {t('share.logout')}
-        </Button>
-      </div>
-    </>
-  )
-}
-
-function Option({ value, icon, label, hint }: { value: StorageSource; icon: ReactNode; label: string; hint: string }) {
-  return (
-    <RadioField>
-      <Radio value={value} color="blue" />
-      <Label className="flex items-center gap-2">
-        <span className="flex text-zinc-500 *:size-4 dark:text-zinc-400">{icon}</span>
-        {label}
-      </Label>
-      <Description>{hint}</Description>
-    </RadioField>
-  )
-}
-
-/**
- * Where boards are kept besides this device: nowhere, Penrill Cloud or a self-hosted Penrill Server,
- * and the account there. Not something most people need, but it should be easy to find.
- */
-export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () => void }) {
-  const t = useT()
-  useAccounts((s) => s.version)
-  const [source, setSource] = useState<StorageSource>(pref.source)
-  const [address, setAddress] = useState(pref.address)
-  const [name, setName] = useState('')
-  const [password, setPassword] = useState('')
-  const [register, setRegister] = useState(false)
-  const [error, setError] = useState<MessageKey | null>(null)
   const [busy, setBusy] = useState(false)
-  let origin = ''
-  try {
-    origin = source === 'server' ? serverOrigin(address.trim()) : source === 'cloud' ? cloudOrigin : ''
-  } catch {
-    // Checked when saving.
-  }
-  const session = account(origin)
-  const changed = source !== pref.source || (source === 'server' && origin !== pref.origin)
+  const [failed, setFailed] = useState(false)
 
-  function resetCredentials(): void {
-    setName('')
-    setPassword('')
-    setRegister(false)
-    setError(null)
-  }
-
-  async function save(): Promise<void> {
-    if (source !== 'device' && !origin) {
-      setError('storage.invalid')
-      return
-    }
+  async function disconnect(): Promise<void> {
     setBusy(true)
-    setError(null)
-    try {
-      if (origin && !session) {
-        const signedIn = await clientFor(origin).signIn(name, password, register)
-        if (!signedIn.name || !signedIn.token) throw new Error('Invalid account')
-        rememberAccount(origin, signedIn)
-      } else if (origin) await clientFor(origin).boards()
-      if (source === 'server') localStorage.setItem('penrill-server-origin', origin)
-      localStorage.setItem('penrill-library-source', source)
-      resetCredentials()
-      onChange()
-    } catch (reason) {
-      const status = reason instanceof ApiError ? reason.status : 0
-      if (session && status === 401) {
-        rememberAccount(origin, null)
-        onChange()
-      }
-      setError(status === 401 ? 'share.authError' : status === 409 ? 'share.taken' : 'storage.error')
-    } finally {
-      setBusy(false)
-      setPassword('')
-    }
-  }
-
-  async function signOut(): Promise<void> {
-    setBusy(true)
+    setFailed(false)
     try {
       await boardLibrary.save()
       try {
-        await clientFor(origin).signOut()
+        // Ends this device's token on the server too, so it no longer shows among the account's devices.
+        await clientFor(pref.origin).signOut()
       } catch (reason) {
         if (!(reason instanceof ApiError && reason.status === 401)) throw reason
       }
-      rememberAccount(origin, null)
-      resetCredentials()
+      rememberAccount(pref.origin, null)
+      setStoragePreference('device')
+      connectFlow.cancel()
       onChange()
       // Penrill Cloud only has boards of a signed-in account: start over at its sign-in page.
       if (hostedCloud) window.location.reload()
     } catch {
-      setError('storage.error')
+      setFailed(true)
     } finally {
       setBusy(false)
     }
   }
 
-  // Penrill Cloud in the browser: the account is the whole story.
-  if (hostedCloud) {
-    return (
-      <>
-        <PageHeader title={t('home.sync')} description={t('sync.cloudHint')} />
-        <Divider className="my-10" soft />
-        <Subheading className="m-0">{t('share.account')}</Subheading>
-        {session && <SignedIn origin={cloudOrigin} name={session.name} live busy={busy} onSignOut={() => void signOut()} />}
-        {error && <Text className="mt-4 text-red-600! dark:text-red-500!">{t(error)}</Text>}
-      </>
-    )
-  }
+  return (
+    <>
+      <DescriptionList>
+        <DescriptionTerm>{t('share.account')}</DescriptionTerm>
+        <DescriptionDetails>{name}</DescriptionDetails>
+        <DescriptionTerm>{t('sync.server')}</DescriptionTerm>
+        <DescriptionDetails className="break-all">{pref.source === 'cloud' ? t(cloudLabel) : pref.origin}</DescriptionDetails>
+        <Connection origin={pref.origin} />
+      </DescriptionList>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Button outline disabled={busy} onClick={() => void disconnect()}>
+          {hostedCloud ? t('share.logout') : t('sync.disconnect')}
+        </Button>
+        {pref.source === 'server' && (
+          <Button plain onClick={() => void openPage(`${pref.origin}/account`)}>
+            {t('sync.manage')}
+            <ArrowTopRightOnSquareIcon />
+          </Button>
+        )}
+      </div>
+      {!hostedCloud && <Text className="mt-4">{t('sync.disconnectHint')}</Text>}
+      {failed && <Text className="mt-4 text-red-600! dark:text-red-500!">{t('storage.error')}</Text>}
+    </>
+  )
+}
 
-  const submitLabel: MessageKey = busy ? 'storage.connecting' : origin && !session ? (register ? 'share.register' : 'share.login') : 'storage.apply'
-  const canSubmit = !busy && (changed || (!!origin && !session))
+function openPage(url: string): Promise<void> {
+  if (platform.connect) return platform.connect.openExternal(url)
+  window.open(url, '_blank', 'noopener')
+  return Promise.resolve()
+}
+
+function Choice({ icon, title, hint, children }: { icon: ReactNode; title: string; hint: string; children: ReactNode }) {
+  return (
+    <section className="py-2">
+      <Subheading className="m-0 flex items-center gap-2">
+        <span className="flex text-zinc-500 *:size-4 dark:text-zinc-400">{icon}</span>
+        {title}
+      </Subheading>
+      <Text className="mt-1">{hint}</Text>
+      <div className="mt-4">{children}</div>
+    </section>
+  )
+}
+
+/** Not connected yet: Penrill Cloud, a server by address or link, or one found nearby. */
+function Choices() {
+  const t = useT()
+  const [address, setAddress] = useState('')
+  const [nearby, setNearby] = useState<FoundServer[] | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void platform.connect?.discover().then((found) => alive && setNearby(found), () => alive && setNearby([]))
+    return () => {
+      alive = false
+    }
+  }, [])
 
   return (
     <>
-      <PageHeader title={t('home.sync')} description={t('sync.intro')} />
-      <form
-        className="max-w-2xl"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void save()
-        }}
-      >
-        <Divider className="my-10" soft />
-        <Fieldset disabled={busy}>
-          <Legend>{t('storage.destination')}</Legend>
-          <RadioGroup
-            className="mt-4!"
-            value={source}
-            onChange={(value: string) => {
-              setSource(value as StorageSource)
-              resetCredentials()
-            }}
-          >
-            <Option value="device" icon={<ComputerDesktopIcon />} label={t('storage.device')} hint={t('sync.deviceHint')} />
-            {cloudOrigin && <Option value="cloud" icon={<CloudIcon />} label={t(cloudLabel)} hint={t('sync.cloudHint')} />}
-            <Option value="server" icon={<ServerStackIcon />} label={t('storage.server')} hint={t('sync.serverHint')} />
-          </RadioGroup>
-          {source === 'server' && (
-            <Field className="mt-8">
-              <Label>{t('storage.address')}</Label>
-              <Input
-                type="url"
-                required
-                value={address}
-                placeholder="https://"
-                onChange={(e) => {
-                  setAddress(e.target.value)
-                  resetCredentials()
-                }}
-              />
-              <Description>
-                <TextLink href={SELF_HOST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
-                  {t('sync.selfHost')}
-                  <ArrowTopRightOnSquareIcon className="size-3.5" />
-                </TextLink>
-              </Description>
-            </Field>
-          )}
-        </Fieldset>
-
-        {source !== 'device' && origin && (
-          <>
-            <Divider className="my-10" soft />
-            <Subheading className="m-0">{t('share.account')}</Subheading>
-            {session ? (
-              <SignedIn origin={origin} name={session.name} live={!changed} busy={busy} onSignOut={() => void signOut()} />
-            ) : (
-              <Fieldset disabled={busy} className="mt-2">
-                <Text className="m-0">{t('sync.signInHint')}</Text>
-                <FieldGroup className="mt-6!">
-                  <Field>
-                    <Label>{t('share.username')}</Label>
-                    <Input required autoComplete="username" pattern="[a-z0-9_\-]{3,32}" title={t('share.nameHint')} value={name} onChange={(e) => setName(e.target.value)} />
-                  </Field>
-                  <Field>
-                    <Label>{t('share.password')}</Label>
-                    <Input
-                      required
-                      type="password"
-                      autoComplete={register ? 'new-password' : 'current-password'}
-                      minLength={10}
-                      maxLength={256}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                    {register && <Description>{t('share.nameHint')}</Description>}
-                  </Field>
-                </FieldGroup>
-                <Button
-                  plain
-                  className="mt-4"
-                  onClick={() => {
-                    setRegister(!register)
-                    setError(null)
-                  }}
-                >
-                  {t(register ? 'share.existing' : 'share.createAccount')}
-                </Button>
-              </Fieldset>
-            )}
-          </>
-        )}
-
-        {error && (
-          <Field className="mt-6">
-            <ErrorMessage className="whitespace-pre-line" role="alert">
-              {t(error)}
-            </ErrorMessage>
+      {cloudOrigin && (
+        <>
+          <Choice icon={<CloudIcon />} title={t(cloudLabel)} hint={t('sync.cloudHint')}>
+            <Button color="blue" onClick={() => void connectFlow.connect('cloud')}>
+              {t('storage.connect')}
+            </Button>
+          </Choice>
+          <Divider className="my-8" soft />
+        </>
+      )}
+      <Choice icon={<ServerStackIcon />} title={t('storage.server')} hint={t('sync.serverHint')}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (address.trim()) void connectFlow.connect(address)
+          }}
+        >
+          <Field>
+            <Label>{t('sync.serverField')}</Label>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <div className="min-w-0 flex-1">
+                <Input aria-label={t('sync.serverField')} value={address} spellCheck={false} autoCapitalize="none" placeholder="https://" onChange={(e) => setAddress(e.target.value)} />
+              </div>
+              <Button type="submit" color={cloudOrigin ? 'dark/zinc' : 'blue'} disabled={!address.trim()}>
+                {t('storage.connect')}
+              </Button>
+            </div>
+            <Description>{t('sync.serverFieldHint')}</Description>
           </Field>
+        </form>
+        {platform.connect && (
+          <div className="mt-6">
+            <Text className="flex items-center gap-2 font-medium text-zinc-950! dark:text-white!">
+              <SignalIcon className="size-4 text-zinc-500" />
+              {t('sync.nearby')}
+            </Text>
+            {nearby === null ? (
+              <Text className="mt-2">{t('sync.searching')}</Text>
+            ) : (
+              <ul className="mt-2 divide-y divide-zinc-950/5 dark:divide-white/5">
+                {nearby.map((server) => (
+                  <li key={server.origin} className="flex items-center justify-between gap-3 py-2">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm/6 text-zinc-950 dark:text-white">{server.name}</span>
+                      <span className="block truncate text-xs text-zinc-500">{server.origin}</span>
+                    </span>
+                    <Button outline onClick={() => void connectFlow.connect(server.origin)}>
+                      {t('storage.connect')}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
-        <Divider className="my-10" soft />
-        <div className="flex justify-end">
-          <Button type="submit" color="blue" disabled={!canSubmit}>
-            {t(submitLabel)}
-          </Button>
+        <Text className="mt-6">
+          <TextLink href={SELF_HOST_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">
+            {t('sync.selfHost')}
+            <ArrowTopRightOnSquareIcon className="size-3.5" />
+          </TextLink>
+        </Text>
+      </Choice>
+    </>
+  )
+}
+
+const FAILURES: Record<Extract<ConnectState, { step: 'failed' }>['reason'], MessageKey> = {
+  invalid: 'sync.failed.invalid',
+  unreachable: 'sync.failed.unreachable',
+  outdated: 'sync.failed.outdated',
+  denied: 'sync.failed.denied',
+  expired: 'sync.failed.expired',
+  mismatch: 'sync.failed.mismatch'
+}
+
+/** The connect flow while it runs: checking, comparing a fingerprint, waiting for the browser, or what went wrong. */
+function Progress({ state }: { state: Exclude<ConnectState, { step: 'idle' } | { step: 'connected' }> }) {
+  const t = useT()
+  const cancel = (
+    <Button plain onClick={() => connectFlow.cancel()}>
+      {t('sync.cancel')}
+    </Button>
+  )
+  switch (state.step) {
+    case 'checking':
+      return (
+        <div role="status">
+          <Text>{t('sync.checking', { origin: state.origin })}</Text>
+          <div className="mt-6">{cancel}</div>
         </div>
-      </form>
+      )
+    case 'confirm':
+      return (
+        <div>
+          <Subheading className="m-0">{t('sync.confirmTitle')}</Subheading>
+          <Text className="mt-2">{t('sync.confirmText')}</Text>
+          <p className="mt-4 font-mono text-2xl font-semibold tracking-wider text-zinc-950 dark:text-white">{shortPin(state.pin)}</p>
+          <Text className="mt-1 break-all text-xs!">{state.origin}</Text>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button color="blue" onClick={() => connectFlow.confirm(true)}>
+              {t('sync.trust')}
+            </Button>
+            {cancel}
+          </div>
+        </div>
+      )
+    case 'waiting':
+      return (
+        <div>
+          <Subheading className="m-0">{t('sync.waitingTitle')}</Subheading>
+          <Text className="mt-2">{t(platform.connect ? 'sync.waitingText' : 'sync.waitingTextWeb', { server: state.server })}</Text>
+          <p className="mt-4 font-mono text-3xl font-semibold tracking-[0.15em] text-zinc-950 dark:text-white">{state.userCode}</p>
+          <Text className="mt-4" role="status">
+            {t('sync.waiting')}
+          </Text>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button {...(platform.connect ? { outline: true } : { color: 'blue' })} onClick={() => connectFlow.reopen()}>
+              {t(platform.connect ? 'sync.reopen' : 'sync.openTab')}
+              <ArrowTopRightOnSquareIcon />
+            </Button>
+            {cancel}
+          </div>
+        </div>
+      )
+    case 'failed':
+      return (
+        <div>
+          <Text className="text-red-600! dark:text-red-500!" role="alert">
+            {t(FAILURES[state.reason])}
+          </Text>
+          {state.reason === 'unreachable' && !platform.connect && state.origin?.startsWith('https:') && state.origin !== cloudOrigin && (
+            <Text className="mt-2">
+              {t('sync.failed.certificate')}{' '}
+              <TextLink href={state.origin} target="_blank" rel="noreferrer">
+                {state.origin}
+              </TextLink>
+            </Text>
+          )}
+          <div className="mt-6 flex flex-wrap gap-3">
+            {state.origin && state.reason !== 'mismatch' && (
+              <Button color="blue" onClick={() => void connectFlow.connect(state.origin === cloudOrigin ? 'cloud' : state.origin!)}>
+                {t('sync.retry')}
+              </Button>
+            )}
+            {cancel}
+          </div>
+        </div>
+      )
+  }
+}
+
+/**
+ * Where boards are kept besides this device: nowhere, Penrill Cloud or a Penrill Server. Connecting
+ * never asks for a password here: the browser does that on the server's own page (see sync/connect.ts).
+ */
+export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () => void }) {
+  const t = useT()
+  useAccounts((s) => s.version)
+  const state = useConnect()
+  const session = pref.source !== 'device' ? account(pref.origin) : null
+
+  // A finished connection changes where boards go: let the home screen pick that up, once per connection.
+  const handled = useRef<ConnectState | null>(null)
+  useEffect(() => {
+    if (state.step !== 'connected' || handled.current === state) return
+    handled.current = state
+    onChange()
+  }, [state, onChange])
+
+  return (
+    <>
+      <PageHeader title={t('home.sync')} description={t(hostedCloud ? 'sync.cloudHint' : 'sync.intro')} />
+      <div className="max-w-2xl">
+        <Divider className="my-10" soft />
+        {state.step !== 'idle' && state.step !== 'connected' ? (
+          <Progress state={state} />
+        ) : session ? (
+          <>
+            {state.step === 'connected' && state.origin === pref.origin && (
+              <Text className="mb-6">
+                <Badge color="green">{t('sync.connected', { server: state.server, user: state.user })}</Badge>
+              </Text>
+            )}
+            <Connected pref={pref} name={session.name} onChange={onChange} />
+          </>
+        ) : hostedCloud ? null : (
+          <Choices />
+        )}
+      </div>
     </>
   )
 }

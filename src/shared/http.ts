@@ -25,7 +25,8 @@ export function serverOrigin(address: string): string {
   return url.origin
 }
 
-export async function sendHttp(origin: string, request: HttpRequest): Promise<HttpResponse> {
+/** `fetchImpl`: the desktop app passes Electron's `net.fetch`, which goes through Chromium and its certificate pins. */
+export async function sendHttp(origin: string, request: HttpRequest, fetchImpl: typeof fetch = fetch): Promise<HttpResponse> {
   if (!API_PATH.test(request.path) || !METHODS.has(request.method)) throw new Error('Unexpected API request')
   const url = new URL(request.path, serverOrigin(origin))
   for (const [key, value] of Object.entries(request.query ?? {})) url.searchParams.set(key, value)
@@ -33,7 +34,7 @@ export async function sendHttp(origin: string, request: HttpRequest): Promise<Ht
   if (request.token) headers.set('Authorization', 'Bearer ' + request.token)
   if (request.contentType) headers.set('Content-Type', request.contentType)
   const body = typeof request.body === 'string' ? request.body : request.body ? new Blob([request.body as BlobPart]) : undefined
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     method: request.method, headers, body,
     credentials: 'omit', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS)
   })

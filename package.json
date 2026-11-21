@@ -61,6 +61,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
+    "bonjour-service": "1.4.4",
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.11",
     "motion": "^14.14.0"

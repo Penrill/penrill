@@ -11,3 +11,7 @@
 .cloud-entry input { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--surface); color: var(--text); }
 .cloud-entry .primary { justify-content: center; }
 .cloud-entry [role=alert] { color: var(--danger-text); }
+
+/* Device approval (/link). */
+.cloud-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.9rem; font-weight: 600; letter-spacing: 0.12em; }
+.cloud-actions { display: flex; gap: 12px; flex-wrap: wrap; }

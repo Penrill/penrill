@@ -1,5 +1,5 @@
 import '@penrill/ui/styles.css'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Button } from '@penrill/ui/button'
 import { Input } from '@penrill/ui/input'
@@ -14,7 +14,7 @@ import './cloud.css'
 const origin = window.location.origin
 const client = new PenrillClient(origin, sendHttp, () => account(origin)?.token ?? null)
 const language = detectLanguage()
-const t = (key: MessageKey) => translate(language, key)
+const t = (key: MessageKey, vars?: Record<string, string>) => translate(language, key, vars)
 
 function CloudLogin({ unavailable }: { unavailable: boolean }) {
   const [register, setRegister] = useState(false)
@@ -56,6 +56,48 @@ function CloudLogin({ unavailable }: { unavailable: boolean }) {
   </main>
 }
 
+/**
+ * Where the Penrill editor sends people to allow a device (see sync/connect.ts): the code both
+ * screens show, which device asks, and Allow or Deny for the signed-in account.
+ */
+function CloudLink({ user }: { user: string }) {
+  const code = new URLSearchParams(location.search).get('code') ?? ''
+  const [info, setInfo] = useState<{ device: string; code: string } | null | undefined>(undefined)
+  const [done, setDone] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    client.describeLink(code).then(setInfo, () => setInfo(null))
+  }, [code])
+  async function decide(allow: boolean) {
+    setBusy(true)
+    try {
+      const ok = info && await client.decideLink(code, allow)
+      setDone(ok ? t(allow ? 'cloud.linkDone' : 'cloud.linkDenied', { device: info!.device }) : t('cloud.linkMissing'))
+    } catch {
+      setDone(t('storage.error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return <main className="cloud-entry">
+    <header><CloudIcon width={28} /> Penrill Cloud</header>
+    <section>
+      {info === undefined ? <p>{t('cloud.loading')}</p>
+        : done ? <p role="status">{done}</p>
+        : !info ? <p role="alert">{t('cloud.linkMissing')}</p>
+        : <>
+          <h1>{t('cloud.linkTitle', { device: info.device })}</h1>
+          <p>{t('cloud.linkText', { user })}</p>
+          <p className="cloud-code">{info.code.slice(0, 4)}-{info.code.slice(4)}</p>
+          <div className="cloud-actions">
+            <Button type="button" disabled={busy} onClick={() => void decide(true)}>{t('cloud.allow')}</Button>
+            <button type="button" className="text-btn outline" disabled={busy} onClick={() => void decide(false)}>{t('cloud.deny')}</button>
+          </div>
+        </>}
+    </section>
+  </main>
+}
+
 export async function startCloud() {
   document.title = 'Penrill Cloud'
   document.documentElement.lang = language
@@ -69,6 +111,10 @@ export async function startCloud() {
   if (session) {
     try {
       await client.boards()
+      if (location.pathname === '/link') {
+        createRoot(container).render(<CloudLink user={session.name} />)
+        return
+      }
       await import('../../src/renderer/src/main')
       return
     } catch (error) {

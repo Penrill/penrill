@@ -9,6 +9,23 @@ const invoke =
 contextBridge.exposeInMainWorld('penrill', {
   platform: process.platform,
   http: invoke('server:http'),
+  connect: (() => {
+    const init = ipcRenderer.sendSync('connect:init') as { deviceName: string; accounts: Record<string, unknown> }
+    return {
+      deviceName: init.deviceName,
+      accounts: init.accounts,
+      probe: invoke('connect:probe'),
+      trust: invoke('connect:trust'),
+      openExternal: invoke('connect:open'),
+      discover: invoke('connect:discover'),
+      saveAccount: invoke('connect:save-account'),
+      // Links that came before this handler existed are handed over once it does.
+      onLink: (handler: (link: string) => void) => {
+        ipcRenderer.on('connect:link', (_e, link: string) => handler(link))
+        void ipcRenderer.invoke('connect:take-pending').then((links: string[]) => links.forEach(handler))
+      }
+    }
+  })(),
   // Read once, synchronously, so the first render already knows which features are on.
   features: ipcRenderer.sendSync('features:get'),
   setFeature: invoke('features:set'),

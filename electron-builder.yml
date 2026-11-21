@@ -11,6 +11,10 @@ asar: true
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 # appId keeps its pre-Penrill value: changing it would make updates install as a separate app.
+# penrill://connect links from a server's page open the app and start connecting to that server.
+protocols:
+  - name: Penrill
+    schemes: [penrill]
 fileAssociations:
   - ext: penrill
     name: Penrill board

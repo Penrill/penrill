@@ -38,6 +38,26 @@ export interface BoardContent {
   items: WireItem[]
 }
 
+/** What `GET /api/server` tells before signing in. Older servers do not have it. */
+export interface ServerInfo {
+  service: string
+  name: string
+  registration: 'open' | 'invite'
+  /** Device linking is supported. */
+  link: boolean
+  pin: string | null
+}
+
+export interface LinkStart {
+  deviceCode: string
+  userCode: string
+  verifyUrl: string
+  verifyUrlComplete: string
+  expiresIn: number
+}
+
+export type LinkPoll = { status: 'approved'; account: Account } | { status: 'pending' | 'denied' | 'expired' }
+
 export type Http = (origin: string, request: HttpRequest) => Promise<HttpResponse>
 
 const decoder = new TextDecoder()
@@ -59,6 +79,51 @@ export class PenrillClient {
 
   signIn(name: string, password: string, register: boolean): Promise<Account> {
     return this.json({ method: 'POST', path: register ? '/api/register' : '/api/login', ...jsonBody({ name, password }) }, false)
+  }
+
+  async serverInfo(): Promise<ServerInfo> {
+    const info = await this.json<ServerInfo>({ method: 'GET', path: '/api/server' }, false)
+    if (info?.service !== 'penrill') throw new Error('Not a Penrill server')
+    return info
+  }
+
+  startLink(device: string, app: string): Promise<LinkStart> {
+    return this.json({ method: 'POST', path: '/api/link/start', ...jsonBody({ device, app }) }, false)
+  }
+
+  /** Long poll: the server answers as soon as the person decides, or after a few seconds with "pending". */
+  async pollLink(deviceCode: string): Promise<LinkPoll> {
+    try {
+      const response = await this.call({ method: 'POST', path: '/api/link/poll', ...jsonBody({ deviceCode }) }, false)
+      if (response.status === 202) return { status: 'pending' }
+      const linked = JSON.parse(decoder.decode(response.body)) as Account
+      if (typeof linked?.name !== 'string' || typeof linked.token !== 'string') throw new Error('Unsupported server')
+      return { status: 'approved', account: { name: linked.name, token: linked.token } }
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) return { status: 'denied' }
+      if (error instanceof ApiError && error.status === 410) return { status: 'expired' }
+      throw error
+    }
+  }
+
+  /** Which device waits under this code; null when none does (any more). */
+  async describeLink(code: string): Promise<{ code: string; device: string; app: string; address: string } | null> {
+    try {
+      return await this.json({ method: 'GET', path: `/api/link/${encodeURIComponent(code.replace(/[^A-Za-z]/g, ''))}` })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  }
+
+  async decideLink(code: string, allow: boolean): Promise<boolean> {
+    try {
+      await this.call({ method: 'POST', path: `/api/link/${encodeURIComponent(code.replace(/[^A-Za-z]/g, ''))}`, ...jsonBody({ allow }) })
+      return true
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return false
+      throw error
+    }
   }
 
   async signOut(): Promise<void> {

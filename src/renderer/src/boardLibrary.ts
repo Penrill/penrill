@@ -7,6 +7,7 @@ import { decodeBoard, encodeBoard, type BoardData } from '../../board/engine/ser
 import { translate, type MessageKey } from '../../board/i18n'
 import { prefsStore } from '../../board/store'
 import { platform } from './platform'
+import { connectFlow, onConnectHash } from './sync/connect'
 import { useApp, type HomeTab } from './appState'
 import { parseRoute, startRouter, type Route } from './router'
 import { moveStorageKey } from '../../shared/legacyStorage'
@@ -267,8 +268,14 @@ class BoardLibrary {
     platform.onBeforeClose(() => this.flush(true))
     await this.refreshLibrary()
     const pending = await platform.library.takePendingOpen()
-    if (pending && await this.openBoard(pending)) return
-    await this.show(opened)
+    if (!pending || !(await this.openBoard(pending))) await this.show(opened)
+    // After the first screen, so a connect link the app was opened with is not covered by it.
+    const connect = (link: string) => {
+      void this.show({ view: 'home', tab: 'sync' })
+      void connectFlow.connect(link)
+    }
+    platform.connect?.onLink(connect)
+    onConnectHash(connect)
   }
 
   /** Show a screen: a board (the home screen if it can't be opened) or a page of the home screen. */

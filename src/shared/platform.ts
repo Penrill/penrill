@@ -64,7 +64,46 @@ export interface UpdateApi {
   onState(handler: (s: UpdateState) => void): void
 }
 
+/** A server's certificate as presented, before anyone trusts it. */
+export interface ServerProbe {
+  /** `sha256/<base64>` of its public key. */
+  pin: string
+  /** Whether a public certificate authority vouches for it, so no pin is needed. */
+  trusted: boolean
+}
+
+/** A Penrill Server announcing itself on the local network. */
+export interface FoundServer {
+  name: string
+  origin: string
+}
+
+/** A signed-in account on one server, as the editor keeps it. */
+export interface StoredAccount {
+  name: string
+  token: string
+}
+
+/**
+ * What connecting to a server needs beyond HTTP (desktop only): the device name, trusting a
+ * server's own certificate by its pin, opening the browser, finding servers nearby, connect
+ * links the app is opened with, and keeping tokens in the system keychain.
+ */
+export interface ConnectApi {
+  deviceName: string
+  probe(origin: string): Promise<ServerProbe>
+  trust(origin: string, pin: string): Promise<void>
+  openExternal(url: string): Promise<void>
+  discover(): Promise<FoundServer[]>
+  onLink(handler: (link: string) => void): void
+  /** Accounts by origin, decrypted at startup. */
+  accounts: Record<string, StoredAccount>
+  saveAccount(origin: string, value: StoredAccount | null): Promise<void>
+}
+
 export interface PlatformApi {
+  /** Desktop only; the browser connects to publicly trusted servers and keeps accounts in local storage. */
+  connect?: ConnectApi
   http(origin: string, request: import('./http').HttpRequest): Promise<import('./http').HttpResponse>
   platform: string
   update: UpdateApi

@@ -15,3 +15,10 @@ export function storagePreference() {
   catch { /* Use the local development service for an invalid saved address. */ }
   return { source, address, origin: source === 'server' ? address : source === 'cloud' ? cloudOrigin : '' }
 }
+
+/** Where new boards go from now on. Penrill Cloud in the browser has no choice to make. */
+export function setStoragePreference(source: StorageSource, origin?: string): void {
+  if (hostedCloud) return
+  if (source === 'server' && origin) localStorage.setItem('penrill-server-origin', serverOrigin(origin))
+  localStorage.setItem('penrill-library-source', source)
+}
