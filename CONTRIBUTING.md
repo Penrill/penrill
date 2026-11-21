@@ -27,6 +27,9 @@ npm run typecheck && npm test && npm run build   # run before every commit
   board library, files and updates.
 - The landing page lives in `site/`. `npm run build:site` builds it into `dist/site` and
   prerenders one static HTML page per language, so search engines see the whole text.
+- The logo is drawn in `scripts/icons/logo.mjs`, with its colours in `PALETTES`. `npm run icons`
+  regenerates `build/icon.svg`, the app, site and web icons and the social preview
+  (`npm run icons -- --palette blue` for another palette). Commit the generated files.
 - Board data stays **vector**. A change to the file format needs a `FORMAT_VERSION` bump in
   `engine/serialize.ts`, and older files must keep opening.
 - Saving must stay power-cut safe: write board and library files through `writeDurable`

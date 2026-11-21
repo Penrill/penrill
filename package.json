@@ -28,6 +28,7 @@
     "build:site": "vite build --config site.vite.config.mts && node scripts/prerender-site.mjs",
     "dev:web": "vite --config apps/web/vite.config.mts",
     "build:web": "vite build --config apps/web/vite.config.mts",
+    "icons": "node scripts/icons/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --workspaces --if-present --silent && node scripts/check-boundaries.mjs",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux",
