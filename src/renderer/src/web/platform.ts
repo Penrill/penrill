@@ -1,14 +1,19 @@
+import { account } from '../sync/accounts'
+import { hostedCloud, cloudOrigin } from '../storagePreference'
+import { sendHttp } from '../../../shared/http'
 import { cleanOverrides, parseFeaturesFile } from '../../../shared/features'
 import type { BoardStoreApi, PlatformApi } from '../../../shared/platform'
 import { createWebFiles, exportFile } from './files'
 import { createIndexedDbStore } from './library'
+import { moveStorageKey } from '../../../shared/legacyStorage'
 
 /** Set by the web build (apps/web/vite.config.mts); absent when the renderer runs some other way. */
 declare const __APP_VERSION__: string | undefined
 
-const FEATURES_KEY = 'inkboard-features'
+const FEATURES_KEY = 'penrill-features'
 
 function readFeatures(): string | null {
+  moveStorageKey('inkboard-features', FEATURES_KEY)
   try {
     return localStorage.getItem(FEATURES_KEY)
   } catch {
@@ -37,10 +42,11 @@ function persistAfterFirstSave(store: BoardStoreApi): BoardStoreApi {
 
 /** The app's platform in a browser: IndexedDB library, file pickers, print-to-PDF, no installer updates. */
 export function createWebPlatform(): PlatformApi {
-  const store = persistAfterFirstSave(createIndexedDbStore())
+  const store = persistAfterFirstSave(createIndexedDbStore(hostedCloud ? 'penrill-cloud:' + account(cloudOrigin)?.name : undefined))
   const features = parseFeaturesFile(readFeatures())
   return {
     platform: 'web',
+    http: sendHttp,
     features,
     async setFeature(id, on) {
       Object.assign(features, cleanOverrides({ [id]: on }))

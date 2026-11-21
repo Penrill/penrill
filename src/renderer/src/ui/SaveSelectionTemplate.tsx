@@ -2,12 +2,14 @@ import { useCallback, useState } from 'react'
 import type { TemplateEntry } from '../../../shared/library'
 import { useT } from '../../../board/i18n'
 import { BookmarkIcon } from '../../../board/ui/icons'
-import { Popover } from '../../../board/ui/Popover'
+import { Dialog, DialogBody, DialogTitle } from '@penrill/ui/dialog'
+import { Input } from '@penrill/ui/input'
+import { Button } from '@penrill/ui/button'
 import { boardLibrary } from '../boardLibrary'
 import { TemplateThumb } from './TemplatesMenu'
 import { useApp } from '../appState'
 
-export function SaveSelectionTemplate({ side }: { side: 'above' | 'below' }) {
+export function SaveSelectionTemplate() {
   const t = useT()
   const [saving, setSaving] = useState(false)
   const [name, setName] = useState('')
@@ -23,7 +25,8 @@ export function SaveSelectionTemplate({ side }: { side: 'above' | 'below' }) {
         <BookmarkIcon />
       </button>
       {saving && (
-        <Popover onClose={close} className="sel-popover tpl-popover" fit={side}>
+        <Dialog open={saving} onClose={close} size="md">
+          <DialogTitle>{t('tpl.saveSelection')}</DialogTitle><DialogBody>
           {replacing ? (
             // Explicit second step, so a template can't be overwritten by a slip of the pen.
             <div className="tpl-confirm">
@@ -58,10 +61,10 @@ export function SaveSelectionTemplate({ side }: { side: 'above' | 'below' }) {
               })
             }}
           >
-            <input autoFocus value={name} placeholder={t('tpl.namePlaceholder')} onChange={(e) => setName(e.target.value)} />
-            <button type="submit" className="text-btn outline" disabled={!name.trim()}>
+            <Input aria-label={t('tpl.namePlaceholder')} autoFocus value={name} placeholder={t('tpl.namePlaceholder')} onChange={(e) => setName(e.target.value)} />
+            <Button type="submit" outline disabled={!name.trim()}>
               {t('tpl.save')}
-            </button>
+            </Button>
           </form>
           {templates.length > 0 && (
             <>
@@ -78,7 +81,7 @@ export function SaveSelectionTemplate({ side }: { side: 'above' | 'below' }) {
           )}
           </>
           )}
-        </Popover>
+        </DialogBody></Dialog>
       )}
     </div>
   )

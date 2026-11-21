@@ -1,6 +1,6 @@
 import { inkColor } from './surface'
-import { turnedBBox } from '@inkboard/core/geometry'
-import type { BBox, TextFormat, TextItem, TextRun } from '@inkboard/core/types'
+import { turnedBBox } from '@penrill/core/geometry'
+import type { BBox, TextFormat, TextItem, TextRun } from '@penrill/core/types'
 
 /**
  * Text on the board: lines (Enter = new line) of differently formatted runs (colour, size, bold,

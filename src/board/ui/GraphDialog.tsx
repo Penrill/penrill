@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { sanitizeGraph } from '../engine/graph'
-import type { GraphParams } from '@inkboard/core/types'
+import type { GraphParams } from '@penrill/core/types'
 import { useT } from '../i18n'
 import { prefsStore } from '../store'
 import { useEditor, useSession } from '../editorContext'

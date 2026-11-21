@@ -44,13 +44,13 @@ export async function removeWithBackup(path: string): Promise<void> {
   await rm(`${path}.tmp`, { force: true })
 }
 
-/** Unpack a board buffer (plain UTF-8 JSON or legacy gzip-compressed .inkboard) and parse its JSON. */
+/** Unpack a board buffer (plain UTF-8 JSON or legacy gzip-compressed board file) and parse its JSON. */
 export function parseBoardBuffer(b: Uint8Array | Buffer): Record<string, unknown> {
   const buf = Buffer.isBuffer(b) ? b : Buffer.from(b.buffer, b.byteOffset, b.byteLength)
   const raw = buf[0] === 0x1f && buf[1] === 0x8b ? gunzipSync(buf) : buf
   const doc = JSON.parse(raw.toString('utf8')) as Record<string, unknown>
   if (!doc || typeof doc !== 'object' || doc.format !== 'inkboard') {
-    throw new Error('Not an Inkboard file')
+    throw new Error('Not a Penrill board')
   }
   return doc
 }

@@ -4,6 +4,7 @@ import { basename, extname, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { TRASH_DAYS, type BoardEntry, type LibraryState, type Tag, type TemplateEntry } from '../shared/library'
 import { isValidBoard, parseBoardBuffer, readDurable, removeWithBackup, safeFileName, writeDurable } from './fsutil'
+import { BOARD_EXT, LEGACY_BOARD_EXT, boardTitleOf } from '../shared/boardFile'
 
 /** A board entry as the 0.2-0.6 `index.json` stored it. */
 interface LegacyBoardEntry {
@@ -94,7 +95,7 @@ const SCHEMA: ((db: DatabaseSync) => void)[] = [
         thumb BLOB
       );
     `)
-    // The .inkboard file a board was imported from (and its mtime then): opening the same, unchanged
+    // The board file a board was imported from (and its mtime then): opening the same, unchanged
     // file again opens that board instead of importing a duplicate.
     const cols = new Set((db.prepare('PRAGMA table_info(boards)').all() as { name: string }[]).map((c) => c.name))
     if (!cols.has('source_path')) db.exec('ALTER TABLE boards ADD COLUMN source_path TEXT')
@@ -115,7 +116,7 @@ const exists = (p: string): Promise<boolean> =>
  * Vector board JSON is stored uncompressed in `boards.data` and `templates.data`.
  * Raster images are decoded out of base64 and stored once by SHA-256 hash as raw binary BLOBs in `assets`.
  * Thumbnails are stored as raw binary WebP BLOBs.
- * Standalone `.inkboard` files are written or imported only on explicit user request.
+ * Standalone board files are written or imported only on explicit user request.
  */
 export class Library {
   private root: string
@@ -166,7 +167,7 @@ export class Library {
   private migrateSchema(): void {
     const current = (this.db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
     if (current > SCHEMA.length) {
-      throw new Error('This library was made by a newer version of Inkboard. Please update Inkboard.')
+      throw new Error('This library was made by a newer version of Penrill. Please update Penrill.')
     }
     for (let v = current; v < SCHEMA.length; v++) {
       this.tx(() => {
@@ -442,7 +443,7 @@ export class Library {
       } catch {
         // no meta
       }
-      const title = meta.fileName ? meta.fileName.replace(/\.inkboard$/i, '') : 'Board'
+      const title = meta.fileName ? boardTitleOf(meta.fileName) : 'Board'
       await this.create(title, new Uint8Array(bytes))
       await rm(bytesPath, { force: true })
       await rm(metaPath, { force: true })
@@ -667,7 +668,7 @@ export class Library {
   // ------------------------------------------------------------------ explicit file export / import
 
   /**
-   * Export a board to a standalone `.inkboard` file. The board stays in the library; opening this
+   * Export a board to a standalone `.penrill` file. The board stays in the library; opening this
    * file again (unchanged) opens the board instead of importing a copy.
    */
   async saveAsFile(id: string, path: string, bytes: Uint8Array): Promise<BoardEntry> {
@@ -679,7 +680,7 @@ export class Library {
   }
 
   /**
-   * Open a `.inkboard` file (plain JSON or legacy gzip). If this exact file, unchanged since, was already
+   * Open a `.penrill` or `.inkboard` file (plain JSON or legacy gzip). If this exact file, unchanged since, was already
    * imported or exported, that board is returned (and taken out of "Recently deleted"); otherwise the
    * file is imported as a new board.
    */
@@ -773,8 +774,8 @@ export class Library {
     }
   }
 
-  private backupName(b: BoardEntry): string {
-    return `${safeFileName(b.title)} (${b.id.slice(0, 6)}).inkboard`
+  private backupName(b: BoardEntry, ext = BOARD_EXT): string {
+    return `${safeFileName(b.title)} (${b.id.slice(0, 6)}).${ext}`
   }
 
   private async mirrorToBackup(b: BoardEntry, bytes: Uint8Array, force = false): Promise<void> {
@@ -785,6 +786,8 @@ export class Library {
     this.lastBackup.set(b.id, Date.now())
     try {
       await writeDurable(join(dir, this.backupName(b)), bytes)
+      // Mirrors written before 0.13 used the old extension; the new file replaces them.
+      await removeWithBackup(join(dir, this.backupName(b, LEGACY_BOARD_EXT))).catch(() => {})
     } catch (err) {
       console.error('Backup mirror failed', err)
     }
@@ -794,6 +797,7 @@ export class Library {
     const dir = this.backupDir
     if (!dir) return
     await removeWithBackup(join(dir, this.backupName(b))).catch(() => {})
+    await removeWithBackup(join(dir, this.backupName(b, LEGACY_BOARD_EXT))).catch(() => {})
     this.lastBackup.delete(b.id)
   }
 }

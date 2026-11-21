@@ -1,6 +1,12 @@
-**Inkboard** is a free infinite whiteboard for pen tablets.
+**Penrill** is a free infinite whiteboard for pen tablets.
 
-![Inkboard](https://raw.githubusercontent.com/yaroslavyushchenko/inkboard/main/docs/images/hero.png)
+![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
+
+## Inkboard is now Penrill
+
+- **New name, same app.** Inkboard updates to Penrill by itself; your boards, templates and settings stay.
+- **Board files are now `.penrill`.** Your `.inkboard` files still open, by double-click or with *Open*.
+- **New website:** [penrill.com](https://penrill.com/), with the web app at [penrill.com/app](https://penrill.com/app/).
 
 ## What's new in 0.12.1: Easter eggs, redrawn
 
@@ -33,7 +39,7 @@
 - **Refreshed interface:** settings in clear sections with switches, one consistent look for buttons and
   selected items, and a dark theme with better contrast.
 
-Boards with turned pictures, text or formulas are saved as format version 10 and need Inkboard 0.11.0
+Boards with turned pictures, text or formulas are saved as format version 10 and need version 0.11.0
 or newer. Other boards still open in older versions.
 
 ## Also in 0.10.1
@@ -46,8 +52,8 @@ or newer. Other boards still open in older versions.
 
 ## Also in 0.10.0
 
-- **Inkboard in your browser:** [open the app](https://yaroslavyushchenko.github.io/inkboard/app/) with
-  nothing to install. Boards are kept in the browser; you can save and open `.inkboard` files, export PNG,
+- **Penrill in your browser:** [open the app](https://penrill.com/app/) with
+  nothing to install. Boards are kept in the browser; you can save and open board files, export PNG,
   and print to PDF. It keeps working offline after the first visit.
 - **Hold-to-snap shapes:** keep the pen still at the end of a stroke to turn a rough circle, oval, arc,
   rectangle, square or triangle into a clean one. Keep holding and drag to resize it; Shift or a finger
@@ -63,7 +69,7 @@ or newer. Other boards still open in older versions.
 - New license: FSL-1.1-MIT (free to use, study and change for anything except a competing product;
   every release turns MIT after two years). Versions up to 0.9.2 stay under GPL-3.0-or-later.
 
-Boards that use the school backgrounds are saved as format version 9 and need Inkboard 0.10.0 or newer.
+Boards that use the school backgrounds are saved as format version 9 and need version 0.10.0 or newer.
 
 ## Also in 0.9.2
 
@@ -88,7 +94,7 @@ Boards that use the school backgrounds are saved as format version 9 and need In
   stored vector data. Thumbnails and exports preserve the board's appearance.
 - **Updated website:** new English and Ukrainian examples with screenshots that follow the site theme.
 
-Chalkboard files use format version 8 and need Inkboard 0.9.0 or newer. Older boards remain readable;
+Chalkboard files use format version 8 and need version 0.9.0 or newer. Older boards remain readable;
 boards without chalkboard surfaces continue to use the lowest compatible format version.
 
 ## Also in 0.8.0
@@ -123,8 +129,8 @@ use. Other boards still open there.
 - **New library storage:** boards, templates, tags and thumbnails now live in one local database, with each
   image stored once. Your boards move over automatically on first launch; the old files are kept in the
   `legacy-0.6` folder inside the library, nothing is deleted.
-- **Every board lives in Inkboard now.** *Save as file…* saves a copy you can send or keep. Opening an
-  `.inkboard` file adds it to your boards once; opening the same file again opens that board.
+- **Every board lives in the app now.** *Save as file…* saves a copy you can send or keep. Opening a
+  board file adds it to your boards once; opening the same file again opens that board.
 - **Autosave** writes at most 5 seconds after you change something, even while you keep drawing.
 - **Version history has been removed.**
 
@@ -146,7 +152,7 @@ Boards saved by 0.6 can't be opened by older versions, so update every computer 
 
 ## Also in 0.5.2
 
-- **macOS:** the `.dmg` window now shows how to install Inkboard and how to open it the first time.
+- **macOS:** the `.dmg` window now shows how to install Penrill and how to open it the first time.
 
 ## Also in 0.5.1
 
@@ -176,8 +182,8 @@ Boards saved by 0.5 can't be opened by older versions, so update every computer 
 
 | System | File |
 |---|---|
-| Windows | `Inkboard-Setup-…-x64.exe` |
-| macOS (Intel and Apple Silicon) | `Inkboard-…-mac-universal.dmg` |
+| Windows | `Penrill-Setup-…-x64.exe` |
+| macOS (Intel and Apple Silicon) | `Penrill-…-mac-universal.dmg` |
 | Linux | `.AppImage` (any distro, auto-updates) or `.deb` (Ubuntu / Debian) |
 
 ## First launch
@@ -185,9 +191,9 @@ Boards saved by 0.5 can't be opened by older versions, so update every computer 
 The builds are not code-signed yet, so the system will warn you once:
 
 - **Windows:** "Windows protected your PC" → click **More info** → **Run anyway**.
-- **macOS:** open the `.dmg`, drag Inkboard to Applications and open it. macOS says it can't verify the app:
+- **macOS:** open the `.dmg`, drag Penrill to Applications and open it. macOS says it can't verify the app:
   click **Done**, open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**.
   You only do this once.
-- **Linux AppImage:** allow it to run (file Properties → *Executable as Program*, or `chmod +x Inkboard-*.AppImage`) and open it.
+- **Linux AppImage:** allow it to run (file Properties → *Executable as Program*, or `chmod +x Penrill-*.AppImage`) and open it.
 
 Feedback and bug reports: open an issue in this repository.

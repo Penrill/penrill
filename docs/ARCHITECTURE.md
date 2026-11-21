@@ -1,6 +1,6 @@
 # Architecture
 
-Inkboard is moving from one Electron app to a set of layers that the desktop app, a web app and,
+Penrill is moving from one Electron app to a set of layers that the desktop app, a web app and,
 one day, a React Native app can share. The move happens in small steps; after each one the app
 works and ships as before. This file describes where the code is going and what is already done.
 
@@ -30,16 +30,16 @@ Code only depends on the layers below it. Two things never appear below `ui-web`
 ## Packages
 
 Workspace packages live in `packages/` and are imported by name with a module path, for example
-`@inkboard/core/scene`. Each package exports its source files directly (`"exports": { "./*":
+`@penrill/core/scene`. Each package exports its source files directly (`"exports": { "./*":
 "./src/*.ts" }`); there is no build step.
 
 | Package | What it holds | Depends on |
 |---|---|---|
-| `@inkboard/math` | Formula trees and editing (the keypad model), lexer, parser, evaluator | nothing |
-| `@inkboard/core` | Item types, scene with undo and redo, camera, geometry, shape outlines, point erasing | math |
-| `@inkboard/shape-recognition` | Hold-to-snap: recognises circles, ovals, arcs, rectangles, squares and triangles in a stroke | core |
-| `@inkboard/render` | Display lists (what to draw, as data) and their SVG form | nothing |
-| `@inkboard/render-canvas` | Draws display lists on a Canvas 2D context; the only package with the DOM types | render |
+| `@penrill/math` | Formula trees and editing (the keypad model), lexer, parser, evaluator | nothing |
+| `@penrill/core` | Item types, scene with undo and redo, camera, geometry, shape outlines, point erasing | math |
+| `@penrill/shape-recognition` | Hold-to-snap: recognises circles, ovals, arcs, rectangles, squares and triangles in a stroke | core |
+| `@penrill/render` | Display lists (what to draw, as data) and their SVG form | nothing |
+| `@penrill/render-canvas` | Draws display lists on a Canvas 2D context; the only package with the DOM types | render |
 
 Still in `src/board/engine`: the board renderer and exports (`renderer.ts`, `export.ts`), ink,
 text layout, formula typesetting, graphs, backgrounds and the drawing instruments. They move into
@@ -47,8 +47,8 @@ packages as each one draws through a display list (below).
 
 ## Drawing: display lists
 
-An item describes how it looks as a display list (`@inkboard/render/display`): lines, polylines,
-polygons, text and groups, with the item's own colours. Backends draw it: `@inkboard/render-canvas`
+An item describes how it looks as a display list (`@penrill/render/display`): lines, polylines,
+polygons, text and groups, with the item's own colours. Backends draw it: `@penrill/render-canvas`
 on screen and in PNG exports, `toSvg` for SVG and PDF exports, Skia one day for React Native. One
 description, so the screen and the exports can't drift apart, and lists are cached per item object
 (items are replaced, never changed in place). Colours are mapped while drawing (`inkColors` in
@@ -74,7 +74,7 @@ never reads the app store: the app tells it whether it is on screen through `ses
 
 ## Feature modules
 
-What Inkboard can do comes in modules (`src/board/modules`), registered when the app creates an
+What Penrill can do comes in modules (`src/board/modules`), registered when the app creates an
 editor: `createEditor({ modules: builtinModules })`. The board's core reaches them only through the
 registry (`src/board/registry.ts`, `editor.features`):
 
@@ -131,7 +131,7 @@ instruments, text, two-finger pinch, and the order in which a press picks what i
 The board library lives in different databases on different platforms, behind the same
 interfaces (repositories), so the editor and the UI never know which one is used:
 
-| Platform | Library (boards, thumbnails, tags, templates) | `.inkboard` files |
+| Platform | Library (boards, thumbnails, tags, templates) | `.penrill` files |
 |---|---|---|
 | Desktop | SQLite (`node:sqlite`) in the Electron main process (`src/main/library.ts`), reached over IPC | native open and save dialogs; a saved file is the board |
 | Web | IndexedDB in the page (`src/renderer/src/web/library.ts`), `navigator.storage.persist()` after the first save | File System Access API, or download and upload (`web/files.ts`); a saved file is a copy |
@@ -170,7 +170,7 @@ Only where there are really two or more ways to do something:
 2. Done: `createEditor()` instead of the global `editor`; the UI store split into preferences,
    board session and app state.
 3. Done for the first tools: tool controllers in `src/board/tools` (see "Tools" for what is left).
-4. Done: the web app (`apps/web`, published at `/inkboard/app/`): the desktop app shell with the web
+4. Done: the web app (`apps/web`, published at `/app/` on penrill.com): the desktop app shell with the web
    platform, IndexedDB storage, file pickers, print to PDF, and a service worker for offline use.
 5. In progress: display lists for drawing on screen and in exports (graphs and formulas done; ink,
    text and images next), then the renderer moves into a package.

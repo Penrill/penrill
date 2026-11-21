@@ -1,3 +1,4 @@
+import { sendHttp } from '../shared/http'
 import { app, BrowserWindow, dialog, ipcMain, Menu, powerMonitor, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { rm, writeFile } from 'node:fs/promises'
@@ -8,11 +9,13 @@ import { initFeatures } from './features'
 import { safeFileName, writeDurable } from './fsutil'
 import { Library } from './library'
 import { initUpdater } from './updater'
+import { BOARD_EXT, BOARD_EXTS, isBoardFileName } from '../shared/boardFile'
 
-const FILE_FILTERS = [{ name: 'Inkboard', extensions: ['inkboard'] }]
+const FILE_FILTERS = [{ name: 'Penrill', extensions: BOARD_EXTS }]
 
-// Separate profile for automated tests / portable setups.
-if (process.env['INKBOARD_USER_DATA']) app.setPath('userData', process.env['INKBOARD_USER_DATA'])
+// The profile folder keeps its pre-Penrill name: installations updated from Inkboard keep their
+// library, preferences and recovery data there. Don't rename it.
+app.setPath('userData', process.env['PENRILL_USER_DATA'] || process.env['INKBOARD_USER_DATA'] || join(app.getPath('appData'), 'Inkboard'))
 
 let mainWindow: BrowserWindow | null = null
 let library: Library
@@ -22,9 +25,9 @@ let installingUpdate = false
 const pendingPaths: string[] = []
 
 const boardArg = (argv: string[]): string | undefined =>
-  argv.find((a) => a.toLowerCase().endsWith('.inkboard') && existsSync(a))
+  argv.find((a) => isBoardFileName(a) && existsSync(a))
 
-// One app instance: opening a .inkboard file while Inkboard runs focuses the existing window.
+// One app instance: opening a board file while Penrill runs focuses the existing window.
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
@@ -50,7 +53,7 @@ async function openPathInApp(path: string): Promise<void> {
     const entry = await library.importFile(path)
     mainWindow?.webContents.send('library:open', entry.id)
   } catch (err) {
-    dialog.showErrorBox('Inkboard', `Could not open ${path}\n${(err as Error).message}`)
+    dialog.showErrorBox('Penrill', `Could not open ${path}\n${(err as Error).message}`)
   }
 }
 
@@ -70,7 +73,7 @@ async function askSavePath(e: Electron.IpcMainInvokeEvent, suggestedName: string
 /** Vector PDF: print the board's SVG from a hidden window at exactly the drawing's size. */
 async function svgToPdf(svg: string, width: number, height: number): Promise<Uint8Array> {
   const html = `<!doctype html><meta charset="utf-8"><style>@page{size:${width}px ${height}px;margin:0}html,body{margin:0;padding:0}svg{display:block}</style>${svg}`
-  const tmp = join(tmpdir(), `inkboard-export-${process.pid}-${Date.now()}.html`)
+  const tmp = join(tmpdir(), `penrill-export-${process.pid}-${Date.now()}.html`)
   await writeFile(tmp, html)
   const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } })
   try {
@@ -90,6 +93,10 @@ async function svgToPdf(svg: string, width: number, height: number): Promise<Uin
 
 function registerIpc(): void {
   const h = ipcMain.handle.bind(ipcMain)
+  h('server:http', (event, origin, request) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame) throw new Error('Unexpected sender')
+    return sendHttp(origin, request)
+  })
 
   h('library:list', () => library.list())
   h('library:thumb', (_e, id: string) => library.thumb(id))
@@ -115,7 +122,7 @@ function registerIpc(): void {
   h('template:delete', (_e, id: string) => library.deleteTemplate(id))
 
   h('library:save-as-file', async (e, id: string, bytes: Uint8Array, suggestedName: string) => {
-    const path = await askSavePath(e, suggestedName, 'inkboard', 'Inkboard')
+    const path = await askSavePath(e, suggestedName, BOARD_EXT, 'Penrill')
     if (!path) return null
     const entry = await library.saveAsFile(id, path, bytes)
     app.addRecentDocument(path)
@@ -171,7 +178,7 @@ function createWindow(): void {
     minWidth: 640,
     minHeight: 480,
     show: false,
-    title: 'Inkboard',
+    title: 'Penrill',
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
     webPreferences: {

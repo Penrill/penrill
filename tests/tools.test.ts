@@ -2,8 +2,8 @@
 // Run: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Scene } from '@inkboard/core/scene'
-import type { ImageItem, Item, StrokeItem } from '@inkboard/core/types'
+import { Scene } from '@penrill/core/scene'
+import type { ImageItem, Item, StrokeItem } from '@penrill/core/types'
 import { itemsTouched } from '../src/board/tools/brushSelect.ts'
 import { beginErase, eraseAlong, eraseUnit, type EraseRecord } from '../src/board/tools/eraser.ts'
 import { LASER_FADE_MS, LaserTrail } from '../src/board/tools/laser.ts'

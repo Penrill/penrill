@@ -1,8 +1,14 @@
+import {
+  CloudIcon, CloudArrowUpIcon, ComputerDesktopIcon, SignalSlashIcon,
+  ExclamationTriangleIcon, ArrowPathIcon
+} from '@heroicons/react/24/outline'
+import { activeLink, useLinks } from '../sync/links'
+import { useSyncStatus } from '../sync/librarySync'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { boardLibrary } from '../boardLibrary'
 import { useT } from '../../../board/i18n'
 import { platform } from '../platform'
-import { AlertIcon, CheckIcon, HomeIcon, MenuIcon } from '../../../board/ui/icons'
+import { HomeIcon, MenuIcon } from '../../../board/ui/icons'
 import { Popover } from '../../../board/ui/Popover'
 import { useSession } from '../../../board/editorContext'
 import { useApp } from '../appState'
@@ -52,20 +58,49 @@ function SaveStatus() {
   const t = useT()
   const status = useApp((s) => s.saveStatus)
   const board = useApp((s) => s.board)
+  const remote = useSyncStatus(s => board ? s.states[board.id] : undefined)
+  useLinks(s => s.version)
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
   if (!board) return null
-  const where = board.kind === 'file' && board.filePath ? t('save.inFile', { path: board.filePath }) : t('save.inApp')
-  if (status === 'error') {
-    return (
-      <span className="save-status error" title={t('save.error')}>
-        <AlertIcon width={16} height={16} />
-      </span>
-    )
-  }
+
+  const link = activeLink(board.id)
+  const where = board.kind === 'file' && board.filePath
+    ? t('save.inFile', { path: board.filePath })
+    : t('save.inApp')
   const busy = status === 'saving' || status === 'pending'
+  const localText = t(status === 'error' ? 'save.error' : busy ? 'save.saving' : 'save.saved')
+  const state = remote ?? 'pending'
+  const label = link ? t(`storage.${state}`) : t('storage.device')
+  const warning = status === 'error' || (link && (state === 'offline' || state === 'denied'))
+  const Icon = status === 'error' || (link && state === 'denied') ? ExclamationTriangleIcon
+    : link ? state === 'offline' ? SignalSlashIcon : state === 'pending' ? CloudArrowUpIcon : CloudIcon
+    : busy ? ArrowPathIcon : ComputerDesktopIcon
+  const description = [label, link?.origin, localText, where].filter(Boolean).join('\n')
+
   return (
-    <span className={`save-status ${busy ? 'busy' : ''}`} title={`${busy ? t('save.saving') : t('save.saved')}. ${where}`}>
-      {busy ? <span className="save-spinner" /> : <CheckIcon width={16} height={16} />}
-    </span>
+    <div className="menu-anchor">
+      <button
+        type="button"
+        data-popover-anchor
+        className={`icon-btn board-sync-status${warning ? ' warning' : ''}`}
+        title={description}
+        aria-label={description}
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+      >
+        <Icon width={19} height={19} aria-hidden="true" />
+      </button>
+      {open && (
+        <Popover onClose={close} fit="below" className="board-sync-detail">
+          <strong>{label}</strong>
+          {link && <span>{link.origin}</span>}
+          <span>{localText}</span>
+          <span>{where}</span>
+          {link && state === 'denied' && <span>{t('storage.deniedHelp')}</span>}
+        </Popover>
+      )}
+    </div>
   )
 }
 
@@ -125,7 +160,7 @@ export function MainMenu() {
             <span>{t(hasSelection ? 'menu.exportSelPdf' : 'menu.exportPdf')}</span>
           </button>
           <div className="menu-sep" />
-          <div className="menu-version">Inkboard {appVersion}</div>
+          <div className="menu-version">Penrill {appVersion}</div>
         </Popover>
       )}
     </div>

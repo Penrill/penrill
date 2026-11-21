@@ -1,14 +1,14 @@
 import { ACCENT, accent } from './accent'
 import { drawBackground } from './background'
-import { viewportBBox } from '@inkboard/core/camera'
-import { bboxIntersects } from '@inkboard/core/geometry'
+import { viewportBBox } from '@penrill/core/camera'
+import { bboxIntersects } from '@penrill/core/geometry'
 import { drawCompass, type Compass, type CompassState } from './compass'
 import { drawAngleLabel, drawProtractor, type Protractor, type ProtractorState } from './protractor'
 import { drawStraightedge, type Straightedge, type StraightState } from './straightedge'
 import { inkColor, isChalk, withInkSurface } from './surface'
 import { buildInkPath, drawCaps, fillInk, linePath, strokeLine, type InkStyle } from './ink'
 import { xformBBox, type Xform } from './transform'
-import type { BackgroundKind, BBox, Camera, Item, LineCap, LineDash, Point } from '@inkboard/core/types'
+import type { BackgroundKind, BBox, Camera, Item, LineCap, LineDash, Point } from '@penrill/core/types'
 import type { FeatureRegistry } from '../registry'
 
 export interface LiveStroke extends InkStyle {
@@ -177,6 +177,7 @@ export class BoardRenderer {
     cam: Camera,
     sel: SelectionOverlay,
     extras: {
+      peerInk?: Iterable<LiveStroke>
       ruler?: { s: Straightedge; state: StraightState } | null
       setSquare?: { s: Straightedge; state: StraightState } | null
       protractor?: { p: Protractor; state: ProtractorState } | null
@@ -314,6 +315,12 @@ export class BoardRenderer {
       }
     }
 
+    if (extras.peerInk) {
+      for (const stroke of extras.peerInk) {
+        this.applyCamera(ctx, cam)
+        withInkSurface(this.bg, () => drawLive(ctx, stroke))
+      }
+    }
     if (extras.laser) drawLaser(ctx, cam, this.dpr, extras.laser)
 
     if (live && (live.points.length > 0 || live.parts?.length)) {

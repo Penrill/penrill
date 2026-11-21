@@ -1,5 +1,5 @@
 appId: app.inkboard.desktop
-productName: Inkboard
+productName: Penrill
 copyright: Copyright © 2026 Yaroslav Yushchenko and contributors
 directories:
   buildResources: build
@@ -10,10 +10,17 @@ files:
 asar: true
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
+# appId keeps its pre-Penrill value: changing it would make updates install as a separate app.
 fileAssociations:
+  - ext: penrill
+    name: Penrill board
+    description: Penrill whiteboard
+    mimeType: application/x-penrill
+    role: Editor
+  # Boards saved before 0.13.
   - ext: inkboard
-    name: Inkboard board
-    description: Inkboard whiteboard
+    name: Penrill board (Inkboard)
+    description: Penrill whiteboard
     mimeType: application/x-inkboard
     role: Editor
 
@@ -56,7 +63,7 @@ linux:
   maintainer: Yaroslav Yushchenko <contact@yaroslavyushchenko.com>
   synopsis: Free whiteboard for teachers with a pen tablet
   description: >-
-    Inkboard is an infinite whiteboard for writing and drawing with a pen tablet.
+    Penrill is an infinite whiteboard for writing and drawing with a pen tablet.
     It has pressure-sensitive vector ink, a protractor and a compass, shapes,
     pyramids and prisms, number lines, coordinate planes and formatted text.
     Every board saves itself within seconds, so nothing is lost even if the power
@@ -74,7 +81,7 @@ snapcraft:
     confinement: strict
     grade: stable
     summary: Free infinite whiteboard for teachers with a pen tablet
-    title: Inkboard
+    title: Penrill
     # The gnome extension adds the GNOME runtime, themes and the desktop/wayland/x11/opengl
     # plugs; listing them here too keeps the intent explicit. browser-support is needed
     # by Electron itself (electron-builder only adds it when no plugs are given).
@@ -96,5 +103,5 @@ toolsets:
 # Auto-update feed: electron-updater reads latest*.yml from GitHub Releases.
 publish:
   provider: github
-  owner: yaroslavyushchenko
-  repo: inkboard
+  owner: Penrill
+  repo: penrill

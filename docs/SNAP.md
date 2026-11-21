@@ -61,9 +61,9 @@ also published as a snap.
    - **Screenshots**: upload `docs/images/hero.png`, `docs/images/home.png` and
      `docs/images/text-format.png` (up to 5 images).
    - **License**: `FSL-1.1-MIT`.
-   - **Website**: `https://github.com/yaroslavyushchenko/inkboard`
-   - **Source code**: `https://github.com/yaroslavyushchenko/inkboard`
-   - **Contact / issues**: `https://github.com/yaroslavyushchenko/inkboard/issues`
+   - **Website**: `https://github.com/Penrill/penrill`
+   - **Source code**: `https://github.com/Penrill/penrill`
+   - **Contact / issues**: `https://github.com/Penrill/penrill/issues`
    - **Category**: Education.
    - Summary, title, description and the icon come from the snap itself on every upload.
 

@@ -1,5 +1,5 @@
-import { shapeOutline } from '@inkboard/core/shapes'
-import type { Point, ShapeSpec } from '@inkboard/core/types'
+import { shapeOutline } from '@penrill/core/shapes'
+import type { Point, ShapeSpec } from '@penrill/core/types'
 
 /**
  * Hold-to-snap shapes: draw, keep the pen still at the end, and the stroke becomes the clean shape

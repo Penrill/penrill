@@ -1,7 +1,7 @@
 // Lets the web app open without a network after the first visit.
 // Network first, so a reload always gets the latest version when online; the cache is the fallback.
 // Board data is not here: it lives in IndexedDB (src/renderer/src/web/library.ts).
-const CACHE = 'inkboard-app'
+const CACHE = 'penrill-app'
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))

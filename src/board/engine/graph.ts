@@ -1,12 +1,12 @@
-import { paint } from '@inkboard/render-canvas/paint'
-import { PAPER, toSvg, type GroupPrim, type Prim, type TextPrim } from '@inkboard/render/display'
+import { paint } from '@penrill/render-canvas/paint'
+import { PAPER, toSvg, type GroupPrim, type Prim, type TextPrim } from '@penrill/render/display'
 import { inkColors } from './surface'
-import { isBlank, type FormulaState, type Row } from '@inkboard/math/formula'
+import { isBlank, type FormulaState, type Row } from '@penrill/math/formula'
 import { fnHead, isFnLetter, labelRows, parsePlot, parseRows, readPlotRows, rowsToText } from './formulaexpr'
 import { typesetRows } from './formulatype'
-import { MAX_EXPR_LENGTH, type MathFn } from '@inkboard/math/mathexpr'
+import { MAX_EXPR_LENGTH, type MathFn } from '@penrill/math/mathexpr'
 import { MATH_FONT, typesetFormula } from './mathtype'
-import type { BBox, GraphItem, GraphParams, PlotFn } from '@inkboard/core/types'
+import type { BBox, GraphItem, GraphParams, PlotFn } from '@penrill/core/types'
 
 /** At most this many functions on one plane. */
 export const MAX_FNS = 8
@@ -762,7 +762,7 @@ const fontFamily = (italic?: boolean, math?: boolean): string =>
 const displays = new WeakMap<GraphItem, GroupPrim>()
 
 /**
- * What the graph looks like (display list, @inkboard/render): axes, arrow heads, curves, then the
+ * What the graph looks like (display list, @penrill/render): axes, arrow heads, curves, then the
  * formulas over them with a paper-coloured halo so they stay readable where curves cross.
  * Built once per item object; the screen, PNG and SVG exports and the menu previews all draw this.
  */

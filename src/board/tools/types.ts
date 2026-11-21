@@ -1,4 +1,4 @@
-import type { Scene } from '@inkboard/core/scene'
+import type { Scene } from '@penrill/core/scene'
 import type { Editor } from '../editor'
 import type { LiveStroke } from '../engine/renderer'
 import type { SessionStore } from '../session'

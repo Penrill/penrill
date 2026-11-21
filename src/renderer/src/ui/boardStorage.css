@@ -1,0 +1,47 @@
+.storage-settings {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  width: min(24rem, 90vw);
+}
+.storage-settings::backdrop { background: rgb(0 0 0 / .35) }
+.storage-settings header { display: flex; align-items: center; justify-content: space-between }
+.storage-settings h2 { margin: 0 }
+.storage-settings form, .storage-settings label { display: grid; gap: .45rem }
+.storage-settings form { margin-top: 1rem; gap: 1rem }
+.storage-settings :is(input, select) { padding: .5rem; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: .4rem }
+.storage-settings .text-btn { justify-self: end }
+.storage-settings p { white-space: pre-line; color: var(--danger-text) }
+.card-location { color: var(--muted) }
+.remote-title { background: none; color: inherit; border: 0; padding: 0; cursor: pointer; text-align: start }
+.board-sync-detail { display: grid; gap: .3rem }
+.board-sync-status { color: var(--muted) }
+.board-sync-status.warning { color: var(--warning-text) }
+.board-sync-detail {
+  position: absolute;
+  z-index: 3;
+  width: max-content;
+  max-width: min(19rem, 90vw);
+  padding: .7rem .85rem;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+.board-sync-detail span { color: var(--muted); white-space: pre-line }
+.storage-settings h3, .shared-library .chip { display: flex; align-items: center; gap: .5rem }
+.storage-settings h3 { margin: .35rem 0 }
+.storage-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; padding: 0; border: 0; margin: 0 }
+.storage-options legend { margin-bottom: .5rem }
+.storage-options label { position: relative; justify-items: center; text-align: center; cursor: pointer; border: 1px solid var(--border); border-radius: .6rem; padding: .65rem .25rem; font-size: .82rem }
+.storage-options input { position: absolute; opacity: 0 }
+.storage-options label:has(:checked), .shared-library [aria-pressed=true] { border-color: var(--primary-text); background: var(--chip-bg) }
+.storage-options label:focus-within { outline: 2px solid var(--primary-text) }
+.account-section, .shared-content { display: grid; gap: .65rem; padding: .8rem 0 0; border: 0; border-top: 1px solid var(--border) }
+.storage-settings small { color: var(--muted); overflow-wrap: anywhere }
+.shared-library { width: min(34rem, 92vw); max-height: 85vh }
+.shared-content { margin: 1rem 0 }
+.shared-content nav, .shared-template { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem }
+.shared-content form { margin: 0; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: .5rem }
+.shared-template { justify-content: space-between }
+.shared-template small { display: block }

@@ -1,8 +1,9 @@
 import type { ExportKind } from '../../../shared/library'
 import type { BoardFilesApi, BoardStoreApi } from '../../../shared/platform'
+import { BOARD_EXT, BOARD_EXTS, BOARD_MIME, boardTitleOf } from '../../../shared/boardFile'
 
 /**
- * .inkboard files and exports in the browser. Where the File System Access API exists (Chrome, Edge)
+ * Board files and exports in the browser. Where the File System Access API exists (Chrome, Edge)
  * the user picks where to save; elsewhere the file is downloaded. The board itself always stays in the
  * browser library: a saved file is a copy, not a file the board keeps writing to as on the desktop.
  */
@@ -17,7 +18,7 @@ interface FileType {
   accept: Record<string, string[]>
 }
 
-const BOARD_TYPE: FileType = { description: 'Inkboard board', accept: { 'application/x-inkboard': ['.inkboard'] } }
+const BOARD_TYPE: FileType = { description: 'Penrill board', accept: { [BOARD_MIME]: BOARD_EXTS.map((e) => `.${e}`) } }
 
 const isAbort = (err: unknown): boolean => err instanceof DOMException && err.name === 'AbortError'
 
@@ -48,7 +49,7 @@ async function saveFile(data: Uint8Array, name: string, type: FileType): Promise
   }
 }
 
-/** Lets the user pick a .inkboard file; null when cancelled. */
+/** Lets the user pick a board file; null when cancelled. */
 async function pickBoardFile(): Promise<File | null> {
   const picker = (window as PickerWindow).showOpenFilePicker
   if (picker) {
@@ -63,7 +64,7 @@ async function pickBoardFile(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.inkboard'
+    input.accept = BOARD_EXTS.map((e) => `.${e}`).join(',')
     input.onchange = () => resolve(input.files?.[0] ?? null)
     input.oncancel = () => resolve(null)
     input.click()
@@ -73,14 +74,14 @@ async function pickBoardFile(): Promise<File | null> {
 export function createWebFiles(store: BoardStoreApi): BoardFilesApi {
   return {
     async saveAsFile(id, bytes, suggestedName) {
-      if (!(await saveFile(bytes, `${suggestedName}.inkboard`, BOARD_TYPE))) return null
+      if (!(await saveFile(bytes, `${suggestedName}.${BOARD_EXT}`, BOARD_TYPE))) return null
       const entry = (await store.list()).boards.find((b) => b.id === id)
       return entry ?? null
     },
     async importFile() {
       const file = await pickBoardFile()
       if (!file) return null
-      return store.create(file.name.replace(/\.inkboard$/i, ''), new Uint8Array(await file.arrayBuffer()))
+      return store.create(boardTitleOf(file.name), new Uint8Array(await file.arrayBuffer()))
     },
     // Boards in the browser have no file of their own to find or show.
     async locate() {

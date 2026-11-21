@@ -1,4 +1,4 @@
-import { slots, type Atom, type Row } from '@inkboard/math/formula'
+import { slots, type Atom, type Row } from '@penrill/math/formula'
 import { parseRows } from '../../../engine/formulaexpr'
 
 /** Whether a formula with no answer divides by zero (or comes out as infinity). */

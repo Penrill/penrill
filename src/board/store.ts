@@ -7,12 +7,13 @@ import { useStore } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { createStore } from 'zustand/vanilla'
 import type { GraphPreset } from './engine/graph'
-import type { ShapeKind } from '@inkboard/core/shapes'
-import { validateRows, type Cursor, type FormulaState, type Row } from '@inkboard/math/formula'
+import type { ShapeKind } from '@penrill/core/shapes'
+import { validateRows, type Cursor, type FormulaState, type Row } from '@penrill/math/formula'
 import { cleanInstrumentPrefs, DEFAULT_INSTRUMENTS, type InstrumentPrefs } from './engine/instruments'
 import { cleanToolbarLayout, type ToolbarItemId } from './toolbarLayout'
 import type { FullRun } from './engine/text'
-import type { BackgroundKind, LineCap, LineDash } from '@inkboard/core/types'
+import { moveStorageKey } from '../shared/legacyStorage'
+import type { BackgroundKind, LineCap, LineDash } from '@penrill/core/types'
 import { detectLanguage, type Lang } from './i18n'
 
 export type Tool = 'select' | 'brushSelect' | 'move' | 'pen' | 'highlighter' | 'eraser' | 'pan' | 'shape' | 'text' | 'laser'
@@ -198,7 +199,7 @@ export const prefsStore = createStore<Prefs>()(
     }),
     {
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
-      name: 'inkboard-settings',
+      name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
       version: 1,
       merge: (saved, current) => {
@@ -258,6 +259,7 @@ export function usePrefs<T>(select: (s: Prefs) => T): T {
 }
 
 export function enablePreferenceStorage(): void {
+  moveStorageKey('inkboard-settings', 'penrill-settings')
   prefsStore.persist.setOptions({ storage: createJSONStorage(() => localStorage) })
   void prefsStore.persist.rehydrate()
 }

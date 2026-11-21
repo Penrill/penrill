@@ -1,5 +1,5 @@
 {
-  "name": "@inkboard/math",
+  "name": "@penrill/math",
   "version": "0.0.0",
   "private": true,
   "description": "Formula trees, the math keypad model, lexer, parser and evaluator. No DOM, no UI.",

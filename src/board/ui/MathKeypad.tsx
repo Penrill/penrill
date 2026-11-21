@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { backspace, insert, insertFraction, moveLeft, moveRight, typeChar, type FormulaState, type Row } from '@inkboard/math/formula'
+import { backspace, insert, insertFraction, moveLeft, moveRight, typeChar, type FormulaState, type Row } from '@penrill/math/formula'
 import { typesetRows } from '../engine/formulatype'
 import { useT, type MessageKey } from '../i18n'
 import { usePrefs } from '../store'

@@ -1555,7 +1555,7 @@ button:disabled {
 
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(2, 150px);
+  grid-template-columns: repeat(auto-fill, minmax(min(145px, 100%), 1fr));
   gap: 10px;
   margin-top: 8px;
 }
@@ -3139,4 +3139,25 @@ label.settings-row {
 
 :is(.bg-option, .surface-option).active {
   font-weight: var(--font-weight-semibold);
+}
+
+.peer-cursors {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.peer-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.peer-cursor span {
+  display: block;
+  margin: -5px 0 0 12px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: currentColor;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  -webkit-text-fill-color: white;
 }

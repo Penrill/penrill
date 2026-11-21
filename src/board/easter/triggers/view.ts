@@ -1,4 +1,4 @@
-import { MAX_ZOOM, MIN_ZOOM } from '@inkboard/core/camera'
+import { MAX_ZOOM, MIN_ZOOM } from '@penrill/core/camera'
 import type { Trigger } from '../core/egg'
 
 /** The board zoomed all the way in or out; fires again only after leaving the limit. */

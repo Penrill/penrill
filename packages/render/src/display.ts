@@ -1,7 +1,7 @@
 /**
  * Display lists: what an item looks like, as plain data (lines, polylines, polygons, text, groups).
  * Items build them once (they can be cached per item object); backends turn them into pixels or
- * markup: Canvas 2D on screen and in PNG exports (@inkboard/render-canvas), SVG for vector exports
+ * markup: Canvas 2D on screen and in PNG exports (@penrill/render-canvas), SVG for vector exports
  * (svg below), and later Skia for React Native. One description, so the screen and the exports can't
  * drift apart.
  *

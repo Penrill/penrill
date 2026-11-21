@@ -1,4 +1,4 @@
-import type { Row } from '@inkboard/math/formula'
+import type { Row } from '@penrill/math/formula'
 import type { ShapeKind } from './shapes'
 
 /** A sampled input point in world coordinates: x, y and pen pressure (0..1). */

@@ -1,5 +1,5 @@
-import { paint } from '@inkboard/render-canvas/paint'
-import { toSvg, type GroupPrim, type Prim } from '@inkboard/render/display'
+import { paint } from '@penrill/render-canvas/paint'
+import { toSvg, type GroupPrim, type Prim } from '@penrill/render/display'
 import { inkColors } from './surface'
 /**
  * Typesetting of keypad formulas (engine/formula.ts): the tree becomes the same vector primitives
@@ -7,14 +7,14 @@ import { inkColors } from './surface'
  * board canvas, PNG and SVG all draw it alike. For the editor the layout also reports where the
  * caret can stand and where the empty slots are.
  */
-import type { Atom, Cursor, Row } from '@inkboard/math/formula'
-import { hasBase } from '@inkboard/math/formula'
+import type { Atom, Cursor, Row } from '@penrill/math/formula'
+import { hasBase } from '@penrill/math/formula'
 import {
   dropOf, empty, fence, frac, MATH_FONT, measureMath, put, radical, raiseOf, row, rule, SCRIPT, scripts, text,
   type Ctx, type MathBox, type MathMark, type Measure
 } from './mathtype'
-import type { BBox } from '@inkboard/core/types'
-import { turnedBBox } from '@inkboard/core/geometry'
+import type { BBox } from '@penrill/core/types'
+import { turnedBBox } from '@penrill/core/geometry'
 
 export interface FormulaLayout {
   box: MathBox
@@ -367,7 +367,7 @@ export function formulaBBox(f: Placed & { rot?: number }): BBox {
   return turnedBBox(formulaLocalBox(f), f.rot)
 }
 
-/** A typeset formula as a display list (@inkboard/render): glyphs and the strokes of bars and roots. */
+/** A typeset formula as a display list (@penrill/render): glyphs and the strokes of bars and roots. */
 export function mathBoxDisplay(b: MathBox, x: number, baseline: number, color: string): GroupPrim {
   return {
     kind: 'group',

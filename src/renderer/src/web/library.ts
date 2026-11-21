@@ -25,7 +25,7 @@ const request = <T>(r: IDBRequest<T>): Promise<T> =>
     r.onerror = () => reject(r.error)
   })
 
-export function openLibraryDb(name = 'inkboard'): Promise<IDBDatabase> {
+export function openLibraryDb(name = 'penrill'): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const open = indexedDB.open(name, 1)
     open.onupgradeneeded = () => {
@@ -75,7 +75,7 @@ function boardIn(idx: LibraryState, id: string): BoardEntry {
 
 const bytesOf = (v: unknown): Uint8Array | null => (v instanceof Uint8Array ? v : v instanceof ArrayBuffer ? new Uint8Array(v) : null)
 
-export function createIndexedDbStore(dbName = 'inkboard'): BoardStoreApi {
+export function createIndexedDbStore(dbName = 'penrill'): BoardStoreApi {
   let opened: Promise<IDBDatabase> | null = null
   const db = (): Promise<IDBDatabase> => (opened ??= openLibraryDb(dbName).then(async (d) => (await purgeExpired(d), d)))
 

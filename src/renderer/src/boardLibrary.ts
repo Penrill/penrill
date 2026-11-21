@@ -8,6 +8,7 @@ import { translate } from '../../board/i18n'
 import { prefsStore } from '../../board/store'
 import { platform } from './platform'
 import { useApp } from './appState'
+import { moveStorageKey } from '../../shared/legacyStorage'
 
 /**
  * Autosave: write at most 5 s after the first unsaved change, even while drawing non-stop, so a crash
@@ -29,6 +30,11 @@ class BoardLibrary {
   private saveTimer: ReturnType<typeof setTimeout> | null = null
   private saving: Promise<void> | null = null
 
+  private readonly leavingListeners = new Set<() => void>()
+  private readonly created = new Set<(id: string) => void>()
+  private readonly renamed = new Set<(id: string, title: string) => void>()
+  private readonly savedListeners = new Set<(id: string, startedAt: number) => void>()
+
   /** The editor of the board on screen; the desktop app has one and reuses it for every board it opens. */
   constructor(readonly editor: Editor) {
     editor.scene.subscribe(() => this.markChanged())
@@ -44,6 +50,32 @@ class BoardLibrary {
       // The board only reacts to keys and shows its panels while it is on screen.
       if (s.view !== prev.view) editor.session.setState({ active: s.view === 'board' })
     })
+  }
+
+  /** Called before the editor shows another board (or home), while it still holds the current one. */
+  onLeaving(listener: () => void): () => void {
+    this.leavingListeners.add(listener)
+    return () => this.leavingListeners.delete(listener)
+  }
+
+  onCreated(listener: (id: string) => void): () => void {
+    this.created.add(listener)
+    return () => this.created.delete(listener)
+  }
+
+  onRenamed(listener: (id: string, title: string) => void): () => void {
+    this.renamed.add(listener)
+    return () => this.renamed.delete(listener)
+  }
+
+  /** Called after the device copy of a board is written; it holds every edit made before `startedAt`. */
+  onSaved(listener: (id: string, startedAt: number) => void): () => void {
+    this.savedListeners.add(listener)
+    return () => this.savedListeners.delete(listener)
+  }
+
+  private leaving(): void {
+    for (const listener of this.leavingListeners) listener()
   }
 
   // ---------------------------------------------------------------- templates
@@ -152,6 +184,7 @@ class BoardLibrary {
     const version = this.editor.scene.version
     const meta = this.metaVersion
     const camera = this.editor.camera
+    const startedAt = Date.now()
     const data = this.boardData()
     useApp.setState({ saveStatus: 'saving' })
     this.saving = (async () => {
@@ -161,12 +194,19 @@ class BoardLibrary {
         const thumb = wantThumb ? await renderThumbnail(data.items, data.background, this.editor.features) : null
         const r = await platform.library.save(board.id, bytes, thumb)
         this.saved = { version, meta, camera }
+        if (r.ok) for (const listener of this.savedListeners) listener(board.id, startedAt)
         if (thumb) {
           this.thumbVersion = version
           this.lastThumbAt = Date.now()
         }
         if (useApp.getState().board?.id === board.id) {
-          useApp.setState({ saveStatus: r.ok ? 'saved' : 'error' })
+          useApp.setState(({ library }) => ({
+            saveStatus: r.ok ? 'saved' : 'error',
+            library: r.ok ? {
+              ...library,
+              boards: library.boards.map(entry => entry.id === board.id ? { ...entry, updatedAt: r.updatedAt } : entry)
+            } : library
+          }))
         }
       } catch (err) {
         console.error('Autosave failed', err)
@@ -182,7 +222,7 @@ class BoardLibrary {
   private updateTitle(): void {
     const { board, view } = useApp.getState()
     const name = view === 'home' || !board ? this.editor.t('home.title') : board.title
-    platform.setTitle(`${name} · Inkboard`)
+    platform.setTitle(`${name} · Penrill`)
   }
 
   /** Remember the running version; if it changed since last launch, show "Updated to X". */
@@ -190,9 +230,10 @@ class BoardLibrary {
     const version = await platform.update.version()
     useApp.setState({ appVersion: version })
     try {
-      const prev = localStorage.getItem('inkboard-last-version')
+      moveStorageKey('inkboard-last-version', 'penrill-last-version')
+      const prev = localStorage.getItem('penrill-last-version')
       if (prev && prev !== version && version !== 'dev') useApp.setState({ justUpdatedTo: version })
-      localStorage.setItem('inkboard-last-version', version)
+      localStorage.setItem('penrill-last-version', version)
     } catch {
       // storage unavailable: just skip the notice
     }
@@ -215,19 +256,14 @@ class BoardLibrary {
     platform.onFlushRequest(() => this.flush(true))
     platform.onBeforeClose(() => this.flush(true))
     await this.refreshLibrary()
-    const lib = useApp.getState().library
-    const live = lib.boards.filter((b) => !b.deletedAt)
     const pending = await platform.library.takePendingOpen()
-    if (pending) await this.refreshLibrary()
-    const last = live.find((b) => b.id === lib.lastOpenedId)
-    const recent = [...live].sort((a, b) => b.openedAt - a.openedAt)[0]
-    const target = pending ?? last?.id ?? recent?.id
-    if (target && (await this.openBoard(target))) return
-    await this.newBoard()
+    if (pending && await this.openBoard(pending)) return
+    await this.goHome()
   }
 
   /** Open a board from the library. Returns false if it couldn't be loaded. */
   async openBoard(id: string): Promise<boolean> {
+    this.leaving()
     await this.flush(true)
     let entry = useApp.getState().library.boards.find((b) => b.id === id)
     if (!entry) {
@@ -273,6 +309,7 @@ class BoardLibrary {
   }
 
   async newBoard(): Promise<void> {
+    this.leaving()
     await this.flush(true)
     // Show the empty board immediately; anything drawn while the library entry is being
     // created counts as an unsaved change of the new board (nothing gets lost).
@@ -283,6 +320,7 @@ class BoardLibrary {
     const loadedVersion = this.editor.scene.version
     const loadedMeta = this.metaVersion
     const entry = await platform.library.create(this.newBoardTitle(), await encodeBoard(empty))
+    for (const listener of this.created) listener(entry.id)
     this.saved = { version: loadedVersion, meta: loadedMeta, camera: empty.camera }
     this.thumbVersion = loadedVersion
     this.lastThumbAt = 0
@@ -294,6 +332,7 @@ class BoardLibrary {
   }
 
   async goHome(): Promise<void> {
+    this.leaving()
     this.editor.clearSelection()
     await this.flush(true)
     await this.refreshLibrary()
@@ -304,11 +343,13 @@ class BoardLibrary {
     const entry = await platform.library.rename(id, title)
     const b = useApp.getState().board
     if (b?.id === id) useApp.setState({ board: { ...b, title: entry.title, filePath: entry.filePath } })
+    for (const listener of this.renamed) listener(id, entry.title)
     await this.refreshLibrary()
   }
 
   async deleteBoard(id: string): Promise<void> {
     const wasOpen = useApp.getState().board?.id === id
+    if (wasOpen) this.leaving()
     if (wasOpen) await this.flush(true)
     await platform.library.remove(id)
     if (wasOpen) useApp.setState({ board: null })
@@ -321,7 +362,7 @@ class BoardLibrary {
     await this.flush(true)
   }
 
-  /** Export the open board (or a board by id from the home screen) to a standalone .inkboard file. */
+  /** Export the open board (or a board by id from the home screen) to a standalone .penrill file. */
   async saveAsFile(boardId?: string): Promise<void> {
     const open = useApp.getState().board
     const targetId = boardId ?? open?.id
@@ -356,7 +397,7 @@ class BoardLibrary {
     // Exports are always on white paper (same pattern), even from the chalkboard: they get printed
     // and pasted into documents, where a dark green page wastes ink and reads badly.
     const bg = withSurface(prefsStore.getState().background, false)
-    const title = useApp.getState().board?.title ?? 'Inkboard'
+    const title = useApp.getState().board?.title ?? 'Penrill'
     try {
       if (kind === 'png') {
         const png = await renderPng(items, bg, this.editor.features)

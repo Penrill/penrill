@@ -1,9 +1,9 @@
-# Inkboard Contributor License Agreement
+# Penrill Contributor License Agreement
 
 Version 1.0
 
-Thank you for helping with Inkboard. This agreement lets the project owner, Yaroslav Yushchenko
-(the "Owner"), use what you contribute in any version of Inkboard, under any license. **You keep
+Thank you for helping with Penrill (called Inkboard before 0.13). This agreement lets the project owner, Yaroslav Yushchenko
+(the "Owner"), use what you contribute in any version of Penrill, under any license. **You keep
 the copyright in your work.**
 
 You accept this agreement by posting this sentence as a comment on your pull request:
@@ -19,7 +19,7 @@ later Contribution you submit, until a new version of this agreement is publishe
   another organisation, "You" also means that organisation.
 - **"Contribution"**: any work You submit to the Project for inclusion in it: code, documentation,
   translations, images or anything else, through a pull request, a patch, an issue or any other way.
-- **"Project"**: Inkboard and the other repositories owned or managed by the Owner where this
+- **"Project"**: Penrill (formerly Inkboard) and the other repositories owned or managed by the Owner where this
   agreement is used.
 
 ## 2. Copyright license

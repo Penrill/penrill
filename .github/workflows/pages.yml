@@ -1,7 +1,7 @@
 # Publishes to GitHub Pages:
 # - the landing page, prerendered to static HTML for each language:
-#   https://yaroslavyushchenko.github.io/inkboard/ (English) and .../inkboard/uk/ (Ukrainian)
-# - the web app (the same app as the desktop one, boards kept in the browser): .../inkboard/app/
+#   https://penrill.com/ (English) and https://penrill.com/uk/ (Ukrainian)
+# - the web app (the same app as the desktop one, boards kept in the browser): https://penrill.com/app/
 # Download buttons read the latest release from the GitHub API, so a new release needs no redeploy.
 name: Pages
 

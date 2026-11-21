@@ -15,7 +15,7 @@ export interface UpdateState {
   url?: string
 }
 
-const REPO = 'yaroslavyushchenko/inkboard'
+const REPO = 'Penrill/penrill'
 const RELEASES_URL = `https://github.com/${REPO}/releases/latest`
 const CHECK_EVERY_MS = 4 * 60 * 60 * 1000
 

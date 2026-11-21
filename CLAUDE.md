@@ -1,4 +1,4 @@
-# Inkboard: notes for AI assistants
+# Penrill: notes for AI assistants
 
 Free, source-available (FSL-1.1-MIT) infinite whiteboard for pen tablets; Electron + React + TS,
 custom Canvas 2D engine in `src/board/engine` and workspace packages in `packages/` (no DOM, no UI
@@ -15,6 +15,10 @@ there; layers and rules in `docs/ARCHITECTURE.md`). Roadmap: `docs/PLAN.md`.
 - Board data must stay vector; file format changes need a `FORMAT_VERSION` bump in `engine/serialize.ts`
   and must keep reading older files.
 - Writing (UI, docs, site, commits, comments): no em dashes; rephrase instead.
+- The app was called Inkboard up to 0.12. Use "Penrill" everywhere. Keep the few old identifiers that
+  updates depend on: `appId: app.inkboard.desktop`, the `Inkboard` profile folder, the npm/snap name
+  `inkboard`, `desktopName`, the `format: 'inkboard'` value inside board files and opening `.inkboard`
+  files. Never create a GitHub repo `yaroslavyushchenko/inkboard`: old installs find updates through its redirect.
 - Features are modules (`src/board/modules`, registry in `src/board/registry.ts`): a new item type or
   feature behaviour goes into a module, not into `renderer.ts`, `export.ts` or `Board.tsx`.
 - Saving is power-cut safe (`src/main/fsutil.ts` writeDurable); don't bypass it for board/library files.

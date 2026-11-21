@@ -1,4 +1,4 @@
-# Inkboard: notes for AI assistants
+# Penrill: notes for AI assistants
 
 Free, source-available (FSL-1.1-MIT) infinite whiteboard for pen tablets; Electron + React + TS,
 custom Canvas 2D engine in `src/board/engine` and workspace packages in `packages/` (no DOM, no UI

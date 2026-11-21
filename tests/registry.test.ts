@@ -1,7 +1,7 @@
 // Feature modules and their registry (src/board/registry.ts, src/board/modules). Run: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { Point } from '@inkboard/core/types'
+import type { Point } from '@penrill/core/types'
 import { graphSvg } from '../src/board/engine/graph.ts'
 import { builtinModules, formulasModule, graphsModule, shapeRecognitionModule, strokesModule } from '../src/board/modules/index.ts'
 import { FeatureRegistry } from '../src/board/registry.ts'

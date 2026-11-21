@@ -1,5 +1,5 @@
 {
-  "name": "@inkboard/core",
+  "name": "@penrill/core",
   "version": "0.0.0",
   "private": true,
   "description": "The board document model: items, scene with undo and redo, camera, geometry and shapes. No DOM, no UI.",
@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@inkboard/math": "*"
+    "@penrill/math": "*"
   }
 }

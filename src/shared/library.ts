@@ -11,7 +11,7 @@ export interface Tag {
 export interface BoardEntry {
   id: string
   title: string
-  /** draft = lives in the app's hidden library folder; file = a .inkboard file the user saved somewhere. */
+  /** draft = lives in the app's hidden library folder; file = a board file the user saved somewhere. */
   kind: 'draft' | 'file'
   filePath?: string
   createdAt: number

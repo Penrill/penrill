@@ -1,7 +1,7 @@
 import { ACCENT } from './accent'
 import { COMPASS_CELL } from './compass'
 import { IDLE_HANDLES, instrumentLook, rgba } from './instrumentLook'
-import type { Camera, Point } from '@inkboard/core/types'
+import type { Camera, Point } from '@penrill/core/types'
 
 /**
  * Straight-edged drawing aids: the ruler and the set squares (45° and 30°/60°). Like the protractor

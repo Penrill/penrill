@@ -1,4 +1,4 @@
-import { slots, type Atom, type Row } from '@inkboard/math/formula'
+import { slots, type Atom, type Row } from '@penrill/math/formula'
 import type { Egg } from '../../core/egg'
 import { formula } from '../../triggers/formula'
 import { typed } from '../../triggers/typed'

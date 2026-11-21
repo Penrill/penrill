@@ -1,6 +1,6 @@
-# Inkboard project plan
+# Penrill project plan
 
-Working name: **Inkboard** (easy to rename). Goal: a free, source-available (FSL-1.1-MIT) replacement for
+Name: **Penrill** (called Inkboard up to 0.12). Goal: a free, source-available (FSL-1.1-MIT) replacement for
 the discontinued Microsoft Whiteboard: an infinite canvas for stylus drawing that feels as close to it as
 possible. Primary user: a school teacher with a pen tablet (Windows) who writes assignments for students.
 
@@ -68,7 +68,7 @@ in progress and the pen cursor (so drawing never forces a full board redraw).
 - [x] Pens, colours, language and background remembered between launches
 
 ### Stage 3: files & library (v0.2)
-- [x] Save / open a board (`.inkboard`: gzip JSON, images stored once as assets)
+- [x] Save / open a board (`.penrill`, formerly `.inkboard`: gzip JSON, images stored once as assets)
 - [x] Board library with thumbnails: home screen ("All boards"), search, pinned boards, colour tags
 - [x] Drafts live in the app's hidden library folder; explicitly saved files are tracked and
       **autosaved into the file itself**
@@ -76,7 +76,7 @@ in progress and the pen cursor (so drawing never forces a full board redraw).
       flush on close / sleep / shutdown; corrupt file → automatic fallback to `.bak`
 - [x] Version history: snapshot every 5 min of editing (last 36), restore is undoable (Ctrl+Z)
 - [x] Recently deleted (30 days, one-click restore)
-- [x] Open `.inkboard` from the OS (double-click / "Open with"), single app instance
+- [x] Open board files from the OS (double-click / "Open with"), single app instance
 - [x] Export PNG and vector PDF (whole board or selection)
 - [x] Optional backup folder (USB stick / cloud-synced folder), mirrored automatically
 - [x] Migration of the 0.1 autosave into the library

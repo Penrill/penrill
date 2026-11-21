@@ -1,5 +1,5 @@
 {
-  "name": "@inkboard/render",
+  "name": "@penrill/render",
   "version": "0.0.0",
   "private": true,
   "description": "Display lists: what to draw on a board (lines, shapes, text, images), independent of how, plus their SVG form. No DOM.",

@@ -1,7 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import { BACKGROUND_STYLE, CHALK_PATTERN_COLOR, MAJOR_COLOR } from '../engine/background'
 import { bgPattern, CHALK_WHITE, CHALKBOARD_COLOR, isChalk, withPattern, withSurface } from '../engine/surface'
-import type { PaperPattern } from '@inkboard/core/types'
+import type { PaperPattern } from '@penrill/core/types'
 import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
 import { prefsStore, usePrefs } from '../store'
 import { useShallow } from 'zustand/react/shallow'

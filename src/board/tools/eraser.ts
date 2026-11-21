@@ -1,8 +1,8 @@
-import { splitStroke } from '@inkboard/core/erase'
-import { bboxIntersects, circleHitsPolyline, newId } from '@inkboard/core/geometry'
-import type { Scene } from '@inkboard/core/scene'
-import { shapeMembers } from '@inkboard/core/shapeItems'
-import type { Item, StrokeItem } from '@inkboard/core/types'
+import { splitStroke } from '@penrill/core/erase'
+import { bboxIntersects, circleHitsPolyline, newId } from '@penrill/core/geometry'
+import type { Scene } from '@penrill/core/scene'
+import { shapeMembers } from '@penrill/core/shapeItems'
+import type { Item, StrokeItem } from '@penrill/core/types'
 import type { EraserMode } from '../store'
 import type { Gesture, Sample, ToolContext } from './types'
 

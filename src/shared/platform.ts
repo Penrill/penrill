@@ -30,15 +30,15 @@ export interface BoardStoreApi {
   deleteTemplate(id: string): Promise<void>
 }
 
-/** .inkboard files outside the library: native dialogs on the desktop, file pickers or downloads in the browser. */
+/** Board files outside the library: native dialogs on the desktop, file pickers or downloads in the browser. */
 export interface BoardFilesApi {
-  /** Ask for a path and turn the board into a .inkboard file there. null = cancelled. */
+  /** Ask for a path and turn the board into a .penrill file there. null = cancelled. */
   saveAsFile(id: string, bytes: Uint8Array, suggestedName: string): Promise<BoardEntry | null>
-  /** Pick an existing .inkboard file and add it to the library. null = cancelled. */
+  /** Pick an existing board file and add it to the library. null = cancelled. */
   importFile(): Promise<BoardEntry | null>
   locate(id: string): Promise<BoardEntry | null>
   showInFolder(id: string): Promise<void>
-  /** A board file the app was launched with ("Open with Inkboard"), already imported. */
+  /** A board file the app was launched with ("Open with Penrill"), already imported. */
   takePendingOpen(): Promise<string | null>
 }
 
@@ -65,6 +65,7 @@ export interface UpdateApi {
 }
 
 export interface PlatformApi {
+  http(origin: string, request: import('./http').HttpRequest): Promise<import('./http').HttpResponse>
   platform: string
   update: UpdateApi
   capabilities: { backup: boolean; showInFolder: boolean }

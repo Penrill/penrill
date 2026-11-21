@@ -1,0 +1,14 @@
+{
+  "name": "@penrill/sync",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Board sync: protocol, replica with pending local changes, and the live session state machine. No DOM, no UI.",
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

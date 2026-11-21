@@ -3,7 +3,7 @@ import { createWebPlatform } from './web/platform'
 
 declare global {
   interface Window {
-    inkboard?: PlatformApi
+    penrill?: PlatformApi
   }
 }
 
@@ -12,4 +12,4 @@ declare global {
  * preload exposes the desktop one (SQLite library, native files, auto-update); in a browser it's the
  * web one (IndexedDB, file pickers). The rest of the app only sees PlatformApi.
  */
-export const platform: PlatformApi = window.inkboard ?? createWebPlatform()
+export const platform: PlatformApi = window.penrill ?? createWebPlatform()

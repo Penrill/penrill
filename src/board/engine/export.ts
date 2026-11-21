@@ -5,7 +5,7 @@ import { loadImage } from './images'
 import { drawItems } from './renderer'
 import { isChalk, surfaceColor, withInkSurface } from './surface'
 import { unionBBox } from './transform'
-import type { BackgroundKind, BBox, Camera, Item } from '@inkboard/core/types'
+import type { BackgroundKind, BBox, Camera, Item } from '@penrill/core/types'
 import type { FeatureRegistry } from '../registry'
 
 /** Make sure every image is decoded before drawing off-screen (otherwise it would be skipped). */

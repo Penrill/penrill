@@ -1,0 +1,24 @@
+{
+  "name": "@penrill/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./styles.css": "./styles.css",
+    "./*": "./src/*.tsx"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.10",
+    "react": "^19.3.1",
+    "clsx": "^2.1.1",
+    "motion": "^14.14.0"
+  },
+  "peerDependencies": {
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "license": "SEE LICENSE IN README.md",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

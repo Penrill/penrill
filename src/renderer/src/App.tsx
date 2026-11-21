@@ -1,7 +1,9 @@
+import { syncCoordinator } from './sync/coordinator'
 import { useEffect } from 'react'
 import { BoardWorkspace } from '../../board/BoardWorkspace'
 import type { BoardFileActions } from '../../board/ui/Board'
 import { boardLibrary } from './boardLibrary'
+import { BoardCursors } from './ui/BoardCursors'
 import { BackupSettings } from './ui/BackupSettings'
 import { HomeScreen } from './ui/HomeScreen'
 import { MainMenu } from './ui/MainMenu'
@@ -21,7 +23,9 @@ const fileActions: BoardFileActions = {
 export function App() {
   const view = useApp((s) => s.view)
   useEffect(() => {
+    const stop = syncCoordinator.start()
     void boardLibrary.start()
+    return stop
   }, [])
   return (
     <BoardWorkspace
@@ -30,10 +34,11 @@ export function App() {
       fileActions={fileActions}
       menu={<MainMenu />}
       extraTools={<TemplatesMenu />}
-      selectionActions={(side) => <SaveSelectionTemplate side={side} />}
+      selectionActions={() => <SaveSelectionTemplate />}
       storageSettings={<BackupSettings />}
       about={<AboutSection />}
     >
+      {view === 'board' && <BoardCursors />}
       <UpdateBanner />
       {view === 'home' && <HomeScreen />}
     </BoardWorkspace>

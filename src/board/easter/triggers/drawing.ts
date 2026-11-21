@@ -1,4 +1,4 @@
-import type { Item, StrokeItem } from '@inkboard/core/types'
+import type { Item, StrokeItem } from '@penrill/core/types'
 import type { Editor } from '../../editor'
 import type { Trigger } from '../core/egg'
 

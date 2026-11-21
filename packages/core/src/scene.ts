@@ -15,7 +15,7 @@ export class Scene {
   private items: Item[] = []
   private undoStack: HistoryEntry[] = []
   private redoStack: HistoryEntry[] = []
-  private listeners = new Set<() => void>()
+  private listeners = new Set<(local: boolean) => void>()
   private nextZ = 1
   /** Bumped on every change; used for dirty tracking. */
   version = 0
@@ -36,7 +36,7 @@ export class Scene {
     return this.redoStack.length > 0
   }
 
-  subscribe(fn: () => void): () => void {
+  subscribe(fn: (local: boolean) => void): () => void {
     this.listeners.add(fn)
     return () => this.listeners.delete(fn)
   }
@@ -93,7 +93,29 @@ export class Scene {
     this.nextZ = this.items.reduce((m, i) => Math.max(m, i.z), 0) + 1
     this.undoStack = []
     this.redoStack = []
-    this.emit()
+    this.emit(false)
+  }
+
+  /**
+   * Show items changed elsewhere (another device, another person). Not an undoable step, and local
+   * history entries that touch these items are dropped so Ctrl+Z can't bring back a stale version.
+   */
+  applyRemote(upserts: Item[], removedIds: Iterable<string>): void {
+    const touched = new Set([...upserts.map((item) => item.id), ...removedIds])
+    if (touched.size === 0) return
+    this.items = this.items.filter((item) => !touched.has(item.id)).concat(upserts).sort((a, b) => a.z - b.z)
+    for (const item of upserts) if (item.z >= this.nextZ) this.nextZ = item.z + 1
+    const prune = (entries: HistoryEntry[]) =>
+      entries
+        .map((entry) => ({
+          ...entry,
+          added: entry.added.filter((item) => !touched.has(item.id)),
+          removed: entry.removed.filter((item) => !touched.has(item.id))
+        }))
+        .filter((entry) => entry.added.length || entry.removed.length)
+    this.undoStack = prune(this.undoStack)
+    this.redoStack = prune(this.redoStack)
+    this.emit(false)
   }
 
   getById(ids: Iterable<string>): Item[] {
@@ -141,8 +163,8 @@ export class Scene {
     this.items = this.items.filter((i) => !ids.has(i.id))
   }
 
-  private emit(): void {
+  private emit(local = true): void {
     this.version++
-    for (const fn of this.listeners) fn()
+    for (const fn of this.listeners) fn(local)
   }
 }

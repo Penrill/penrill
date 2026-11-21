@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { moveStorageKey } from '../../../shared/legacyStorage'
 
 /**
  * Which achievements are earned, whether collecting is on, and which shows are set to play every
@@ -6,9 +7,9 @@ import { useSyncExternalStore } from 'react'
  * computer. Knows only ids: the eggs themselves are listed in eggs/index.ts.
  */
 
-const ON = 'inkboard.achievements.on'
-const GOT = 'inkboard.achievements.got'
-const REPEAT = 'inkboard.achievements.repeat'
+const ON = 'penrill.achievements.on'
+const GOT = 'penrill.achievements.got'
+const REPEAT = 'penrill.achievements.repeat'
 
 export interface AchievementsState {
   on: boolean
@@ -21,6 +22,7 @@ export interface AchievementsState {
 }
 
 function load(): AchievementsState {
+  for (const key of [ON, GOT, REPEAT]) moveStorageKey(key.replace('penrill.', 'inkboard.'), key)
   try {
     return {
       on: localStorage.getItem(ON) === '1',

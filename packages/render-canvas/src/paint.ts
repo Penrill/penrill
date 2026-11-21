@@ -1,8 +1,8 @@
-import type { ColorMap, Prim } from '@inkboard/render/display'
+import type { ColorMap, Prim } from '@penrill/render/display'
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 
-/** Draws a display list (@inkboard/render/display) on a Canvas 2D context, on screen or offscreen. */
+/** Draws a display list (@penrill/render/display) on a Canvas 2D context, on screen or offscreen. */
 export function paint(ctx: Ctx, p: Prim, color: ColorMap): void {
   switch (p.kind) {
     case 'group':

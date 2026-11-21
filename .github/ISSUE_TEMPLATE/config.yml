@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Download Inkboard / Завантажити
-    url: https://github.com/yaroslavyushchenko/inkboard/releases/latest
+  - name: Download Penrill / Завантажити
+    url: https://github.com/Penrill/penrill/releases/latest
     about: Installers for Windows, macOS and Linux.
   - name: Website / Сайт
-    url: https://yaroslavyushchenko.github.io/inkboard/
-    about: What Inkboard can do, in English and Ukrainian.
+    url: https://penrill.com/
+    about: What Penrill can do, in English and Ukrainian.

@@ -1,4 +1,4 @@
-import type { Row } from '@inkboard/math/formula'
+import type { Row } from '@penrill/math/formula'
 import { listen } from '../core/bus'
 import type { Trigger } from '../core/egg'
 

@@ -1,4 +1,4 @@
-import type { Row } from '@inkboard/math/formula'
+import type { Row } from '@penrill/math/formula'
 
 /**
  * What the app tells the eggs. The app calls the few functions exported from easter/index.tsx

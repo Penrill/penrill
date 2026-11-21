@@ -1,35 +1,35 @@
 <div align="center">
 
-<img src="build/icon.png" width="112" alt="Іконка Inkboard">
+<img src="build/icon.png" width="112" alt="Іконка Penrill">
 
-# Inkboard
+# Penrill
 
 **Безкоштовна дошка для вчителів, які пишуть і малюють графічним планшетом.**<br>
 Нескінченна дошка, векторне чорнило з натиском, транспортир і циркуль, фігури й координатні осі для математики.
 
-[![Остання версія](https://img.shields.io/github/v/release/yaroslavyushchenko/inkboard?label=версія&color=4f6bed)](https://github.com/yaroslavyushchenko/inkboard/releases/latest)
-[![Завантаження](https://img.shields.io/github/downloads/yaroslavyushchenko/inkboard/total?label=завантажень&color=2f9e44)](https://github.com/yaroslavyushchenko/inkboard/releases)
+[![Остання версія](https://img.shields.io/github/v/release/Penrill/penrill?label=версія&color=4f6bed)](https://github.com/Penrill/penrill/releases/latest)
+[![Завантаження](https://img.shields.io/github/downloads/Penrill/penrill/total?label=завантажень&color=2f9e44)](https://github.com/Penrill/penrill/releases)
 [![Ліцензія: FSL-1.1-MIT](https://img.shields.io/badge/ліцензія-FSL--1.1--MIT-blue)](LICENSE)
 
-[![Завантажити для Windows](https://img.shields.io/badge/Завантажити-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/yaroslavyushchenko/inkboard/releases/latest)
-[![Завантажити для macOS](https://img.shields.io/badge/Завантажити-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/yaroslavyushchenko/inkboard/releases/latest)
-[![Завантажити для Linux](https://img.shields.io/badge/Завантажити-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/yaroslavyushchenko/inkboard/releases/latest)
+[![Завантажити для Windows](https://img.shields.io/badge/Завантажити-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Penrill/penrill/releases/latest)
+[![Завантажити для macOS](https://img.shields.io/badge/Завантажити-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Penrill/penrill/releases/latest)
+[![Завантажити для Linux](https://img.shields.io/badge/Завантажити-Linux-E95420?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Penrill/penrill/releases/latest)
 
 [![Завантажте з Snap Store](https://snapcraft.io/uk/dark/install.svg)](https://snapcraft.io/inkboard)
 
-**[Сайт](https://yaroslavyushchenko.github.io/inkboard/)** ·
-**[Завантажити](https://github.com/yaroslavyushchenko/inkboard/releases/latest)** ·
+**[Сайт](https://penrill.com/)** ·
+**[Завантажити](https://github.com/Penrill/penrill/releases/latest)** ·
 **[Гарячі клавіші](docs/SHORTCUTS.md)** ·
 **[English](README.md)**
 
-<img src="docs/images/hero.png" alt="Inkboard: дошка з форматованим текстом, транспортиром, шестикутною пірамідою і колом, накресленим циркулем" width="900">
+<img src="docs/images/hero.png" alt="Penrill: дошка з форматованим текстом, транспортиром, шестикутною пірамідою і колом, накресленим циркулем" width="900">
 
 </div>
 
 ## Навіщо
 
 Microsoft Whiteboard припиняє роботу, а багато вчителів працювали в ньому з графічним планшетом.
-Inkboard такий самий простий (відкрив і пишеш), але має ще й інструменти, потрібні на уроці математики.
+Penrill такий самий простий (відкрив і пишеш), але має ще й інструменти, потрібні на уроці математики.
 Працює без інтернету й без облікового запису, дошки зберігаються на вашому комп'ютері.
 
 ## Можливості
@@ -55,32 +55,32 @@ Inkboard такий самий простий (відкрив і пишеш), а
 
 ## Встановлення
 
-Завантажте останню версію зі **[сторінки релізів](https://github.com/yaroslavyushchenko/inkboard/releases/latest)**:
+Завантажте останню версію зі **[сторінки релізів](https://github.com/Penrill/penrill/releases/latest)**:
 
 | Система | Файл | Примітка |
 |---|---|---|
-| Windows 10 / 11 | `Inkboard-Setup-…-x64.exe` | Windows може попередити про невідомого видавця: **Докладніше → Усе одно запустити** |
-| macOS | `Inkboard-…-mac-universal.dmg` | Програма ще не нотаризована Apple: якщо macOS не дає запустити, відкрийте **Системні параметри → Приватність і безпека → Усе одно відкрити** |
-| Ubuntu та інші Linux зі snap | [Snap Store](https://snapcraft.io/inkboard) | Встановіть із Центру застосунків (пошук Inkboard) або командою `sudo snap install inkboard` |
-| Linux | `Inkboard-…-x86_64.AppImage` або `.deb` | AppImage: у властивостях файлу дозвольте запуск як програми (або `chmod +x`) і відкрийте |
+| Windows 10 / 11 | `Penrill-Setup-…-x64.exe` | Windows може попередити про невідомого видавця: **Докладніше → Усе одно запустити** |
+| macOS | `Penrill-…-mac-universal.dmg` | Програма ще не нотаризована Apple: якщо macOS не дає запустити, відкрийте **Системні параметри → Приватність і безпека → Усе одно відкрити** |
+| Ubuntu та інші Linux зі snap | [Snap Store](https://snapcraft.io/inkboard) | Встановіть із Центру застосунків (пошук inkboard) або командою `sudo snap install inkboard` |
+| Linux | `Penrill-…-x86_64.AppImage` або `.deb` | AppImage: у властивостях файлу дозвольте запуск як програми (або `chmod +x`) і відкрийте |
 
-Далі на Windows, з AppImage і зі Snap Store Inkboard оновлюється сам; на macOS і з `.deb` повідомляє про нову версію.
+Далі на Windows, з AppImage і зі Snap Store Penrill оновлюється сам; на macOS і з `.deb` повідомляє про нову версію.
 
 ## Планшети Wacom
 
 - **Кнопки пера:** у Wacom Center задайте нижній кнопці *Правий клік*, а верхній *Середній клік*,
-  а в Inkboard (Налаштування → Кнопки пера) виберіть, що вони роблять: гумка, ласо або поточний інструмент.
+  а в Penrill (Налаштування → Кнопки пера) виберіть, що вони роблять: гумка, ласо або поточний інструмент.
 - **ExpressKeys** налаштовуються в Wacom Center як *Натискання клавіш…*, наприклад Ctrl+Z, X, V, M, пробіл.
   Повний список клавіш є в Налаштуваннях і в [docs/SHORTCUTS.md](docs/SHORTCUTS.md).
 
 ## Зворотний зв'язок
 
 Знайшли помилку чи чогось бракує для уроків?
-[Створіть issue](https://github.com/yaroslavyushchenko/inkboard/issues/new/choose), можна українською.
+[Створіть issue](https://github.com/Penrill/penrill/issues/new/choose), можна українською.
 
 ## Ліцензія
 
-Inkboard безкоштовний, а його вихідний код відкритий для всіх за ліцензією
+Penrill безкоштовний, а його вихідний код відкритий для всіх за ліцензією
 [Functional Source License 1.1, MIT Future License](LICENSE) (FSL-1.1-MIT). Програму можна
 використовувати, вивчати, змінювати й поширювати для будь-яких цілей, крім створення конкурентного
 продукту чи сервісу, а кожен випуск через два роки після виходу стає доступним і за ліцензією MIT.

@@ -1,6 +1,6 @@
 import { BACKGROUND_STYLE, MAJOR_COLOR, patternColor, ROW } from './background'
 import { bgPattern, isChalk } from './surface'
-import type { BackgroundKind, BBox } from '@inkboard/core/types'
+import type { BackgroundKind, BBox } from '@penrill/core/types'
 
 /** Numbers in SVG output: at most two decimals. */
 const r2 = (v: number): string => (Math.round(v * 100) / 100).toString()

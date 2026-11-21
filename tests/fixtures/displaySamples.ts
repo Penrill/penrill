@@ -1,7 +1,7 @@
 // Sample graphs and formulas for tests/display.test.ts (shared with the script that made the fixture).
 import { graphBBox, sanitizeGraph } from '../../src/board/engine/graph.ts'
-import type { FormulaItem, GraphItem, GraphParams } from '@inkboard/core/types'
-import { typeChar, insertFraction, EMPTY_FORMULA, type FormulaState } from '@inkboard/math/formula'
+import type { FormulaItem, GraphItem, GraphParams } from '@penrill/core/types'
+import { typeChar, insertFraction, EMPTY_FORMULA, type FormulaState } from '@penrill/math/formula'
 
 function graph(id: string, p: GraphParams, color = '#1e1e1e'): GraphItem {
   const g: GraphItem = { ...sanitizeGraph(p), type: 'graph', id, z: 1, ox: 10, oy: 20, color, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }

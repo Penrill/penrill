@@ -1,9 +1,9 @@
-import { circleHitsPolyline, turnedBBox, turnPoint } from '@inkboard/core/geometry'
-import { isLinear } from '@inkboard/core/shapes'
+import { circleHitsPolyline, turnedBBox, turnPoint } from '@penrill/core/geometry'
+import { isLinear } from '@penrill/core/shapes'
 import { formulaBBox, formulaLocalBox } from './formulatype'
 import { graphBBox } from './graph'
 import { scaleRuns, textBBox, textBox } from './text'
-import type { BBox, FormulaItem, ImageItem, Item, TextItem } from '@inkboard/core/types'
+import type { BBox, FormulaItem, ImageItem, Item, TextItem } from '@penrill/core/types'
 
 /**
  * Uniform scale `s` and turn `r` (radians, clockwise on screen) about anchor (ax, ay), then

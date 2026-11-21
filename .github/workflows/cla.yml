@@ -33,7 +33,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           path-to-signatures: signatures/cla.json
-          path-to-document: https://github.com/yaroslavyushchenko/inkboard/blob/main/CLA.md
+          path-to-document: https://github.com/Penrill/penrill/blob/main/CLA.md
           branch: cla-signatures
           allowlist: yaroslavyushchenko,*[bot]
           lock-pullrequest-aftermerge: false

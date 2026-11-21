@@ -1,9 +1,9 @@
-import { holdShape, recognizeShape, type Snapped } from '@inkboard/shape-recognition/snapshape'
+import { holdShape, recognizeShape, type Snapped } from '@penrill/shape-recognition/snapshape'
 import type { FeatureModule } from '../registry'
 
 /**
  * Hold-to-snap: keep the pen still at the end of a stroke and a rough circle, oval, arc, rectangle,
- * square or triangle becomes a clean one (the recognisers are in @inkboard/shape-recognition).
+ * square or triangle becomes a clean one (the recognisers are in @penrill/shape-recognition).
  * Without this module strokes simply stay as drawn.
  */
 export const shapeRecognitionModule: FeatureModule = {

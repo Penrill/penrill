@@ -1,18 +1,19 @@
-import { validateRows, type Row } from '@inkboard/math/formula'
+import { validateRows, type Row } from '@penrill/math/formula'
 import { isEquation } from './formulaexpr'
 import { formulaBBox } from './formulatype'
 import { graphBBox, sanitizeGraph } from './graph'
-import { isShapeKind, MAX_BASE, MIN_BASE } from '@inkboard/core/shapes'
-import { turnedBBox } from '@inkboard/core/geometry'
+import { isShapeKind, MAX_BASE, MIN_BASE } from '@penrill/core/shapes'
+import { turnedBBox } from '@penrill/core/geometry'
 import { bgPattern, isBackgroundKind, isChalk, SCHOOL_PATTERNS } from './surface'
 import { textBBox } from './text'
-import type { TextRun } from '@inkboard/core/types'
-import type { BackgroundKind, Camera, FormulaItem, GraphItem, GraphParams, Item, LineCap, LineDash, Point, ShapeSpec, TextItem } from '@inkboard/core/types'
+import type { TextRun } from '@penrill/core/types'
+import type { BackgroundKind, Camera, FormulaItem, GraphItem, GraphParams, Item, LineCap, LineDash, Point, ShapeSpec, TextItem } from '@penrill/core/types'
 
 /**
- * `.inkboard` board document format: plain UTF-8 JSON (legacy gzip-compressed files are still accepted on read).
+ * Board document format (`.penrill` files, formerly `.inkboard`): plain UTF-8 JSON (legacy gzip-compressed files are still accepted on read).
  * Ink stays vector (flattened point lists). Images are referenced by key in `assets`.
  */
+/** The format id inside every board file. Keeps the app's former name so older versions can still read boards. */
 export const FORMAT = 'inkboard'
 /**
  * 2 = straight-line strokes (`geom`), coordinate graphs, groups.
@@ -192,8 +193,8 @@ export function serializeBoard(data: BoardData): BoardFile {
 const readRot = (v: unknown): { rot?: number } => (typeof v === 'number' && Number.isFinite(v) && v !== 0 ? { rot: v } : {})
 
 export function deserializeBoard(file: BoardFile): BoardData {
-  if (file?.format !== FORMAT) throw new Error('Not an Inkboard file')
-  if (file.version > FORMAT_VERSION) throw new Error('This board was made with a newer version of Inkboard')
+  if (file?.format !== FORMAT) throw new Error('Not a Penrill board')
+  if (file.version > FORMAT_VERSION) throw new Error('This board was made with a newer version of Penrill')
   const items: Item[] = []
   for (const s of file.items) {
     if (s.type === 'stroke') {
@@ -281,7 +282,7 @@ export async function encodeBoard(data: BoardData): Promise<Uint8Array> {
 }
 
 export async function decodeBoard(bytes: Uint8Array): Promise<BoardData> {
-  // Accept both plain JSON and legacy gzip-compressed .inkboard files.
+  // Accept both plain JSON and legacy gzip-compressed board files.
   const isGzip = bytes[0] === 0x1f && bytes[1] === 0x8b
   const raw = isGzip ? await decompressGzip(bytes) : bytes
   return deserializeBoard(JSON.parse(new TextDecoder().decode(raw)) as BoardFile)

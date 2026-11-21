@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { panBy, screenToWorld, zoomAt } from '@inkboard/core/camera'
-import { bboxOfPoints, newId } from '@inkboard/core/geometry'
+import { panBy, screenToWorld, zoomAt } from '@penrill/core/camera'
+import { bboxOfPoints, newId } from '@penrill/core/geometry'
 import { setImageLoadListener } from '../engine/images'
 import {
   BoardRenderer,
@@ -15,10 +15,10 @@ import {
   type LiveStroke
 } from '../engine/renderer'
 import { arcStroke, baseStroke, degText, hitProtractor, rayStroke, scaleAngle, snapDeg, toLocal, toWorld, turnText, type ProtractorHit, type ProtractorState } from '../engine/protractor'
-import { buildShapeItems, editableShape, regenerateShape } from '@inkboard/core/shapeItems'
-import { isLinear, snapAngle } from '@inkboard/core/shapes'
+import { buildShapeItems, editableShape, regenerateShape } from '@penrill/core/shapeItems'
+import { isLinear, snapAngle } from '@penrill/core/shapes'
 import { canTurnSelection, hitTest } from '../engine/transform'
-import type { BBox, Item, Point, ShapeSpec, StrokeItem, TextItem } from '@inkboard/core/types'
+import type { BBox, Item, Point, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
 import { useEditor } from '../editorContext'
 import type { RecognizedShape } from '../registry'
 import type { Session } from '../session'
@@ -65,6 +65,7 @@ type Effective = 'ink' | 'eraser' | 'pan' | 'select' | 'brush' | 'shape' | 'move
 type Gesture =
   | {
       kind: 'ink'
+      id: string
       pointerId: number
       live: LiveStroke
       start: Point
@@ -185,6 +186,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       if (overlayDirty) {
         const shown = gesture && 'tool' in gesture ? gesture.tool.overlay?.() : undefined
         const live = gesture?.kind === 'ink' ? gesture.live : (shown?.live ?? null)
+        if (gesture?.kind === 'ink') editor.shareInk?.(gesture.id, gesture.live, false, false)
         const info = selInfo()
         const hl = !gesture && hoverLine && hoverLine.id !== info?.line?.id ? hoverLine : null
         const comp = ui.compass
@@ -208,6 +210,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           sides: !!info?.shape,
           ends: info?.line ? lineEnds(info.line) : hl ? lineEnds(hl) : null
         }, {
+          peerInk: editor.peerInk.values(),
           ruler: rul ? { s: rul, state: rs!.state } : null,
           setSquare: sq ? { s: sq, state: ss!.state } : null,
           protractor: prot ? { p: prot, state: ps!.state } : null,
@@ -696,6 +699,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       holdAt = null
       angleLabel = null
       if (!g) return
+      let committedInk = false
       if ('tool' in g) {
         g.tool.end()
       } else if (g.kind === 'ink' && g.held?.current.spec) {
@@ -712,7 +716,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const { live } = g
         const stroke: StrokeItem = {
           type: 'stroke',
-          id: newId(),
+          id: g.id,
           z: scene.allocZ(),
           tool: live.tool,
           color: live.color,
@@ -742,6 +746,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const groupId = newId()
           scene.add([{ ...stroke, groupId }, { ...label, groupId }])
         } else scene.add([stroke])
+        committedInk = true
       } else if (g.kind === 'move' || g.kind === 'scale' || g.kind === 'turn') {
         editor.commitPreview()
       } else if (g.kind === 'endpoint') {
@@ -752,6 +757,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           editor.setSelection(g.current)
         }
       }
+      if (g.kind === 'ink') editor.shareInk?.(g.id, g.live, true, committedInk)
       updateCssCursor()
       invalidate(false)
     }
@@ -903,7 +909,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const slot = inkSlot()
           const start: Point = [c.x + Math.cos(c.a) * c.r, c.y + Math.sin(c.a) * c.r, 0.5]
           gesture = {
-            kind: 'ink',
+            kind: 'ink', id: newId(),
             pointerId: e.pointerId,
             start,
             live: {
@@ -1073,7 +1079,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const pressure = e.pointerType === 'pen' && !isHl
         const start = pointFrom(e, pressure)
         gesture = {
-          kind: 'ink',
+          kind: 'ink', id: newId(),
           pointerId: e.pointerId,
           start,
           live: {
@@ -1406,7 +1412,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         (t instanceof HTMLInputElement && !['range', 'checkbox', 'radio', 'button', 'color'].includes(t.type)))
 
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (isTyping(e.target)) return
+      if (isTyping(e.target) || (e.target instanceof Element && e.target.closest('[aria-modal="true"]'))) return
       const ui = readUI()
       // Hold Space = pan (not a one-shot shortcut).
       if (e.code === 'Space' && ui.active && !e.ctrlKey && !e.metaKey) {

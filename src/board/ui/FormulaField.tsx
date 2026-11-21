@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   backspace, insertFraction, moveEnd, moveHome, moveLeft, moveRight, typeChar, type Cursor, type FormulaState
-} from '@inkboard/math/formula'
+} from '@penrill/math/formula'
 import { caretAt, caretOf, caretVertical, typesetRows } from '../engine/formulatype'
 import { type MathTarget, prefsStore } from '../store'
 import { divSign } from './mathKeys'

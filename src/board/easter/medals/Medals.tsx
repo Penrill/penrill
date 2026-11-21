@@ -36,8 +36,8 @@ function MedalOffer() {
           <div className="ach-offer-title">{uk ? 'Збирати досягнення?' : 'Collect achievements?'}</div>
           <p>
             {uk
-              ? 'У Inkboard сховано кілька пасхалок. Знайдете одну, і тут з’явиться медаль. Вимкнути можна будь-коли в налаштуваннях.'
-              : 'Inkboard has a few easter eggs hidden in it. Find one and a medal shows up here. You can switch this off any time in the settings.'}
+              ? 'У Penrill сховано кілька пасхалок. Знайдете одну, і тут з’явиться медаль. Вимкнути можна будь-коли в налаштуваннях.'
+              : 'Penrill has a few easter eggs hidden in it. Find one and a medal shows up here. You can switch this off any time in the settings.'}
           </p>
           <div className="ach-offer-actions">
             <button className="text-btn outline" onClick={() => setOpen(false)}>

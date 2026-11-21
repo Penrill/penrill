@@ -6,8 +6,9 @@ const invoke =
     ipcRenderer.invoke(channel, ...args)
 
 // Mirrors `PlatformApi` in src/shared/platform.ts.
-contextBridge.exposeInMainWorld('inkboard', {
+contextBridge.exposeInMainWorld('penrill', {
   platform: process.platform,
+  http: invoke('server:http'),
   // Read once, synchronously, so the first render already knows which features are on.
   features: ipcRenderer.sendSync('features:get'),
   setFeature: invoke('features:set'),

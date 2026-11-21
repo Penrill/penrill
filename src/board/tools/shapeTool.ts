@@ -1,7 +1,7 @@
-import { newId } from '@inkboard/core/geometry'
-import { buildShapeItems } from '@inkboard/core/shapeItems'
-import { DEFAULT_SHAPE_SIZE, isLinear, SHAPE_BASES, shapeBox, shapeParts } from '@inkboard/core/shapes'
-import type { ShapeSpec } from '@inkboard/core/types'
+import { newId } from '@penrill/core/geometry'
+import { buildShapeItems } from '@penrill/core/shapeItems'
+import { DEFAULT_SHAPE_SIZE, isLinear, SHAPE_BASES, shapeBox, shapeParts } from '@penrill/core/shapes'
+import type { ShapeSpec } from '@penrill/core/types'
 import type { LiveStroke } from '../engine/renderer'
 import type { Gesture, Sample, ToolContext } from './types'
 

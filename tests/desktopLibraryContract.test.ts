@@ -17,7 +17,7 @@ after(async () => {
 })
 
 libraryContract('SQLite', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-contract-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-contract-'))
   const lib = new Library(dir)
   opened.push({ dir, lib })
   await lib.init()

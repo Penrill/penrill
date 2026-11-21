@@ -1,6 +1,6 @@
 import { ACCENT } from './accent'
 import { IDLE_HANDLES, instrumentLook, rgba } from './instrumentLook'
-import type { Camera, Point } from '@inkboard/core/types'
+import type { Camera, Point } from '@penrill/core/types'
 
 /**
  * On-board compass (a drawing aid, not board content), in world coordinates like the protractor.

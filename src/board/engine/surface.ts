@@ -1,5 +1,5 @@
-import type { BackgroundKind, PaperPattern } from '@inkboard/core/types'
-import { PAPER, type ColorMap } from '@inkboard/render/display'
+import type { BackgroundKind, PaperPattern } from '@penrill/core/types'
+import { PAPER, type ColorMap } from '@penrill/render/display'
 
 /**
  * Board surfaces: white paper (the classic look) and a dark green lecture chalkboard

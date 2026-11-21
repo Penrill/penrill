@@ -1,5 +1,5 @@
 {
-  "name": "@inkboard/shape-recognition",
+  "name": "@penrill/shape-recognition",
   "version": "0.0.0",
   "private": true,
   "description": "Hold-to-snap: turns a rough stroke into the clean shape it resembles. No DOM, no UI.",
@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@inkboard/core": "*"
+    "@penrill/core": "*"
   }
 }

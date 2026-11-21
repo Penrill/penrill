@@ -1,6 +1,6 @@
 {
-  "name": "Inkboard",
-  "short_name": "Inkboard",
+  "name": "Penrill",
+  "short_name": "Penrill",
   "description": "An infinite whiteboard for pen tablets.",
   "start_url": "./",
   "scope": "./",

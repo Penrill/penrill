@@ -1,5 +1,5 @@
-import { bboxIntersects, circleHitsPolyline } from '@inkboard/core/geometry'
-import type { Item } from '@inkboard/core/types'
+import { bboxIntersects, circleHitsPolyline } from '@penrill/core/geometry'
+import type { Item } from '@penrill/core/types'
 import type { Gesture, Modifiers, Sample, ToolContext } from './types'
 
 /** Items a circle of radius r touches while it moves from (x0, y0) to (x1, y1) on the board. */

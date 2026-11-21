@@ -3,11 +3,11 @@
  * out the number it stands for, and the two conversions that connect it with formulas typed as text
  * (old boards, older versions of the app).
  */
-import type { Atom, Row } from '@inkboard/math/formula'
-import { slots, validateRows, withSlots } from '@inkboard/math/formula'
-import { parseRow, type LexInfo } from '@inkboard/math/formulalex'
-import { evaluate, parseExpr, parseWith, usesX, usesY, type MathNode, type ParseResult } from '@inkboard/math/mathexpr'
-import type { PlotFn } from '@inkboard/core/types'
+import type { Atom, Row } from '@penrill/math/formula'
+import { slots, validateRows, withSlots } from '@penrill/math/formula'
+import { parseRow, type LexInfo } from '@penrill/math/formulalex'
+import { evaluate, parseExpr, parseWith, usesX, usesY, type MathNode, type ParseResult } from '@penrill/math/mathexpr'
+import type { PlotFn } from '@penrill/core/types'
 
 const c = (s: string): Atom => ({ t: 'c', s })
 const isC = (a: Atom | undefined, s: string): boolean => !!a && a.t === 'c' && a.s === s
@@ -254,7 +254,7 @@ function prec(n: MathNode): number {
 
 /**
  * The formula as plain text that the text parser of any version reads to the same function: what
- * older versions of Inkboard plot when they open a board made with the keypad.
+ * older versions of the app plot when they open a board made with the keypad.
  */
 export function nodeToText(n: MathNode): string {
   const at = (m: MathNode, min: number): string => (prec(m) < min ? `(${nodeToText(m)})` : nodeToText(m))

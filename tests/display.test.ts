@@ -1,9 +1,9 @@
-// Display lists (@inkboard/render): graphs and formulas are drawn from one description on screen and
+// Display lists (@penrill/render): graphs and formulas are drawn from one description on screen and
 // in SVG exports. Run: npm test
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { PAPER, toSvg, type Prim } from '@inkboard/render/display'
+import { PAPER, toSvg, type Prim } from '@penrill/render/display'
 import { graphDisplay, graphSvg } from '../src/board/engine/graph.ts'
 import { formulaSvg } from '../src/board/engine/formulatype.ts'
 import { withInkSurface } from '../src/board/engine/surface.ts'

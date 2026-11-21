@@ -1,5 +1,5 @@
 {
-  "name": "@inkboard/render-canvas",
+  "name": "@penrill/render-canvas",
   "version": "0.0.0",
   "private": true,
   "description": "Draws display lists on a Canvas 2D context. The only package that may use the DOM (canvas) types.",
@@ -12,6 +12,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@inkboard/render": "*"
+    "@penrill/render": "*"
   }
 }

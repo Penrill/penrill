@@ -1,4 +1,4 @@
-import { panBy } from '@inkboard/core/camera'
+import { panBy } from '@penrill/core/camera'
 import type { Gesture, Sample, ToolContext } from './types'
 
 /** Drags the board: the hand tool, Space, the middle or right mouse button, one finger. */

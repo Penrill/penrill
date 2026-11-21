@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import type { ShapeKind } from '@inkboard/core/shapes'
-import type { Camera, GraphParams } from '@inkboard/core/types'
+import type { ShapeKind } from '@penrill/core/shapes'
+import type { Camera, GraphParams } from '@penrill/core/types'
 import type { Compass } from './engine/compass'
 import type { Protractor } from './engine/protractor'
 import type { Straightedge } from './engine/straightedge'

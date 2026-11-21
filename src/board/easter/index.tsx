@@ -1,4 +1,4 @@
-import type { Row } from '@inkboard/math/formula'
+import type { Row } from '@penrill/math/formula'
 import { Armed } from './core/armed'
 import { emit } from './core/bus'
 import { Stage } from './core/stage'

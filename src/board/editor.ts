@@ -1,29 +1,32 @@
-import { clampZoom, screenToWorld, zoomAt } from '@inkboard/core/camera'
+import { clampZoom, screenToWorld, zoomAt } from '@penrill/core/camera'
 import { BUILTIN_GRAPHS, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
 import { plotFormula, plotHead, rowsToText } from './engine/formulaexpr'
-import { bboxOfPoints, newId } from '@inkboard/core/geometry'
+import { bboxOfPoints, newId } from '@penrill/core/geometry'
 import { loadImage, readFileAsDataURL } from './engine/images'
-import { Scene } from '@inkboard/core/scene'
+import type { LiveStroke } from './engine/renderer'
+import { Scene } from '@penrill/core/scene'
 import {
   deserializeBoard,
   serializeBoard,
   type BoardData,
   type BoardFile
 } from './engine/serialize'
-import { editableShape, regenerateShape } from '@inkboard/core/shapeItems'
+import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
 import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
 import { COMPASS_CELL } from './engine/compass'
 import { CM } from './engine/straightedge'
 import { formatAll, formatRange, fullRuns, textBBox, textFields, trimRunsEnd } from './engine/text'
-import { isBlank } from '@inkboard/math/formula'
+import { isBlank } from '@penrill/math/formula'
 import { formulaBBox, formulaBox } from './engine/formulatype'
-import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@inkboard/core/types'
+import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@penrill/core/types'
 import { translate, type MessageKey } from './i18n'
 import { FeatureRegistry, type FeatureModule } from './registry'
 import { createSessionStore, type Session } from './session'
 import { FORMULA_HISTORY, prefsStore } from './store'
 
-const CLIPBOARD_MIME = 'application/x-inkboard'
+const CLIPBOARD_MIME = 'application/x-penrill'
+/** Copied by Inkboard before 0.13; still pasted. */
+const LEGACY_CLIPBOARD_MIME = 'application/x-inkboard'
 
 /** Line ends fit any open line: freehand ink, straight lines, the Line shape (not closed shapes or arrows). */
 export const canHaveEnds = (s: StrokeItem): boolean => !s.shape || s.shape.kind === 'line'
@@ -42,6 +45,8 @@ export class Editor {
   readonly session = createSessionStore()
   /** The feature modules this board was made with: item types, shape recognition, formula answers. */
   readonly features: FeatureRegistry
+  peerInk = new Map<string, LiveStroke>()
+  shareInk?: (id: string, stroke: LiveStroke, finished: boolean, committed: boolean) => void
   camera: Camera = { ...DEFAULT_CAMERA }
   viewport = { width: 0, height: 0 }
   /** Live move/scale of the selection, drawn without touching the scene until committed. */
@@ -543,7 +548,7 @@ export class Editor {
   pasteFromClipboard(e: ClipboardEvent): boolean {
     const data = e.clipboardData
     if (!data) return false
-    let json = data.getData(CLIPBOARD_MIME)
+    let json = data.getData(CLIPBOARD_MIME) || data.getData(LEGACY_CLIPBOARD_MIME)
     if (!json) {
       const text = data.getData('text/plain')
       if (text.startsWith('{"format":"inkboard"')) json = text
@@ -815,9 +820,9 @@ export function createEditor({ modules }: { modules: readonly FeatureModule[] })
   const editor = new Editor(modules)
   // Dev builds only: lets UI tests in the browser inspect the latest board's state.
   if (import.meta.env.DEV) {
-    const w = window as unknown as { __inkboard: Editor; __inkboardPrefs: typeof prefsStore }
-    w.__inkboard = editor
-    w.__inkboardPrefs = prefsStore
+    const w = window as unknown as { __penrill: Editor; __penrillPrefs: typeof prefsStore }
+    w.__penrill = editor
+    w.__penrillPrefs = prefsStore
   }
   return editor
 }

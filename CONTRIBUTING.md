@@ -1,12 +1,12 @@
-# Contributing to Inkboard
+# Contributing to Penrill
 
-Thanks for helping! Inkboard is made for teachers who use a pen tablet, so the best contributions
+Thanks for helping! Penrill is made for teachers who use a pen tablet, so the best contributions
 come from real lessons: what was hard to draw, what got in the way, what's missing.
 
 ## Reporting bugs and ideas
 
-[Open an issue](https://github.com/yaroslavyushchenko/inkboard/issues/new/choose) in English or
-Ukrainian. Please include the Inkboard version (menu ☰ or the "All boards" screen), your system and
+[Open an issue](https://github.com/Penrill/penrill/issues/new/choose) in English or
+Ukrainian. Please include the Penrill version (menu ☰ or the "All boards" screen), your system and
 your tablet. Screenshots or a short screen recording help a lot.
 
 ## Working on the code
@@ -14,8 +14,8 @@ your tablet. Screenshots or a short screen recording help a lot.
 ```bash
 npm install
 npm run dev          # the desktop app with hot reload
-npm run dev:site     # the landing page at /inkboard/ (English) and /inkboard/uk/
-npm run dev:web      # the web version at /inkboard/app/ (boards stay in the browser)
+npm run dev:site     # the landing page at / (English) and /uk/
+npm run dev:web      # the web version at /app/ (boards stay in the browser)
 npm run typecheck && npm test && npm run build   # run before every commit
 ```
 
@@ -44,7 +44,7 @@ and open a pull request, or just describe the change in an issue.
 
 ## License
 
-Inkboard is released under the [FSL-1.1-MIT](LICENSE) license. Before your first pull request is
+Penrill is released under the [FSL-1.1-MIT](LICENSE) license. Before your first pull request is
 merged, please sign the [Contributor License Agreement](CLA.md): a bot comments on the pull request
 and you reply with the sentence it asks for. You only do this once.
 

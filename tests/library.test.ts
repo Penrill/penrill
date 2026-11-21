@@ -32,7 +32,7 @@ function sampleBoardBytes(withImage = false): Uint8Array {
 }
 
 test('stores boards in SQLite and extracts images as raw binary BLOBs without base64', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-sqlite-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-sqlite-'))
   try {
     const lib = new Library(dir)
     await lib.init()
@@ -85,7 +85,7 @@ test('stores boards in SQLite and extracts images as raw binary BLOBs without ba
 })
 
 test('migrates legacy gzipped .inkboard library and moves the old files into legacy-0.6', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-migrate-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-migrate-'))
   try {
     await mkdir(join(dir, 'boards'), { recursive: true })
     await mkdir(join(dir, 'thumbs'), { recursive: true })
@@ -152,7 +152,7 @@ test('migrates legacy gzipped .inkboard library and moves the old files into leg
 })
 
 test('exports standalone .inkboard on request and imports both plain JSON and legacy gzip files', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-export-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-export-'))
   try {
     const lib = new Library(dir)
     await lib.init()
@@ -184,7 +184,7 @@ test('exports standalone .inkboard on request and imports both plain JSON and le
 })
 
 test('opening the same file twice opens one board; a changed file is imported again', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-dedupe-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-dedupe-'))
   try {
     const lib = new Library(dir)
     await lib.init()
@@ -211,7 +211,7 @@ test('opening the same file twice opens one board; a changed file is imported ag
 })
 
 test('migration keeps unreadable boards on disk and a re-run never overwrites migrated rows', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-migrate-safe-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-migrate-safe-'))
   try {
     await mkdir(join(dir, 'boards'), { recursive: true })
     await writeFile(join(dir, 'boards', 'good.inkboard'), gzipSync(Buffer.from(sampleBoardBytes())))
@@ -250,7 +250,7 @@ test('migration keeps unreadable boards on disk and a re-run never overwrites mi
 })
 
 test('schema version is recorded and a newer library is refused', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'inkboard-schema-'))
+  const dir = await mkdtemp(join(tmpdir(), 'penrill-schema-'))
   try {
     const lib = new Library(dir)
     await lib.init()

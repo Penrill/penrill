@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { applyXform, hitTest, xformBBox, xformPoint, type Xform } from '../src/board/engine/transform.ts'
-import type { ImageItem, StrokeItem } from '@inkboard/core/types'
+import type { ImageItem, StrokeItem } from '@penrill/core/types'
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6
 const quarter: Xform = { s: 1, ax: 0, ay: 0, dx: 0, dy: 0, r: Math.PI / 2 }

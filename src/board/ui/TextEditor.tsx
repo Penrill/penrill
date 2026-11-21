@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { commonFormat, formatRange, mergeRuns, sameFormat, TEXT_FONT, TEXT_LINE_HEIGHT, type FullRun } from '../engine/text'
 import { inkColor, withInkSurface } from '../engine/surface'
-import type { TextFormat } from '@inkboard/core/types'
+import type { TextFormat } from '@penrill/core/types'
 import { useT } from '../i18n'
 import { PEN_COLORS, type TextEdit, prefsStore } from '../store'
 import { fitBox, screenArea } from './dock'

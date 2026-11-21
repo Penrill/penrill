@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Community } from './Community'
+import { account, rememberAccount, useAccounts } from '../sync/accounts'
+import { ApiError, type RemoteBoard } from '../sync/api'
+import { clientFor } from '../sync/clients'
+import { syncCoordinator } from '../sync/coordinator'
+import { openRemote, remoteBoard, useRemoteBoards, useSyncStatus } from '../sync/librarySync'
+import { activeLink, linkFor, newRemoteId, removeLink, saveLink, useLinks } from '../sync/links'
+import { renderThumbnail } from '../../../board/engine/export'
+import { StorageSettings } from './BoardStorage'
+import { CloudIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { hostedCloud, cloudOrigin, storagePreference } from '../storagePreference'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import appIcon from '../../../../build/icon.png'
 import { TAG_COLORS, type BoardEntry, type Tag } from '../../../shared/library'
 import { boardLibrary } from '../boardLibrary'
@@ -11,6 +22,7 @@ import { useApp } from '../appState'
 import { Medals } from '../../../board/easter' // easter egg
 
 const lib = platform.library
+const REMOTE_REFRESH_MS = 10_000
 const refresh = (): Promise<void> => boardLibrary.refreshLibrary()
 
 function Thumb({ entry }: { entry: BoardEntry }) {
@@ -23,6 +35,49 @@ function Thumb({ entry }: { entry: BoardEntry }) {
     }
   }, [entry])
   return <div className="card-thumb">{url ? <img src={url} alt="" draggable={false} /> : <div className="card-thumb-empty" />}</div>
+}
+
+function RemoteCard({ origin, row }: { origin: string; row: RemoteBoard }) {
+  const t = useT()
+  const lang = usePrefs(s => s.lang)
+  const ref = useRef<HTMLDivElement>(null)
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    let active = true
+    let preview = ''
+    async function load() {
+      const data = await remoteBoard(origin, row.id)
+      if (!active) return
+      const image = await renderThumbnail(data.items, data.background, boardLibrary.editor.features)
+      if (active && image) {
+        preview = URL.createObjectURL(new Blob([image as BlobPart], { type: 'image/webp' }))
+        setUrl(preview)
+      }
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        observer.disconnect()
+        void load().catch(() => { /* The board can still be opened without a preview. */ })
+      }
+    })
+    if (ref.current) observer.observe(ref.current)
+    return () => {
+      active = false
+      observer.disconnect()
+      if (preview) URL.revokeObjectURL(preview)
+    }
+  }, [origin, row.id, row.seq])
+  const open = () => void openRemote(origin, row).catch(() => window.alert(t('storage.error')))
+  return <div ref={ref} className="board-card">
+    <button className="card-open" aria-label={row.title} onClick={open}>
+      <div className="card-thumb">{url ? <img src={url} alt="" /> : <div className="card-thumb-empty" />}</div>
+    </button>
+    <div className="card-body">
+      <button className="card-title remote-title" onClick={open}>{row.title}</button>
+      <div className="card-meta">{t('home.edited', { when: relativeTime(lang, Date.parse(row.updated)) })}</div>
+      <div className="card-badges"><CloudIcon width={15} className="card-location" /></div>
+    </div>
+  </div>
 }
 
 function TagPicker({ entry, tags, onClose }: { entry: BoardEntry; tags: Tag[]; onClose: () => void }) {
@@ -108,6 +163,10 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
   const [renaming, setRenaming] = useState(false)
   const [title, setTitle] = useState(entry.title)
   const closeMenu = useCallback(() => setMenu(null), [])
+  const status = useSyncStatus(s => s.states[entry.id])
+  useLinks(s => s.version)
+  const link = activeLink(entry.id)
+  const destination = storagePreference()
   const deleted = !!entry.deletedAt
   const act = (fn: () => Promise<unknown>) => () => {
     setMenu(null)
@@ -151,15 +210,18 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
             : t('home.edited', { when: relativeTime(lang, entry.updatedAt) })}
         </div>
         <div className="card-badges">
+          {link && <span className="card-location" title={t(`storage.${status ?? 'pending'}`)}>
+            {status === 'denied' ? <ExclamationTriangleIcon width={15} /> : <CloudIcon width={15} />}
+          </span>}
+          {link && status === 'denied' && <button className="text-btn outline" title={t('storage.deniedHelp')} onClick={act(async () => removeLink(entry.id))}>
+            {t('storage.keepLocal')}</button>}
           {entry.missing ? (
             <span className="badge warn">{t('home.missing')}</span>
           ) : entry.kind === 'file' ? (
             <span className="badge" title={entry.filePath}>
               <FolderIcon width={13} height={13} /> {folder}
             </span>
-          ) : (
-            <span className="badge subtle">{t('home.inApp')}</span>
-          )}
+          ) : null}
           {entry.tagIds.map((id) => {
             const tag = tags.find((x) => x.id === id)
             return tag ? (
@@ -220,6 +282,14 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
                 <button className="menu-item" onClick={() => setMenu('tags')}>
                   {t('card.tags')}…
                 </button>
+                {!entry.missing && !link && account(destination.origin) && (
+                  <button className="menu-item" onClick={act(async () => {
+                    saveLink(entry.id, { origin: destination.origin, user: account(destination.origin)!.name, remote: newRemoteId(), seq: null, published: false })
+                    await syncCoordinator.refresh()
+                  })}>
+                    {t(destination.source === 'cloud' ? 'storage.moveCloud' : 'storage.moveServer')}
+                  </button>
+                )}
                 {!entry.missing && (
                   <>
                     <button className="menu-item" onClick={act(() => lib.duplicate(entry.id))}>
@@ -255,8 +325,40 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
 /** "All boards" screen: thumbnails, search, tags, pinned, recently deleted. */
 export function HomeScreen() {
   const t = useT()
-  const { boards, tags } = useApp((s) => s.library)
+  const library = useApp(s => s.library)
+  const tags = library.tags
+  useAccounts(s => s.version)
+  useLinks(s => s.version)
+  const boards = library.boards.filter(b => {
+    const link = linkFor(b.id)
+    return !link || account(link.origin)?.name === link.user
+  })
   const current = useApp((s) => s.board)
+  const [pref, setPref] = useState(storagePreference)
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if (!event.key || event.key === 'penrill-library-source' || event.key === 'penrill-server-origin') setPref(storagePreference())
+    }
+    window.addEventListener('storage', changed)
+    return () => window.removeEventListener('storage', changed)
+  }, [])
+  const catalog = useRemoteBoards()
+  const remoteError = catalog.error && catalog.origin === pref.origin
+  useEffect(() => {
+    void syncCoordinator.refresh()
+    const timer = setInterval(() => void syncCoordinator.refresh(), REMOTE_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [pref])
+  async function signOut() {
+    try {
+      await boardLibrary.save()
+      await clientFor(cloudOrigin).signOut()
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 401)) { window.alert(t('storage.error')); return }
+    }
+    rememberAccount(cloudOrigin, null)
+    window.location.reload()
+  }
   const [query, setQuery] = useState('')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [manage, setManage] = useState(false)
@@ -286,7 +388,19 @@ export function HomeScreen() {
   }, [boards, query, tagFilter])
 
   const canGoBack = current && boards.some((b) => b.id === current.id && !b.deletedAt)
-  const nothing = pinned.length + rest.length === 0
+  const known = new Set(boards.filter(b => !b.deletedAt).map(b => activeLink(b.id)).filter(l => l?.origin === pref.origin).map(l => l?.remote))
+  const remote = account(pref.origin) && catalog.origin === pref.origin && !tagFilter
+    ? catalog.rows.filter(r => !known.has(r.id) && r.title.toLowerCase().includes(query.trim().toLowerCase()))
+    : []
+  const cards = [
+    ...rest.map(entry => ({ id: entry.id, updated: entry.updatedAt, card: <BoardCard entry={entry} tags={tags} /> })),
+    ...remote.map(row => ({
+      id: 'remote-' + row.id,
+      updated: Date.parse(row.updated),
+      card: <RemoteCard origin={pref.origin} row={row} />
+    }))
+  ].sort((a, b) => b.updated - a.updated)
+  const nothing = pinned.length + cards.length === 0
   const filtering = !!query.trim() || tagFilter !== null
 
   return (
@@ -299,12 +413,14 @@ export function HomeScreen() {
             </button>
           )}
           <img src={appIcon} alt="" draggable={false} />
-          <span>Inkboard</span>
-          <Medals /> {/* easter egg */}
+          <span>{hostedCloud ? 'Penrill Cloud' : 'Penrill'}</span>
+          {hostedCloud ? <span>{account(cloudOrigin)?.name}</span> : <Medals />}
         </div>
         <div className="home-title-row">
           <h1>{t('home.title')}</h1>
           <div className="home-actions">
+            {hostedCloud ? <button className="text-btn outline" onClick={() => void signOut()}>{t('share.logout')}</button> : <StorageSettings onSave={() => setPref(storagePreference())} />}
+            {account(pref.origin) && <Community key={pref.origin + account(pref.origin)?.name} origin={pref.origin} />}
             <button className="text-btn outline" onClick={() => void boardLibrary.openFile()}>
               <FolderIcon width={18} height={18} /> {t('home.openFile')}
             </button>
@@ -342,6 +458,7 @@ export function HomeScreen() {
       </div>
 
       <div className="home-scroll">
+        {remoteError && <p className="muted" role="status">{t('storage.libraryOffline')}</p>}
         {pinned.length > 0 && (
           <section>
             <h2>{t('home.pinned')}</h2>
@@ -353,13 +470,11 @@ export function HomeScreen() {
           </section>
         )}
 
-        {rest.length > 0 && (
+        {cards.length > 0 && (
           <section>
             {pinned.length > 0 && <h2>{t('home.boards')}</h2>}
             <div className="card-grid">
-              {rest.map((b) => (
-                <BoardCard key={b.id} entry={b} tags={tags} />
-              ))}
+              {cards.map(({ id, card }) => <Fragment key={id}>{card}</Fragment>)}
             </div>
           </section>
         )}

@@ -1,4 +1,4 @@
-import type { StrokeItem } from '@inkboard/core/types'
+import type { StrokeItem } from '@penrill/core/types'
 import { capsSvg, dashPattern, drawStroke, HIGHLIGHTER_ALPHA, inkOutlineSvg, lineSvgPath, usesLineRender } from '../engine/ink'
 import { highlightBlend, inkColor } from '../engine/surface'
 import type { FeatureModule } from '../registry'

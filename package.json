@@ -1,6 +1,6 @@
 {
   "name": "inkboard",
-  "productName": "Inkboard",
+  "productName": "Penrill",
   "version": "0.12.1",
   "description": "Free infinite whiteboard for pen tablets",
   "license": "FSL-1.1-MIT",
@@ -8,10 +8,10 @@
     "name": "Yaroslav Yushchenko",
     "email": "contact@yaroslavyushchenko.com"
   },
-  "homepage": "https://github.com/yaroslavyushchenko/inkboard",
+  "homepage": "https://github.com/Penrill/penrill",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yaroslavyushchenko/inkboard.git"
+    "url": "https://github.com/Penrill/penrill.git"
   },
   "desktopName": "inkboard.desktop",
   "main": "./out/main/index.js",
@@ -40,6 +40,7 @@
     "electron-winstaller": false
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -51,11 +52,16 @@
     "perfect-freehand": "^1.2.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "zustand": "^5.1.0"
   },
   "dependencies": {
-    "electron-updater": "^6.8.11"
+    "@headlessui/react": "^2.2.10",
+    "@heroicons/react": "^2.2.0",
+    "clsx": "^2.1.1",
+    "electron-updater": "^6.8.11",
+    "motion": "^14.14.0"
   }
 }

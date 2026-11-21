@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { FormulaState, Row } from '@inkboard/math/formula'
+import type { FormulaState, Row } from '@penrill/math/formula'
 import { caretOf, typesetRows } from '../engine/formulatype'
 import { inkColor, withInkSurface } from '../engine/surface'
 import { useT } from '../i18n'

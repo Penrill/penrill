@@ -1,7 +1,13 @@
 # Changelog
 
-All notable changes to Inkboard. Downloads for every version are on the
-[Releases page](https://github.com/yaroslavyushchenko/inkboard/releases).
+All notable changes to Penrill (called Inkboard up to 0.12). Downloads for every version are on the
+[Releases page](https://github.com/Penrill/penrill/releases).
+
+## Unreleased
+
+- Inkboard is renamed to Penrill. Installed apps update in place and keep their boards and settings.
+- Board files are saved as `.penrill`; `.inkboard` files still open.
+- The website and the web app moved to https://penrill.com.
 
 ## 0.12.1
 

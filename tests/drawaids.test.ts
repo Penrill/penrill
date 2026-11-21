@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { splitStroke } from '@inkboard/core/erase'
+import { splitStroke } from '@penrill/core/erase'
 import { autoBullet, continueList } from '../src/board/engine/lists.ts'
-import { holdShape, perfectShape, recognizeShape } from '@inkboard/shape-recognition/snapshape'
-import type { Point, StrokeItem } from '@inkboard/core/types'
+import { holdShape, perfectShape, recognizeShape } from '@penrill/shape-recognition/snapshape'
+import type { Point, StrokeItem } from '@penrill/core/types'
 
 let n = 0
 const id = (): string => `p${++n}`

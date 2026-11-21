@@ -1,10 +1,10 @@
 // Keeps the layers apart (docs/ARCHITECTURE.md). Part of `npm run typecheck`.
 //
-// - A package under packages/ imports only its own files, the @inkboard packages and npm packages
+// - A package under packages/ imports only its own files, the @penrill packages and npm packages
 //   listed in its own package.json "dependencies". So core can never pick up React, Electron or a
 //   feature by accident.
 // - Package dependencies have no cycles.
-// - Code outside packages/ reaches a package by its name (@inkboard/core/scene), never by a
+// - Code outside packages/ reaches a package by its name (@penrill/core/scene), never by a
 //   relative path into packages/.
 // - The landing page (site/) stands alone: it imports nothing from src/ or packages/.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -76,11 +76,11 @@ for (const base of ['src', 'apps', 'site', 'tests']) {
     for (const spec of imports(file)) {
       const where = `${relative(ROOT, file)}: '${spec}'`
       if (!spec.startsWith('.')) {
-        if (base === 'site' && spec.startsWith('@inkboard/')) problems.push(`${where}: the site imports no app code`)
+        if (base === 'site' && spec.startsWith('@penrill/')) problems.push(`${where}: the site imports no app code`)
         continue
       }
       const target = resolve(dirname(file), spec)
-      if (inside(target, packagesDir)) problems.push(`${where}: import packages by name (@inkboard/...)`)
+      if (inside(target, packagesDir)) problems.push(`${where}: import packages by name (@penrill/...)`)
       if (base === 'site' && !inside(target, join(ROOT, 'site'))) problems.push(`${where}: the site imports no app code`)
     }
   }
