@@ -8,6 +8,8 @@ import { translate, type MessageKey } from '../../board/i18n'
 import { prefsStore } from '../../board/store'
 import { platform } from './platform'
 import { connectFlow, onConnectHash } from './sync/connect'
+import { joinFlow } from './sync/join'
+import { parseConnectTarget } from '../../shared/connect'
 import { useApp, type HomeTab } from './appState'
 import { parseRoute, startRouter, type Route } from './router'
 import { moveStorageKey } from '../../shared/legacyStorage'
@@ -274,6 +276,12 @@ class BoardLibrary {
     if (!pending || !(await this.openBoard(pending))) await this.show(opened)
     // After the first screen, so a connect link the app was opened with is not covered by it.
     const connect = (link: string) => {
+      try {
+        const target = parseConnectTarget(link)
+        if (target.join) return joinFlow.start(target.origin, target.join)
+      } catch {
+        // Not a connect link: the connect flow reports it.
+      }
       void this.show({ view: 'home', tab: 'sync' })
       void connectFlow.connect(link)
     }

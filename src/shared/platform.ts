@@ -82,6 +82,8 @@ export interface FoundServer {
 export interface StoredAccount {
   name: string
   token: string
+  /** Made by opening a board's draw link, not by signing up. */
+  guest?: boolean
 }
 
 /**

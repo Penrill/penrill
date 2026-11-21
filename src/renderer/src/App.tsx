@@ -5,6 +5,7 @@ import type { BoardFileActions } from '../../board/ui/Board'
 import { boardLibrary } from './boardLibrary'
 import { BoardCursors } from './ui/BoardCursors'
 import { BackupSettings } from './ui/BackupSettings'
+import { JoinDialog } from './ui/JoinDialog'
 import { HomeScreen } from './ui/home/HomeScreen'
 import { MainMenu } from './ui/MainMenu'
 import { SaveSelectionTemplate } from './ui/SaveSelectionTemplate'
@@ -50,6 +51,7 @@ export function App() {
     >
       {view === 'board' && <BoardCursors />}
       <UpdateBanner />
+      <JoinDialog />
       {view === 'home' && <HomeScreen settings={settings} />}
     </BoardWorkspace>
   )

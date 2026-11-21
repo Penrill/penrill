@@ -9,6 +9,8 @@ export interface ConnectTarget {
   origin: string
   /** `sha256/<base64>` of the server's public key, when it uses its own certificate. */
   pin?: string
+  /** A board's draw link: open this server as a guest and draw on that board, no account needed. */
+  join?: string
 }
 
 const PIN = /^sha256\/[A-Za-z0-9+/]{43}=$/
@@ -20,7 +22,8 @@ function fromParams(params: URLSearchParams): ConnectTarget | null {
   const server = params.get('server')
   if (!server) return null
   const pin = params.get('pin')
-  return { origin: serverOrigin(server), ...(isPin(pin) ? { pin } : {}) }
+  const join = params.get('join')
+  return { origin: serverOrigin(server), ...(isPin(pin) ? { pin } : {}), ...(join && /^[0-9a-f]{16,64}$/.test(join) ? { join } : {}) }
 }
 
 /** Throws when the text is neither a connect link nor a usable server address. */

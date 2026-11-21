@@ -1,4 +1,4 @@
-import { FolderIcon, FolderPlusIcon, ShareIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/16/solid'
+import { ClipboardIcon, FolderIcon, FolderPlusIcon, LinkIcon, ShareIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '@penrill/ui/dialog'
@@ -13,6 +13,7 @@ import type { BoardEntry } from '../../../../shared/library'
 import { homePath } from '../../router'
 import { account } from '../../sync/accounts'
 import { clientFor } from '../../sync/clients'
+import { drawLink } from '../../sync/join'
 import { refreshCommunity, useCommunity } from '../../sync/librarySync'
 import type { Link } from '../../sync/links'
 
@@ -147,6 +148,68 @@ export function canShareBoard(link: Link | null, owner: string | null): link is 
   return !!link && !owner && !!link.published && account(link.origin)?.name === link.user
 }
 
+/** A link anyone can open to draw on the board, no account needed: for a class. */
+function LinkSection({ link }: { link: Link }) {
+  const t = useT()
+  const [url, setUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const act = async (action: () => Promise<void>): Promise<void> => {
+    setBusy(true)
+    setFailed(false)
+    try {
+      await action()
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const create = (): Promise<void> =>
+    act(async () => setUrl(drawLink(link.origin, await clientFor(link.origin).boardLinkToken(link.remote))))
+  const turnOff = (): Promise<void> =>
+    act(async () => {
+      await clientFor(link.origin).turnOffBoardLink(link.remote)
+      setUrl(null)
+    })
+  const copy = (): void => {
+    if (!url) return
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+  return (
+    <div className="mb-6">
+      <Subheading className="m-0">{t('join.linkTitle')}</Subheading>
+      <Text className="mt-1 mb-3">{t('join.linkHint')}</Text>
+      {url ? (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <Input readOnly aria-label={t('join.linkTitle')} value={url} onFocus={(e) => e.currentTarget.select()} />
+            </div>
+            <Button outline onClick={copy}>
+              <ClipboardIcon />
+              {t(copied ? 'join.copied' : 'join.copy')}
+            </Button>
+          </div>
+          <Button plain className="mt-2" disabled={busy} onClick={() => void turnOff()}>
+            {t('join.turnOff')}
+          </Button>
+        </>
+      ) : (
+        <Button outline disabled={busy} onClick={() => void create()}>
+          <LinkIcon />
+          {t('join.create')}
+        </Button>
+      )}
+      {failed && <Text className="mt-2 text-red-600! dark:text-red-500!">{t('people.failed')}</Text>}
+    </div>
+  )
+}
+
 /** People let in to draw on one board by username: the owner adds and removes them here. */
 function PeopleSection({ link }: { link: Link }) {
   const t = useT()
@@ -235,6 +298,7 @@ export function ShareBoardDialog({ entry, link, onClose }: { entry: BoardEntry; 
       <DialogTitle>{t('folders.shareTitle', { name: entry.title })}</DialogTitle>
       <DialogDescription>{t('people.hint')}</DialogDescription>
       <DialogBody>
+        <LinkSection link={link} />
         <PeopleSection link={link} />
         <Subheading className="mt-6 m-0">{t('folders.title')}</Subheading>
         <Text className="mt-1 mb-3">{t('folders.shareHint')}</Text>

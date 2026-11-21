@@ -211,6 +211,20 @@ export class PenrillClient {
     await this.call({ method: 'DELETE', path: `/api/boards/${id}/people/${encodeURIComponent(name)}` })
   }
 
+  /** The token of this board's draw link, made on first use. */
+  async boardLinkToken(id: string): Promise<string> {
+    return (await this.json<{ token: string }>({ method: 'GET', path: `/api/boards/${id}/link` })).token
+  }
+
+  async turnOffBoardLink(id: string): Promise<void> {
+    await this.call({ method: 'DELETE', path: `/api/boards/${id}/link` })
+  }
+
+  /** Opens a draw link: the server makes a guest account that can reach only that board. */
+  join(token: string, name: string): Promise<{ name: string; token: string; board: string }> {
+    return this.json({ method: 'POST', path: '/api/join', ...jsonBody({ token, name }) }, false)
+  }
+
   async shareBoard(folder: string, board: string): Promise<void> {
     await this.call({ method: 'POST', path: '/api/share-board', ...jsonBody({ folder, board }) })
   }
