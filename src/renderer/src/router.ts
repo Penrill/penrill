@@ -3,7 +3,7 @@ import { platform } from './platform'
 
 /**
  * Which screen the app shows, as an address: the home screen's pages and each board have their own
- * (`/app/board/<id>` on penrill.com), so a reload, a bookmark and the browser's Back button land on
+ * (`/board/<id>` on app.penrill.com), so a reload, a bookmark and the browser's Back button land on
  * the same screen. The desktop app has no address bar and keeps the same routes in memory only.
  */
 export type Route = { view: 'home'; tab: HomeTab } | { view: 'board'; id: string }
@@ -12,7 +12,7 @@ const TABS: readonly HomeTab[] = ['boards', 'templates', 'deleted', 'sync']
 
 /** The address bar follows the app only in a browser. */
 const urlRouting = platform.platform === 'web'
-/** Where the app is served from: /app/ on penrill.com, / on Penrill Cloud. */
+/** Where the app is served from: / on app.penrill.com and on Penrill Cloud. */
 const BASE = urlRouting ? import.meta.env.BASE_URL : '/'
 
 export function parseRoute(path: string): Route {
@@ -47,8 +47,8 @@ const keyOf = (state: AppState): string => {
  */
 export function startRouter(show: (route: Route) => Promise<void>): Route {
   if (!urlRouting) return { view: 'home', tab: 'boards' }
-  // penrill.com is a static site: an address inside the app that has no file of its own comes back
-  // from the site's 404 page as /app/?route=board/<id>.
+  // app.penrill.com is a static site: an address inside the app that has no file of its own comes
+  // back from its 404 page (apps/web/public/404.html) as /?route=board/<id>.
   const redirected = new URLSearchParams(location.search).get('route')
   if (redirected !== null) history.replaceState(null, '', BASE + redirected.replace(/^\/+/, ''))
   // The first screen replaces the address the app was opened with (a board that no longer exists

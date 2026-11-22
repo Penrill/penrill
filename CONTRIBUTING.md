@@ -14,8 +14,7 @@ your tablet. Screenshots or a short screen recording help a lot.
 ```bash
 npm install
 npm run dev          # the desktop app with hot reload
-npm run dev:site     # the landing page at / (English) and /uk/
-npm run dev:web      # the web version at /app/ (boards stay in the browser)
+npm run dev:web      # the web version at http://localhost:5174/ (boards stay in the browser)
 npm run typecheck && npm test && npm run build   # run before every commit
 ```
 
@@ -25,11 +24,11 @@ npm run typecheck && npm test && npm run build   # run before every commit
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layers and the rules `npm run typecheck`
   enforces. The main process (`src/main`) handles the
   board library, files and updates.
-- The landing page lives in `site/`. `npm run build:site` builds it into `dist/site` and
-  prerenders one static HTML page per language, so search engines see the whole text. It is built
-  from Tailwind's Oatmeal template: see `site/src/components/README.md` before adding a section.
+- The landing page at penrill.com lives in its own repository,
+  [Penrill/penrill-site](https://github.com/Penrill/penrill-site). The web app from `apps/web` is
+  published at [app.penrill.com](https://app.penrill.com/).
 - The logo is drawn in `scripts/icons/logo.mjs`, with its colours in `PALETTES`. `npm run icons`
-  regenerates `build/icon.svg`, the app, site and web icons and the social preview
+  regenerates `build/icon.svg`, the app and web icons and the social preview
   (`npm run icons -- --palette blue` for another palette). Commit the generated files.
 - Board data stays **vector**. A change to the file format needs a `FORMAT_VERSION` bump in
   `engine/serialize.ts`, and older files must keep opening.

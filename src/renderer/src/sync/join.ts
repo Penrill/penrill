@@ -6,9 +6,9 @@ import { ApiError } from './api'
 import { clientFor } from './clients'
 import { openRemote } from './librarySync'
 
-/** Where the editor lives for people who follow a draw link: the web app next to this page, or penrill.com from the desktop app. */
+/** Where the editor lives for people who follow a draw link: the web app next to this page, or app.penrill.com from the desktop app. */
 export function drawLink(origin: string, token: string): string {
-  const editor = platform.connect ? 'https://penrill.com/app/' : location.origin + import.meta.env.BASE_URL
+  const editor = platform.connect ? 'https://app.penrill.com/' : location.origin + import.meta.env.BASE_URL
   return `${editor}#server=${encodeURIComponent(origin)}&join=${token}`
 }
 

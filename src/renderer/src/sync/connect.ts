@@ -48,7 +48,7 @@ function deviceName(): string {
 }
 
 /**
- * Connect links in the web app's address: a server's page links to `…/app/#server=…`. Hands each one
+ * Connect links in the web app's address: the connect page links to `https://app.penrill.com/#server=…`. Hands each one
  * over in the form `parseConnectTarget` reads and clears it from the address bar, so a reload does not
  * start over. Following such a link while the app is already open only changes the fragment.
  */

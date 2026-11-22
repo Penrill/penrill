@@ -157,7 +157,7 @@ Requires Node.js (LTS or newer).
 npm install
 npm run dev        # start the app with hot reload
 npm run dev:x11    # Linux/Wayland: use this if pen pressure doesn't work
-npm run dev:web    # the web version at http://localhost:5174/app/
+npm run dev:web    # the web version at http://localhost:5174/
 npm run typecheck
 npm test
 npm run build
@@ -176,8 +176,8 @@ npm run dev:web
 dotnet run --project ../penrill-server/src/Penrill.Server    # in another terminal
 ```
 
-1. Open [the library](http://localhost:5174/app/) and go to **Sync** in its sidebar
-   ([localhost:5174/app/sync](http://localhost:5174/app/sync)). Select Self-hosted and enter the server origin, or select Local test cloud. Register or sign in on that instance.
+1. Open [the library](http://localhost:5174/) and go to **Sync** in its sidebar
+   ([localhost:5174/sync](http://localhost:5174/sync)). Select Self-hosted and enter the server origin, or select Local test cloud. Register or sign in on that instance.
 2. Create a board and draw. Changes sync automatically to the selected service.
 3. To draw together, share the board in a folder, add another account on the same service, and open the board as that user in a second browser profile.
    A WebSocket streams named cursors and pen or highlighter samples as you draw. The server checks board membership before joining the room.

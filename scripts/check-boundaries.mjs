@@ -6,7 +6,6 @@
 // - Package dependencies have no cycles.
 // - Code outside packages/ reaches a package by its name (@penrill/core/scene), never by a
 //   relative path into packages/.
-// - The landing page (site/) stands alone: it imports nothing from src/ or packages/.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 
@@ -70,18 +69,14 @@ function visit(name, path) {
 }
 for (const name of packages.keys()) visit(name, [])
 
-// Apps and the site.
-for (const base of ['src', 'apps', 'site', 'tests']) {
+// Apps.
+for (const base of ['src', 'apps', 'tests']) {
   for (const file of files(join(ROOT, base))) {
     for (const spec of imports(file)) {
       const where = `${relative(ROOT, file)}: '${spec}'`
-      if (!spec.startsWith('.')) {
-        if (base === 'site' && spec.startsWith('@penrill/')) problems.push(`${where}: the site imports no app code`)
-        continue
-      }
+      if (!spec.startsWith('.')) continue
       const target = resolve(dirname(file), spec)
       if (inside(target, packagesDir)) problems.push(`${where}: import packages by name (@penrill/...)`)
-      if (base === 'site' && !inside(target, join(ROOT, 'site'))) problems.push(`${where}: the site imports no app code`)
     }
   }
 }
