@@ -33,6 +33,9 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm run build:web
+        env:
+          # Repository variable; when empty the app offers only device and self-hosted storage.
+          VITE_PENRILL_CLOUD_URL: ${{ vars.PENRILL_CLOUD_URL }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -189,7 +189,8 @@ Deleting a local board removes its local cache from active sync and leaves the r
 
 Local test cloud and self-hosted server use separate SQLite databases.
 The development builds discover the loopback API. Production builds start
-in device mode and show Penrill Cloud when `VITE_PENRILL_CLOUD_URL` is set.
+in device mode and show Penrill Cloud when `VITE_PENRILL_CLOUD_URL` is set
+(CI takes it from the repository variable `PENRILL_CLOUD_URL`).
 Custom servers use HTTPS (HTTP is supported on loopback). For the web
 editor, configure the server's `PENRILL_EDITOR_ORIGINS` with the exact
 allowed origins. These development services bind to loopback.
