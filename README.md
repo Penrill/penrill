@@ -173,7 +173,7 @@ version:
 
 ```bash
 npm run dev:web
-dotnet run --project ../penrill-server/src/Penrill.Server    # in another terminal
+dotnet run --project ../penrill-server/src/Server    # in another terminal
 ```
 
 1. Open [the library](http://localhost:5174/) and go to **Sync** in its sidebar
