@@ -170,7 +170,7 @@ Only where there are really two or more ways to do something:
 2. Done: `createEditor()` instead of the global `editor`; the UI store split into preferences,
    board session and app state.
 3. Done for the first tools: tool controllers in `src/board/tools` (see "Tools" for what is left).
-4. Done: the web app (`apps/web`, published at `/app/` on penrill.com): the desktop app shell with the web
+4. Done: the web app (`apps/web`, published at app.penrill.com): the desktop app shell with the web
    platform, IndexedDB storage, file pickers, print to PDF, and a service worker for offline use.
 5. In progress: display lists for drawing on screen and in exports (graphs and formulas done; ink,
    text and images next), then the renderer moves into a package.

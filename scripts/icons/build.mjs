@@ -2,6 +2,8 @@
 //   npm run icons                     Mist palette
 //   npm run icons -- --palette blue   another palette from PALETTES
 // Writes build/icon.svg and the PNGs below, then rasterizes them in Electron (render.cjs).
+// The landing page (Penrill/penrill-site) keeps its own copies in public/img: copy icon-512.png
+// (as icon.png), apple-touch-icon.png and docs/images/social-preview.png there after a change.
 import { spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -35,13 +37,12 @@ writeFileSync(join(tmp, 'social-preview.html'), preview)
 const jobs = [
   // electron-builder makes the .icns / .ico / Linux sizes from this one.
   { svg: icon, size: 1024, out: at('build/icon.png') },
-  { svg: icon, size: 512, out: at('site/public/img/icon.png') },
   { svg: icon, size: 192, out: at('apps/web/public/icon-192.png') },
   { svg: icon, size: 512, out: at('apps/web/public/icon-512.png') },
-  { svg: bleed, size: 180, out: [at('site/public/img/apple-touch-icon.png'), at('apps/web/public/apple-touch-icon.png')] },
+  { svg: bleed, size: 180, out: at('apps/web/public/apple-touch-icon.png') },
   {
     html: join(tmp, 'social-preview.html'), width: 1280, height: 640,
-    out: [at('site/public/img/social-preview.png'), at('docs/images/social-preview.png')],
+    out: at('docs/images/social-preview.png'),
   },
 ]
 writeFileSync(join(tmp, 'jobs.json'), JSON.stringify(jobs))

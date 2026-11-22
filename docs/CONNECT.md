@@ -129,7 +129,7 @@ https://penrill.com/connect#server=https://pi.local:5081&pin=sha256/3Fq...
 - Servers never decide between the app and the browser: they do not know what the visitor has.
   Their home page leads with the address to enter in Penrill (Sync › Your server) and links to
   `https://penrill.com/connect`, which lets the visitor pick the app (`penrill://`), Penrill in
-  the browser (`/app/#server=…`, which starts connecting by itself) or the download. It never
+  the browser (`https://app.penrill.com/#server=…`, which starts connecting by itself) or the download. It never
   opens `penrill://` on its own, since Safari answers an unknown scheme with an error dialog.
   On tablets and phones it offers only the browser. Parameters are in the fragment, so
   penrill.com never receives the server address. This is also the form printed as a QR code,
@@ -137,7 +137,7 @@ https://penrill.com/connect#server=https://pi.local:5081&pin=sha256/3Fq...
   (a local web editor in development).
 - Penrill in the browser reaches a server with its own certificate only after the browser has
   accepted that certificate once, so the web app says so when such a server is unreachable.
-  Servers allow `https://penrill.com` in CORS and answer Chrome's Private Network Access preflight.
+  Servers allow `https://app.penrill.com` (and, for older links, `https://penrill.com`) in CORS and answer Chrome's Private Network Access preflight.
 - Opening a connect link only pre-fills the server and starts device linking. Because the link
   holds no secret, a forged one can at worst start a link request the user then has to approve
   on a page served by that same server.
