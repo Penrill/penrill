@@ -2,7 +2,14 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
-## Inkboard is now Penrill
+## Penrill Cloud
+
+- **Sync with Penrill Cloud.** On the *Sync* page choose **Penrill Cloud**, sign up or sign in in the browser,
+  and your boards follow you to every computer and to the web app. Share a board with people by username
+  or with a draw link that needs no account.
+- **The web app moved to [app.penrill.com](https://app.penrill.com/).** There you can also open Penrill Cloud.
+
+## Also in 0.12: Inkboard is now Penrill
 
 - **New name, same app.** Inkboard updates to Penrill by itself; your boards, templates and settings stay.
 - **Board files are now `.penrill`.** Your `.inkboard` files still open, by double-click or with *Open*.
