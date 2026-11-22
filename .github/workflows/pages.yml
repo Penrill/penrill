@@ -36,6 +36,10 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm run build:site
+        env:
+          # Google Analytics on the landing page, behind a consent banner (site/src/analytics.ts).
+          # Set the GA_MEASUREMENT_ID repository variable (G-XXXXXXX); without it there is no analytics.
+          VITE_GA_ID: ${{ vars.GA_MEASUREMENT_ID }}
       - run: npm run build:web
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
