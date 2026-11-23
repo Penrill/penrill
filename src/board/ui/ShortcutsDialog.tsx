@@ -1,3 +1,4 @@
+import { Dialog, DialogTitle } from '@penrill/ui/dialog'
 import { useT, type MessageKey } from '../i18n'
 import { CLIPBOARD_KEYS, HOLD_KEYS, SHORTCUTS, isBoardFileShortcut, type ShortcutGroup } from '../shortcuts'
 import { useEditor, useSession } from '../editorContext'
@@ -28,39 +29,37 @@ export function ShortcutsDialog({ fileActions }: { fileActions: boolean }) {
     ...(CLIPBOARD_KEYS.group === g ? [CLIPBOARD_KEYS] : [])
   ]
   return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="panel modal shortcuts-dialog">
-        <h3>{t('shortcuts.title')}</h3>
-        <div className="shortcuts-cols">
-          {GROUPS.map((g) => (
-            <div key={g.id}>
-              <div className="popover-title">{t(g.title)}</div>
-              {rows(g.id).map((r) => (
-                <div key={r.display + r.label} className="shortcut-row">
-                  <kbd>{r.display}</kbd>
-                  <span>{t(r.label as MessageKey)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-        <div className="wacom-guide">
-          <div className="popover-title">{t('wacom.title')}</div>
-          <p>{t('wacom.intro')}</p>
-          <ol>
-            <li>{t('wacom.step1')}</li>
-            <li>{t('wacom.step2')}</li>
-            <li>{t('wacom.step3')}</li>
-          </ol>
-          <p>{t('wacom.suggest')}</p>
-          <p className="muted">{t('wacom.pen')}</p>
-        </div>
-        <div className="modal-actions">
-          <button className="text-btn primary" onClick={close}>
-            {t('common.close')}
-          </button>
-        </div>
+    <Dialog open onClose={close} size="5xl">
+      <DialogTitle className="mb-6">{t('shortcuts.title')}</DialogTitle>
+      <div className="shortcuts-cols">
+        {GROUPS.map((g) => (
+          <div key={g.id}>
+            <div className="popover-title">{t(g.title)}</div>
+            {rows(g.id).map((r) => (
+              <div key={r.display + r.label} className="shortcut-row">
+                <kbd>{r.display}</kbd>
+                <span>{t(r.label as MessageKey)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
-    </div>
+      <div className="wacom-guide">
+        <div className="popover-title">{t('wacom.title')}</div>
+        <p>{t('wacom.intro')}</p>
+        <ol>
+          <li>{t('wacom.step1')}</li>
+          <li>{t('wacom.step2')}</li>
+          <li>{t('wacom.step3')}</li>
+        </ol>
+        <p>{t('wacom.suggest')}</p>
+        <p className="muted">{t('wacom.pen')}</p>
+      </div>
+      <div className="modal-actions">
+        <button className="text-btn primary" onClick={close}>
+          {t('common.close')}
+        </button>
+      </div>
+    </Dialog>
   )
 }

@@ -88,16 +88,16 @@ function LinkSection({ link, onTurnedOff }: { link: Link; onTurnedOff: () => voi
       }
     })
   }
-  const copy = (): void => {
+  const copy = async (): Promise<void> => {
     if (!url) return
-    navigator.clipboard.writeText(url).then(
-      () => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      },
-      // No clipboard (an insecure page, a denied permission): select it for copying by hand.
-      () => field.current?.select()
-    )
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      field.current?.focus()
+      field.current?.select()
+    }
   }
 
   return (

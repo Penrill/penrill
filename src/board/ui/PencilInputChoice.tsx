@@ -8,17 +8,19 @@ import { isIPad } from '../tools/penInput'
 export function PencilInputChoice({ children }: { children: ReactNode }) {
   const t = useT()
   const mode = usePrefs(s => s.iPadFingerMode)
-  const [open, setOpen] = useState(false)
+  const [prompt, setPrompt] = useState<'unseen' | 'open' | 'closed'>('unseen')
   const choose = (value: 'draw' | 'pan') => {
     prefsStore.setState({ iPadFingerMode: value })
-    setOpen(false)
+    setPrompt('closed')
   }
   return (
-    <div className="contents" onPointerUpCapture={e => {
-      if (shouldOfferPencilChoice(isIPad(navigator), mode, e.pointerType)) setOpen(true)
-    }}>
-      {children}
-      <Dialog open={open && mode === null} onClose={() => choose('draw')} size="md">
+    <>
+      <div className="contents" onPointerUpCapture={e => {
+        if (prompt === 'unseen' && shouldOfferPencilChoice(isIPad(navigator), mode, e.pointerType)) setPrompt('open')
+      }}>
+        {children}
+      </div>
+      <Dialog open={prompt === 'open' && mode === null} onClose={() => setPrompt('closed')} size="md">
         <DialogTitle>{t('pen.inputChoice')}</DialogTitle>
         <DialogDescription>{t('pen.inputHint')}</DialogDescription>
         <DialogBody className="grid gap-3">
@@ -32,6 +34,6 @@ export function PencilInputChoice({ children }: { children: ReactNode }) {
           </button>
         </DialogBody>
       </Dialog>
-    </div>
+    </>
   )
 }

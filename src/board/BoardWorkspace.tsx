@@ -67,7 +67,8 @@ export function BoardWorkspace({
     <div className="app">
       <div className={covered ? 'invisible contents' : 'contents'} inert={covered}>
       <PencilInputChoice>
-      <Board fileActions={fileActions} />
+        <Board fileActions={fileActions} />
+      </PencilInputChoice>
       <TextEditor />
       <FormulaEditor />
       <SelectionToolbar actions={selectionActions} />
@@ -112,7 +113,6 @@ export function BoardWorkspace({
       <NoticeArea />
       <InstrumentTip />
       <ShortcutsDialog fileActions={!!fileActions} />
-      </PencilInputChoice>
       </div>
       {children}
     </div>

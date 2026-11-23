@@ -42,13 +42,18 @@ export function Popover({
       if (ref.current && !ref.current.contains(t) && !(t as HTMLElement).closest?.('[data-popover-anchor]')) onClose()
     }
     const key = (e: KeyboardEvent): void => {
-      if (e.code === 'Escape') onClose()
+      const el = ref.current
+      if (e.code !== 'Escape' || e.defaultPrevented || !el || document.querySelector('[aria-modal="true"]')) return
+      if ([...open].at(-1)?.el !== el) return
+      e.preventDefault()
+      el.parentElement?.querySelector<HTMLButtonElement>('[data-popover-anchor]')?.focus()
+      onClose()
     }
     window.addEventListener('pointerdown', down, true)
-    window.addEventListener('keydown', key)
+    document.addEventListener('keydown', key)
     return () => {
       window.removeEventListener('pointerdown', down, true)
-      window.removeEventListener('keydown', key)
+      document.removeEventListener('keydown', key)
     }
   }, [onClose])
   // Runs after every render: the anchor follows the board, so the best place changes with it.

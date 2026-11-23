@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Editor dialogs and Apple Pencil in 0.13.7
+
+- The iPad drawing prompt opens after lifting the pen from the board. Dismissing it leaves your preference undecided for the next visit.
+- Keyboard and clipboard actions in dialogs leave the board behind them alone. Escape closes the shortcuts and coordinate settings dialogs.
+- Escape closes the selection's style menu while keeping the stroke selected. Settings tabs follow the visible layout when navigating with arrow keys.
+- If the browser cannot copy a board link, Penrill selects the link so you can copy it manually.
+
 ## About credits in 0.13.6
 
 - Settings → About now credits Penrill in both English and Ukrainian.

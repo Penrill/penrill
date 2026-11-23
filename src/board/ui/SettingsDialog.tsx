@@ -6,7 +6,7 @@ import { Switch } from '@penrill/ui/switch'
 import { Subheading } from '@penrill/ui/heading'
 import { Text } from '@penrill/ui/text'
 import clsx from 'clsx'
-import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { FEATURE_IDS } from '../../shared/features'
 import { isChalk, withSurface } from '../engine/surface'
 import { useEditor } from '../editorContext'
@@ -329,6 +329,15 @@ export interface SettingsDialogProps {
 /** Settings of the app, not of one board: a dialog with its sections listed on the left. */
 export function SettingsDialog({ open, onClose, storageSettings, about, fixedLanguage, hideExperimental, templates = false }: SettingsDialogProps) {
   const t = useT()
+  const [vertical, setVertical] = useState(() => window.matchMedia('(min-width: 40rem)').matches)
+  useEffect(() => {
+    if (!open) return
+    const layout = window.matchMedia('(min-width: 40rem)')
+    const sync = () => setVertical(layout.matches)
+    sync()
+    layout.addEventListener('change', sync)
+    return () => layout.removeEventListener('change', sync)
+  }, [open])
   const sections: { id: string; label: MessageKey; icon: ReactNode; content: ReactNode }[] = [
     { id: 'general', label: 'settings.general', icon: <Cog6ToothIcon />, content: <GeneralSettings fixedLanguage={fixedLanguage} /> },
     { id: 'pen', label: 'settings.pen', icon: <PencilIcon />, content: <PenAndMouseSettings /> },
@@ -340,7 +349,7 @@ export function SettingsDialog({ open, onClose, storageSettings, about, fixedLan
 
   return (
     <Dialog open={open} onClose={onClose} size="3xl" className="relative overflow-hidden p-0!">
-      <Headless.TabGroup vertical className="flex max-sm:flex-col sm:h-[min(36rem,calc(100dvh-8rem))]">
+      <Headless.TabGroup vertical={vertical} className="flex max-sm:flex-col sm:h-[min(36rem,calc(100dvh-8rem))]">
         <div className="shrink-0 border-zinc-950/5 bg-zinc-50 p-3 max-sm:border-b sm:w-56 sm:border-r dark:border-white/5 dark:bg-white/2.5">
           <DialogTitle className="px-2 pt-2 pb-4">{t('settings.title')}</DialogTitle>
           <Headless.TabList className="flex gap-0.5 max-sm:overflow-x-auto sm:flex-col">

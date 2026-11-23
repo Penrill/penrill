@@ -1471,8 +1471,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         t.tagName === 'TEXTAREA' ||
         (t instanceof HTMLInputElement && !['range', 'checkbox', 'radio', 'button', 'color'].includes(t.type)))
 
+    const inDialog = (): boolean => document.querySelector('[aria-modal="true"]') !== null
+    const boardClipboardActive = (e: ClipboardEvent): boolean =>
+      session.getState().active && !e.defaultPrevented && !isTyping(e.target) && !inDialog()
+
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (isTyping(e.target) || (e.target instanceof Element && e.target.closest('[aria-modal="true"]'))) return
+      if (e.defaultPrevented || isTyping(e.target) || inDialog() ||
+          (e.target instanceof Element && e.target.closest('[role="menu"], select'))) return
       const ui = readUI()
       // Hold Space = pan (not a one-shot shortcut).
       if (e.code === 'Space' && ui.active && !e.ctrlKey && !e.metaKey) {
@@ -1531,7 +1536,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const onSideButton = (e: MouseEvent): void => {
       if (e.button !== 3 && e.button !== 4) return
       e.preventDefault()
-      if (e.type !== 'mouseup' || !session.getState().active || isTyping(e.target)) return
+      if (e.type !== 'mouseup' || !session.getState().active || isTyping(e.target) || inDialog()) return
       if (e.button === 3) editor.undo()
       else editor.redo()
     }
@@ -1558,14 +1563,14 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
 
     // ---------- images: paste & drag-and-drop ----------
     const onPaste = (e: ClipboardEvent): void => {
-      if (isTyping(e.target) || !session.getState().active) return
+      if (!boardClipboardActive(e)) return
       if (editor.pasteFromClipboard(e)) e.preventDefault()
     }
     const onCopy = (e: ClipboardEvent): void => {
-      if (!isTyping(e.target) && editor.copyToClipboard(e, false)) e.preventDefault()
+      if (boardClipboardActive(e) && editor.copyToClipboard(e, false)) e.preventDefault()
     }
     const onCut = (e: ClipboardEvent): void => {
-      if (!isTyping(e.target) && editor.copyToClipboard(e, true)) e.preventDefault()
+      if (boardClipboardActive(e) && editor.copyToClipboard(e, true)) e.preventDefault()
     }
     const onDragOver = (e: DragEvent): void => {
       e.preventDefault()
@@ -1575,7 +1580,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       // Always prevent default, otherwise Electron navigates to the dropped file.
       e.preventDefault()
       const files = [...(e.dataTransfer?.files ?? [])]
-      if (!files.length || !session.getState().active) return
+      if (!files.length || !session.getState().active || e.target !== overlay || inDialog()) return
       const p = local(e)
       void editor.insertImages(files, p.x, p.y)
     }

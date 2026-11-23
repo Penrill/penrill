@@ -1,3 +1,4 @@
+import { Dialog, DialogTitle } from '@penrill/ui/dialog'
 import { useEffect, useState } from 'react'
 import { sanitizeGraph } from '../engine/graph'
 import type { GraphParams } from '@penrill/core/types'
@@ -42,84 +43,83 @@ export function GraphDialog() {
   const isPlane = p.kind === 'plane' || p.kind === 'space'
 
   return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="panel modal graph-dialog" onKeyDown={(e) => e.code === 'Escape' && close()}>
-        <h3>{t(dialog.mode === 'edit' ? 'graph.editTitle' : 'graph.customTitle')}</h3>
+    <Dialog open onClose={close} size="md">
+      <DialogTitle className="mb-6">{t(dialog.mode === 'edit' ? 'graph.editTitle' : 'graph.customTitle')}</DialogTitle>
 
-        <div className="seg">
-          {(['line', 'plane', 'space'] as const).map((k) => (
-            <button
-              key={k}
-              className={p.kind === k ? 'active' : ''}
-              onClick={() => setP(k === 'space' && p.kind !== 'space' ? { ...p, kind: k, zMin: p.zMin ?? 0, zMax: p.zMax ?? Math.max(1, p.yMax) } : { ...p, kind: k })}
-            >
-              {t(k === 'line' ? 'graph.kindLine' : k === 'plane' ? 'graph.kindPlane' : 'graph.kindSpace')}
+      <div className="seg">
+        {(['line', 'plane', 'space'] as const).map((k) => (
+          <button
+            key={k}
+            aria-pressed={p.kind === k}
+            className={p.kind === k ? 'active' : ''}
+            onClick={() => setP(k === 'space' && p.kind !== 'space' ? { ...p, kind: k, zMin: p.zMin ?? 0, zMax: p.zMax ?? Math.max(1, p.yMax) } : { ...p, kind: k })}
+          >
+            {t(k === 'line' ? 'graph.kindLine' : k === 'plane' ? 'graph.kindPlane' : 'graph.kindSpace')}
+          </button>
+        ))}
+      </div>
+
+      <div className="form-grid">
+        <label>{t('graph.xRange')}</label>
+        <div className="range">
+          <input type="number" aria-label={t('graph.rangeMin', { axis: 'x' })} value={p.xMin} onChange={num('xMin')} />
+          <span>…</span>
+          <input type="number" aria-label={t('graph.rangeMax', { axis: 'x' })} value={p.xMax} onChange={num('xMax')} />
+        </div>
+        {isPlane && (
+          <>
+            <label>{t('graph.yRange')}</label>
+            <div className="range">
+              <input type="number" aria-label={t('graph.rangeMin', { axis: 'y' })} value={p.yMin} onChange={num('yMin')} />
+              <span>…</span>
+              <input type="number" aria-label={t('graph.rangeMax', { axis: 'y' })} value={p.yMax} onChange={num('yMax')} />
+            </div>
+          </>
+        )}
+        {p.kind === 'space' && (
+          <>
+            <label>{t('graph.zRange')}</label>
+            <div className="range">
+              <input type="number" aria-label={t('graph.rangeMin', { axis: 'z' })} value={p.zMin ?? 0} onChange={num('zMin')} />
+              <span>…</span>
+              <input type="number" aria-label={t('graph.rangeMax', { axis: 'z' })} value={p.zMax ?? 5} onChange={num('zMax')} />
+            </div>
+          </>
+        )}
+        <label>{t('graph.unit')}</label>
+        <div className="seg small">
+          {UNIT_CHOICES.map((u) => (
+            <button key={u} aria-pressed={p.unit === u} className={p.unit === u ? 'active' : ''} onClick={() => setP({ ...p, unit: u })}>
+              {u / 24 === 1 ? '1' : u / 24}
+              {t('graph.cells')}
             </button>
           ))}
         </div>
-
-        <div className="form-grid">
-          <label>{t('graph.xRange')}</label>
-          <div className="range">
-            <input type="number" value={p.xMin} onChange={num('xMin')} />
-            <span>…</span>
-            <input type="number" value={p.xMax} onChange={num('xMax')} />
-          </div>
-          {isPlane && (
-            <>
-              <label>{t('graph.yRange')}</label>
-              <div className="range">
-                <input type="number" value={p.yMin} onChange={num('yMin')} />
-                <span>…</span>
-                <input type="number" value={p.yMax} onChange={num('yMax')} />
-              </div>
-            </>
-          )}
-          {p.kind === 'space' && (
-            <>
-              <label>{t('graph.zRange')}</label>
-              <div className="range">
-                <input type="number" value={p.zMin ?? 0} onChange={num('zMin')} />
-                <span>…</span>
-                <input type="number" value={p.zMax ?? 5} onChange={num('zMax')} />
-              </div>
-            </>
-          )}
-          <label>{t('graph.unit')}</label>
-          <div className="seg small">
-            {UNIT_CHOICES.map((u) => (
-              <button key={u} className={p.unit === u ? 'active' : ''} onClick={() => setP({ ...p, unit: u })}>
-                {u / 24 === 1 ? '1' : u / 24}
-                {t('graph.cells')}
-              </button>
-            ))}
-          </div>
-          <label>{t('graph.labelStep')}</label>
-          <div className="seg small">
-            {[1, 2, 5, 10].map((n) => (
-              <button key={n} className={p.labelStep === n ? 'active' : ''} onClick={() => setP({ ...p, labelStep: n })}>
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="preset-save">
-          <input value={presetName} placeholder={t('graph.presetName')} onChange={(e) => setPresetName(e.target.value)} />
-          <button className="text-btn outline" disabled={!presetName.trim()} onClick={savePreset}>
-            {t('graph.savePreset')}
-          </button>
-        </div>
-
-        <div className="modal-actions">
-          <button className="text-btn" onClick={close}>
-            {t('common.cancel')}
-          </button>
-          <button className="text-btn primary" onClick={apply}>
-            {t(dialog.mode === 'edit' ? 'graph.apply' : 'graph.insert')}
-          </button>
+        <label>{t('graph.labelStep')}</label>
+        <div className="seg small">
+          {[1, 2, 5, 10].map((n) => (
+            <button key={n} aria-pressed={p.labelStep === n} className={p.labelStep === n ? 'active' : ''} onClick={() => setP({ ...p, labelStep: n })}>
+              {n}
+            </button>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div className="preset-save">
+        <input value={presetName} placeholder={t('graph.presetName')} onChange={(e) => setPresetName(e.target.value)} />
+        <button className="text-btn outline" disabled={!presetName.trim()} onClick={savePreset}>
+          {t('graph.savePreset')}
+        </button>
+      </div>
+
+      <div className="modal-actions">
+        <button className="text-btn" onClick={close}>
+          {t('common.cancel')}
+        </button>
+        <button className="text-btn primary" onClick={apply}>
+          {t(dialog.mode === 'edit' ? 'graph.apply' : 'graph.insert')}
+        </button>
+      </div>
+    </Dialog>
   )
 }
