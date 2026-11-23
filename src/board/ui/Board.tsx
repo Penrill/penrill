@@ -47,6 +47,7 @@ import { beginLasso } from '../tools/lasso'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
+import { inkSamples, penInContact, penWidth } from '../tools/penInput'
 import { WheelSource } from '../engine/wheel'
 
 type StraightSlot = 'ruler' | 'setSquare'
@@ -68,6 +69,8 @@ type Gesture =
       id: string
       pointerId: number
       live: LiveStroke
+      downTime: number
+      provisionalStart?: boolean
       start: Point
       snap?:
         | { mode: 'arc'; startDeg: number; endDeg?: number }
@@ -156,6 +159,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     let gesture: Gesture | null = null
     let hover: Hover | null = null
     let spaceDown = false
+    let penGesture = false
     let lastPenTime = -Infinity
     /** Last press on a text item (for double click / double tap = edit). */
     let lastTap: { id: string; t: number } | null = null
@@ -657,7 +661,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const p = local(e)
       const w = screenToWorld(editor.camera, p.x, p.y)
       // Some tablets report 0 on the very first contact sample.
-      const pr = pressure ? Math.max(0.05, e.pressure || 0.05) : 0.5
+      const pr = pressure ? penWidth(e) : 0.5
       return [w.x, w.y, pr]
     }
 
@@ -695,6 +699,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const finishGesture = (): void => {
       const g = gesture
       gesture = null
+      penGesture = false
       clearTimeout(holdTimer)
       holdAt = null
       angleLabel = null
@@ -779,7 +784,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         reshapeHeld(gesture)
         return
       }
-      if (performance.now() - lastPenTime < PALM_REJECT_MS || gesture?.kind === 'ink' || gesture?.kind === 'eraser')
+      if (penGesture || performance.now() - lastPenTime < PALM_REJECT_MS || gesture?.kind === 'ink' || gesture?.kind === 'eraser')
         return
       const p = local(e)
       touches.set(e.pointerId, p)
@@ -861,8 +866,15 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     // ---------- pointer events ----------
     const onPointerDown = (e: PointerEvent): void => {
       if (e.pointerType === 'touch') return onTouchDown(e)
-      // The same pen / mouse pressing again means we missed its release: end that gesture first.
-      if (gesture && 'pointerId' in gesture && gesture.pointerId === e.pointerId) finishGesture()
+      if (e.pointerType === 'pen' && touches.size) {
+        // A palm can land before the Pencil, especially on iPads without hover.
+        touches.clear()
+        finishGesture()
+      }
+      // A new press can arrive after a missed release, even with a new pen ID.
+      if (gesture && 'pointerId' in gesture && (gesture.pointerId === e.pointerId || (penGesture && e.pointerType === 'pen'))) {
+        finishGesture()
+      }
       if (gesture) return
       if (e.pointerType === 'pen') lastPenTime = performance.now()
       e.preventDefault()
@@ -911,6 +923,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           gesture = {
             kind: 'ink', id: newId(),
             pointerId: e.pointerId,
+            downTime: e.timeStamp,
             start,
             live: {
               tool: isHl ? 'highlighter' : 'pen',
@@ -1081,6 +1094,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         gesture = {
           kind: 'ink', id: newId(),
           pointerId: e.pointerId,
+          downTime: e.timeStamp,
+          provisionalStart: e.pointerType === 'pen' && e.pressure === 0,
           start,
           live: {
             tool: isHl ? 'highlighter' : 'pen',
@@ -1121,6 +1136,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           }
         }
       }
+      penGesture = !!gesture && e.pointerType === 'pen'
       hover = { sx: p.x, sy: p.y, pointerType: e.pointerType, buttons: e.buttons }
       updateCssCursor()
       invalidate(false)
@@ -1132,9 +1148,16 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const p = local(e)
       hover = { sx: p.x, sy: p.y, pointerType: e.pointerType, buttons: e.buttons }
 
-      // No button held any more, but the gesture is still running: the release happened somewhere we
-      // didn't hear about (over a panel, outside the window). End it, or the pen would keep dragging.
-      if (gesture && 'pointerId' in gesture && gesture.pointerId === e.pointerId && e.buttons === 0) finishGesture()
+      if (gesture && 'pointerId' in gesture && gesture.pointerId === e.pointerId && e.buttons === 0) {
+        if (e.pointerType === 'pen' && !penInContact(e) && overlay.hasPointerCapture(e.pointerId)) {
+          // A captured pen can briefly lose both contact signals. Wait for up/cancel
+          // or the next down without appending a hover position or splitting the stroke.
+          clearTimeout(holdTimer)
+          invalidate(false)
+          return
+        }
+        if (!penInContact(e) || e.pointerType !== 'pen') finishGesture()
+      }
       const g = gesture
       if (g && 'pointerId' in g && g.pointerId === e.pointerId) {
         if ('tool' in g) {
@@ -1274,9 +1297,6 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           // Up (counter-clockwise) reads "20°", down "−20°".
           angleLabel = { sx: p.x, sy: p.y, text: turnText(-Math.round((r * 180) / Math.PI), prefsStore.getState().lang === 'uk') }
         } else {
-          // Coalesced events give every sample the tablet produced (often 200+ Hz), not just one per frame.
-          const samples = e.getCoalescedEvents?.() ?? []
-          const events = samples.length ? samples : [e]
           const prot = session.getState().protractor
           const comp = session.getState().compass
           if (g.kind === 'ink' && g.snap?.mode === 'compass') {
@@ -1330,6 +1350,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             g.held.shift = e.shiftKey
             reshapeHeld(g)
           } else if (g.kind === 'ink') {
+            const events = inkSamples(e, g.downTime)
+            if (g.provisionalStart) {
+              // Some drivers report their last hover position on a zero-pressure down.
+              g.start = pointFrom(events[0], g.live.pressure)
+              g.live.points = []
+              g.provisionalStart = false
+            }
             if (!g.snap && !e.shiftKey && g.live.geom !== 'line' && holdAt && Math.hypot(p.x - holdAt.x, p.y - holdAt.y) > HOLD_SLOP) armHold(p.x, p.y)
             if (e.shiftKey || g.live.geom === 'line') {
               // Shift = straight line from where the stroke started (snaps to 0°/45°/90°).

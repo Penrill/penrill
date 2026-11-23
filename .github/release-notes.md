@@ -2,6 +2,11 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Pen input in 0.13.2
+
+- **Wacom tablets.** A stroke now filters out old hover positions that could draw a stray line from the centre of the screen.
+- **Apple Pencil.** Drawing continues through brief contact-signal gaps, even if your palm landed first. On supported devices, tilting the Pencil makes light strokes wider.
+
 ## Penrill Cloud
 
 - **Sync with Penrill Cloud.** On the *Sync* page choose **Penrill Cloud**, sign up or sign in in the browser,
