@@ -1,5 +1,6 @@
 import type { Change } from '@penrill/sync/protocol'
 import type { Outbox, OutboxEntry } from '@penrill/sync/session'
+import { bgPattern, isBackgroundKind } from '../../../board/engine/surface'
 
 interface Row {
   scope: string
@@ -60,7 +61,15 @@ export function outboxFor(scope: string): BoardOutbox {
         request.onsuccess = () => resolve(request.result)
         request.onerror = () => reject(request.error)
       })
-      return rows.map(row => ({ change: row.change, confirmed: row.confirmedAt !== undefined }))
+      return rows.map(({ change, confirmedAt }) => ({
+        // Pending edits from earlier versions may include the device's chalk surface.
+        change: {
+          ...change,
+          ops: change.ops.map(op => op.op === 'meta' && isBackgroundKind(op.background)
+            ? { ...op, background: bgPattern(op.background) } : op)
+        },
+        confirmed: confirmedAt !== undefined
+      }))
     },
     add: change => write(store => store.add({ scope, id: change.id, change } satisfies Row)),
     confirm: id => write(store => eachRow(store, scope, (row, cursor) => {

@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Shared boards and browser updates in 0.13.5
+
+- Choose paper or chalkboard on your own device. Everyone on a shared board still sees the same ruling.
+- Slanted copybook paper keeps the handwriting rows and adds widely spaced guides, including in exports.
+- On mobile and desktop browsers, open Settings → About to check for updates. Reload when ready and return to the same board after saving.
+- About now includes the project website and creator credits.
+
 ## Finger drawing on iPad in 0.13.4
 
 - Draw with a finger as soon as you open a board. Use two fingers to pan and zoom.

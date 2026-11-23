@@ -211,9 +211,9 @@ class BoardLibrary {
         const wantThumb = thumbStale && (final || Date.now() - this.lastThumbAt > THUMB_INTERVAL_MS)
         const thumb = wantThumb ? await renderThumbnail(data.items, data.background, this.editor.features) : null
         const r = await platform.library.save(board.id, bytes, thumb)
-        this.saved = { version, meta, camera }
+        if (r.ok) this.saved = { version, meta, camera }
         if (r.ok) for (const listener of this.savedListeners) listener(board.id, startedAt)
-        if (thumb) {
+        if (r.ok && thumb) {
           this.thumbVersion = version
           this.lastThumbAt = Date.now()
         }
@@ -234,7 +234,7 @@ class BoardLibrary {
     await this.saving
     this.saving = null
     // Edits made while writing get their own save.
-    if (this.hasChanges()) this.markChanged()
+    if (version !== this.editor.scene.version || meta !== this.metaVersion) this.markChanged()
   }
 
   private updateTitle(): void {

@@ -4,7 +4,7 @@ import type { Change, Op, WireItem } from '@penrill/sync/protocol'
 import type { ViewDelta } from '@penrill/sync/replica'
 import type { DocumentPort } from '@penrill/sync/session'
 import type { Editor } from '../../../board/editor'
-import { isBackgroundKind } from '../../../board/engine/surface'
+import { bgPattern, isBackgroundKind, withPattern } from '../../../board/engine/surface'
 import { prefsStore } from '../../../board/store'
 import { fromWire, toWire } from './wire'
 
@@ -36,7 +36,7 @@ export class EditorDocument implements DocumentPort {
   attach(): void {
     for (const item of this.editor.scene.getItems()) this.known.set(item.id, { item, wire: toWire(item) })
     this.title = this.titles.get()
-    this.background = prefsStore.getState().background
+    this.background = bgPattern(prefsStore.getState().background)
     const changed = () => {
       if (!this.applying) this.schedule()
     }
@@ -45,7 +45,7 @@ export class EditorDocument implements DocumentPort {
         if (local) changed()
       }),
       prefsStore.subscribe((state, previous) => {
-        if (state.background !== previous.background) changed()
+        if (bgPattern(state.background) !== bgPattern(previous.background)) changed()
       }),
       this.titles.subscribe(changed)
     ]
@@ -89,7 +89,7 @@ export class EditorDocument implements DocumentPort {
       ops.push({ op: 'delete', id })
     }
     const title = this.titles.get()
-    const background = prefsStore.getState().background
+    const background = bgPattern(prefsStore.getState().background)
     if (title !== this.title || background !== this.background) {
       ops.push({ op: 'meta', ...(title !== this.title ? { title } : {}), ...(background !== this.background ? { background } : {}) })
       this.title = title
@@ -123,9 +123,10 @@ export class EditorDocument implements DocumentPort {
         const selected = this.editor.session.getState().selectedIds
         if (selected.some(id => gone.has(id))) this.editor.session.setState({ selectedIds: selected.filter(id => !gone.has(id)) })
       }
-      if (delta.background !== undefined && delta.background !== this.background && isBackgroundKind(delta.background)) {
-        this.background = delta.background
-        prefsStore.setState({ background: delta.background })
+      if (isBackgroundKind(delta.background) && bgPattern(delta.background) !== this.background) {
+        const pattern = bgPattern(delta.background)
+        this.background = pattern
+        prefsStore.setState(({ background }) => ({ background: withPattern(background, pattern) }))
       }
       if (delta.title !== undefined && delta.title !== this.title) {
         this.title = delta.title

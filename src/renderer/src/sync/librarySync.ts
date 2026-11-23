@@ -6,7 +6,8 @@ import { create } from 'zustand'
 import { DEFAULT_CAMERA } from '../../../board/editor'
 import { renderThumbnail } from '../../../board/engine/export'
 import { decodeBoard, encodeBoard } from '../../../board/engine/serialize'
-import { isBackgroundKind } from '../../../board/engine/surface'
+import { prefsStore } from '../../../board/store'
+import { bgPattern, isBackgroundKind, withPattern } from '../../../board/engine/surface'
 import type { BoardEntry } from '../../../shared/library'
 import { useApp } from '../appState'
 import { boardLibrary } from '../boardLibrary'
@@ -53,7 +54,7 @@ export async function remoteBoard(origin: string, remote: string) {
   const client = clientFor(origin)
   const snapshot = await client.snapshot(remote)
   const items = itemsOf(await assetCodec(client, remote).decodeItems(snapshot.items))
-  return { snapshot, items, background: isBackgroundKind(snapshot.background) ? snapshot.background : 'dots' as const }
+  return { snapshot, items, background: withPattern(prefsStore.getState().background, isBackgroundKind(snapshot.background) ? bgPattern(snapshot.background) : 'dots') }
 }
 
 /** Reloads the server's folders, their members and shared boards and templates. */
@@ -269,7 +270,7 @@ export class LibrarySync {
     const codec = assetCodec(client, link.remote)
     if (!link.published) {
       const data = await decodeBoard(await platform.library.load(localId))
-      link = await publishBoard(localId, link, { title: entry.title, background: data.background, items: data.items.map(toWire) })
+      link = await publishBoard(localId, link, { title: entry.title, background: bgPattern(data.background), items: data.items.map(toWire) })
     }
     const outbox = outboxFor(scopeOf(link))
     for (const { change, confirmed } of await outbox.list()) {
@@ -305,7 +306,7 @@ export class LibrarySync {
     if (this.isLive(localId)) return
     const local = await platform.library.load(localId).then(decodeBoard).catch(() => null)
     const items = itemsOf(state.items.values())
-    const background = isBackgroundKind(state.background) ? state.background : local?.background ?? 'dots'
+    const background = withPattern(prefsStore.getState().background, isBackgroundKind(state.background) ? bgPattern(state.background) : bgPattern(local?.background ?? 'dots'))
     const thumb = await renderThumbnail(items, background, boardLibrary.editor.features).catch(() => null)
     const saved = await platform.library.save(localId, await encodeBoard({ items, background, camera: local?.camera ?? DEFAULT_CAMERA }), thumb)
     if (!saved.ok) throw new Error('Could not write the board on this device')

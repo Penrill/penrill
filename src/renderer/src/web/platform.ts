@@ -3,12 +3,15 @@ import { hostedCloud, cloudOrigin } from '../storagePreference'
 import { sendHttp } from '../../../shared/http'
 import { cleanOverrides, parseFeaturesFile } from '../../../shared/features'
 import type { BoardStoreApi, PlatformApi } from '../../../shared/platform'
+import { createWebUpdater } from './update'
 import { createWebFiles, exportFile } from './files'
 import { createIndexedDbStore } from './library'
 import { moveStorageKey } from '../../../shared/legacyStorage'
 
 /** Set by the web build (apps/web/vite.config.mts); absent when the renderer runs some other way. */
 declare const __APP_VERSION__: string | undefined
+
+declare const __WEB_BUILD__: string | undefined
 
 const FEATURES_KEY = 'penrill-features'
 
@@ -57,20 +60,10 @@ export function createWebPlatform(): PlatformApi {
       }
       return { ...features }
     },
-    update: {
-      async getState() {
-        return { status: 'web' }
-      },
-      async check() {},
-      async install() {
-        location.reload()
-      },
-      async openDownload() {},
-      async version() {
-        return typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev'
-      },
-      onState() {}
-    },
+    update: createWebUpdater(
+      typeof __WEB_BUILD__ === 'string' ? __WEB_BUILD__ : 'dev',
+      typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev'
+    ),
     capabilities: { backup: false, showInFolder: false },
     library: { ...store, ...createWebFiles(store) },
     async chooseBackupDir() {

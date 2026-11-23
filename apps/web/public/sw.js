@@ -9,15 +9,20 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return
+  const url = new URL(request.url)
+  if (url.pathname.endsWith('/web-build.json')) return
+  const refreshing = request.mode === 'navigate' && url.searchParams.has('__penrill_reload')
+  url.searchParams.delete('__penrill_reload')
+  const key = refreshing ? url.href : request
   event.respondWith(
-    fetch(request)
+    fetch(request, refreshing ? { cache: 'reload' } : undefined)
       .then((response) => {
         if (response.ok) {
           const copy = response.clone()
-          void caches.open(CACHE).then((cache) => cache.put(request, copy))
+          void caches.open(CACHE).then((cache) => cache.put(key, copy))
         }
         return response
       })
-      .catch(async () => (await caches.match(request)) ?? (request.mode === 'navigate' ? caches.match('./') : Response.error()))
+      .catch(async () => (await caches.match(key)) ?? (request.mode === 'navigate' ? caches.match('./') : Response.error()))
   )
 })

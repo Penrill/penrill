@@ -12,19 +12,19 @@ export const BACKGROUND_STYLE = {
   math: { step: 24, color: '#e6e8ee' },
   /** Handwriting rows: letters 24 high between the top and base line, 24 free between rows. */
   hand: { step: 72, color: '#d3d9e3' },
-  /** Copybook rows 24 high, 24 apart, with slanted guide lines every 24. */
-  slant: { step: 48, color: '#e1e5ec' }
+  /** Handwriting rows with occasional oblique guides. */
+  slant: { step: 72, color: '#d3d9e3' }
 } as const
 
 /** Pattern colours on the green chalkboard: faint, like lines painted on a lecture board. */
 export const CHALK_PATTERN_COLOR = {
-  dots: '#6f8a7c', grid: '#46625a', lines: '#4c685c', math: '#46625a', hand: '#4f6d63', slant: '#42605a'
+  dots: '#6f8a7c', grid: '#46625a', lines: '#4c685c', math: '#46625a', hand: '#4f6d63', slant: '#4f6d63'
 } as const
 
 /** The darker every-5th line of the math grid, and the main lines of school rows. */
 export const MAJOR_COLOR = { paper: '#a9b2c2', chalk: '#7c9a8e' } as const
 /** Writing rows: letter height, gap between rows, and the slant of copybook guide lines (from horizontal). */
-export const ROW = { letter: 24, gap: 24, slantDeg: 65, slantStep: 24 } as const
+export const ROW = { letter: 24, gap: 24, slantDeg: 65, slantStep: 150 } as const
 
 export function patternColor(bg: BackgroundKind, pattern: keyof typeof BACKGROUND_STYLE): string {
   return isChalk(bg) ? CHALK_PATTERN_COLOR[pattern] : BACKGROUND_STYLE[pattern].color
@@ -143,15 +143,9 @@ function drawSchoolPaper(
   const detail = ROW.letter * cam.zoom >= 9
   for (let r = Math.floor(y0 / period); r * period <= y1; r++) {
     const top = r * period
-    if (kind === 'hand') {
-      // Top line, dashed middle (where small letters end), base line.
-      hline(top, major)
-      if (detail) hline(top + ROW.letter, minor, 4)
-      hline(top + ROW.letter * 2, major)
-    } else {
-      hline(top, major)
-      hline(top + ROW.letter, major)
-    }
+    hline(top, major)
+    if (detail) hline(top + ROW.letter, minor, 4)
+    hline(top + ROW.letter * 2, major)
   }
   if (kind === 'slant' && detail) {
     // Slanted guide lines across each row band (65° from the line, leaning right).

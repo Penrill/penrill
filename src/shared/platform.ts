@@ -61,7 +61,7 @@ export interface UpdateApi {
   install(): Promise<void>
   openDownload(): Promise<void>
   version(): Promise<string>
-  onState(handler: (s: UpdateState) => void): void
+  onState(handler: (s: UpdateState) => void): (() => void) | void
 }
 
 /** A server's certificate as presented, before anyone trusts it. */

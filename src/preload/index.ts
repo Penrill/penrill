@@ -69,7 +69,9 @@ contextBridge.exposeInMainWorld('penrill', {
     openDownload: invoke('update:open-download'),
     version: invoke('app:version'),
     onState: (handler: (s: unknown) => void) => {
-      ipcRenderer.on('update:state', (_e, s) => handler(s))
+      const listener = (_event: Electron.IpcRendererEvent, state: unknown) => handler(state)
+      ipcRenderer.on('update:state', listener)
+      return () => { ipcRenderer.removeListener('update:state', listener) }
     }
   },
   setTitle: (title: string) => ipcRenderer.send('window:title', title),

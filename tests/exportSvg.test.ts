@@ -27,3 +27,12 @@ test('grid lines are 1 unit wide on the cell edges, as on the board', () => {
   assert.ok(svg.includes('M-24 0.5H664'))
   assert.ok(svg.includes('M0.5 -24V424'))
 })
+
+test('slanted paper keeps handwriting rows and adds sparse guides on either surface', () => {
+  for (const prefix of ['', 'chalk-'] as const) {
+    const rows = patternSvg(`${prefix}hand`, box)
+    const slant = patternSvg(`${prefix}slant`, box)
+    assert.ok(slant.startsWith(rows))
+    assert.equal(slant.slice(rows.length).match(/L/g)?.length, 6)
+  }
+})

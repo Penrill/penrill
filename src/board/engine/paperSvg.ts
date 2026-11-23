@@ -42,18 +42,15 @@ export function patternSvg(bgKind: BackgroundKind, box: BBox): string {
     const fine = (v: number[]): number[] => v.filter((p) => Math.round(p / s) % 5 !== 0)
     return stroke(hLines(fine(ys(s))) + vLines(fine(xs(s))), color) + stroke(hLines(ys(s * 5)) + vLines(xs(s * 5)), major)
   }
-  if (bg === 'hand') {
-    // Top and base line of each row in the darker colour, the dashed middle line between them.
-    const majors = [...ys(s), ...ys(s, ROW.letter * 2)]
-    const x0 = Math.floor(box.minX / 8) * 8
-    return stroke(hLines(majors), major) + stroke(hLines(ys(s, ROW.letter), x0), color, ' stroke-dasharray="4 4"')
-  }
-  // Copybook rows: two darker lines per row, and guide lines leaning at the copybook slant.
+  const majors = [...ys(s), ...ys(s, ROW.letter * 2)]
+  const x0 = Math.floor(box.minX / 8) * 8
+  const rows = stroke(hLines(majors), major) + stroke(hLines(ys(s, ROW.letter), x0), color, ' stroke-dasharray="4 4"')
+  if (bg === 'hand') return rows
   const lean = Math.tan(((90 - ROW.slantDeg) * Math.PI) / 180)
   const w = ROW.slantStep
   // A guide line through (x, 0) reaches x - lean * y at height y (skewed like the board pattern).
   const guides = steps(box.minX + lean * box.minY, box.maxX + lean * box.maxY, w)
     .map((x) => `M${r2(x + 0.5 - lean * box.minY)} ${r2(box.minY)}L${r2(x + 0.5 - lean * box.maxY)} ${r2(box.maxY)}`)
     .join('')
-  return stroke(guides, color) + stroke(hLines([...ys(s), ...ys(s, ROW.letter)]), major)
+  return rows + stroke(guides, color)
 }

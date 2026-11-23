@@ -45,7 +45,7 @@ function Preview({ kind, chalk }: { kind: PaperPattern; chalk: boolean }) {
             <line x1="0" y1={v} x2="56" y2={v} />
           </g>
         ))}
-      {kind === 'hand' &&
+      {(kind === 'hand' || kind === 'slant') &&
         [8, 32].map((y) => (
           <g key={y}>
             <line x1="0" y1={y} x2="56" y2={y} stroke={chalk ? MAJOR_COLOR.chalk : '#aab2c0'} />
@@ -53,16 +53,9 @@ function Preview({ kind, chalk }: { kind: PaperPattern; chalk: boolean }) {
             <line x1="0" y1={y + 16} x2="56" y2={y + 16} stroke={chalk ? MAJOR_COLOR.chalk : '#aab2c0'} />
           </g>
         ))}
-      {kind === 'slant' && (
-        <g>
-          {[-16, -8, 0, 8, 16, 24, 32, 40, 48, 56].map((x) => (
-            <line key={x} x1={x} y1="56" x2={x + 26} y2="0" stroke={ink('slant', '#d3d9e3')} />
-          ))}
-          {[12, 22, 36, 46].map((y) => (
-            <line key={y} x1="0" y1={y} x2="56" y2={y} stroke={chalk ? MAJOR_COLOR.chalk : '#aab2c0'} />
-          ))}
-        </g>
-      )}
+      {kind === 'slant' && [-8, 42].map(x => (
+        <line key={x} x1={x} y1="56" x2={x + 26} y2="0" stroke={ink('slant', '#d3d9e3')} />
+      ))}
     </svg>
   )
 }

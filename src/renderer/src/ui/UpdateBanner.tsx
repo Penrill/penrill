@@ -20,7 +20,24 @@ export function UpdateBanner() {
   const [hidden, setHidden] = useState<string[]>([])
   useEffect(() => {
     void platform.update.getState().then(setS)
-    platform.update.onState(setS)
+    return platform.update.onState(setS)
+  }, [])
+  useEffect(() => {
+    if (platform.platform !== 'web') return
+    const hour = 60 * 60 * 1000
+    let lastCheck = 0
+    const check = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastCheck < hour) return
+      lastCheck = Date.now()
+      void platform.update.check()
+    }
+    check()
+    const timer = window.setInterval(check, hour)
+    document.addEventListener('visibilitychange', check)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', check)
+    }
   }, [])
   const hide = (key: string) => () => setHidden((h) => [...h, key])
   const justUpdated = useApp((st) => st.justUpdatedTo)
@@ -38,7 +55,7 @@ export function UpdateBanner() {
   }
   const key = `${s.status}:${s.version}`
   if (hidden.includes(key)) return null
-  if (s.status === 'ready') {
+  if (s.status === 'ready' && platform.platform !== 'web') {
     return (
       <Notice
         timeout={15000}
@@ -81,11 +98,26 @@ export function UpdateBanner() {
 export function AboutSection() {
   const t = useT()
   const [version, setVersion] = useState('')
+  const [reloading, setReloading] = useState(false)
+  const [saveFailed, setSaveFailed] = useState(false)
+  const web = platform.platform === 'web'
+  const reload = async () => {
+    setReloading(true)
+    setSaveFailed(false)
+    try {
+      await boardLibrary.flush(true)
+      const { board, saveStatus } = useApp.getState()
+      if (board && saveStatus !== 'saved') setSaveFailed(true)
+      else await platform.update.install()
+    } finally {
+      setReloading(false)
+    }
+  }
   const [s, setS] = useState<UpdateState>({ status: 'idle' })
   useEffect(() => {
     void platform.update.version().then(setVersion)
     void platform.update.getState().then(setS)
-    platform.update.onState(setS)
+    return platform.update.onState(setS)
   }, [])
   const status =
     s.status === 'dev'
@@ -101,7 +133,7 @@ export function AboutSection() {
         : s.status === 'downloading'
           ? `${t('update.downloading', { version: s.version ?? '' })} ${s.percent ?? 0}%`
           : s.status === 'ready'
-            ? t('update.ready', { version: s.version ?? '' })
+            ? t(web ? 'update.webReady' : 'update.ready', { version: s.version ?? '' })
             : s.status === 'available'
               ? t('update.available', { version: s.version ?? '' })
               : s.status === 'error'
@@ -111,13 +143,19 @@ export function AboutSection() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-4">
         <span className="text-sm/6 font-medium text-zinc-950 dark:text-white">Penrill {version}</span>
-        {s.status !== 'store' && s.status !== 'web' && (
+        {web && s.status === 'ready' ? (
+          <Button color="blue" disabled={reloading} onClick={() => void reload()}>{t('update.reload')}</Button>
+        ) : s.status !== 'store' && (
           <Button outline disabled={s.status === 'checking' || s.status === 'downloading'} onClick={() => void platform.update.check()}>
             {t('update.check')}
           </Button>
         )}
       </div>
-      {status && <Text>{status}</Text>}
+      {status && <div role="status"><Text>{status}</Text></div>}
+      {saveFailed && <p role="alert">{t('update.saveFailed')}</p>}
+      <Text>{t('about.description')}</Text>
+      <Text>{t('about.credit')}</Text>
+      <a href="https://penrill.com/" target="_blank" rel="noopener noreferrer" className="w-fit text-sm text-blue-600 underline dark:text-blue-400">penrill.com</a>
     </div>
   )
 }

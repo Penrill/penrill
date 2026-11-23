@@ -1,4 +1,5 @@
 import tailwindcss from '@tailwindcss/vite'
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, searchForWorkspaceRoot } from 'vite'
@@ -11,11 +12,25 @@ const { version } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8
 //   npm run dev:web                   http://localhost:5174/
 //   npm run build:web                 into dist/web
 //   npm run build:web -- --mode cloud into dist/cloud, served by Penrill Cloud
+const build = randomUUID()
+const buildInfo = JSON.stringify({ version, build })
+
 export default defineConfig(({ mode }) => ({
   root: import.meta.dirname,
   base: '/',
-  plugins: [react(), tailwindcss()],
-  define: { __APP_VERSION__: JSON.stringify(version) },
+  plugins: [react(), tailwindcss(), {
+    name: 'penrill-web-build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'web-build.json', source: buildInfo })
+    },
+    configureServer(server) {
+      server.middlewares.use('/web-build.json', (_request, response) => {
+        response.setHeader('Content-Type', 'application/json')
+        response.end(buildInfo)
+      })
+    }
+  }],
+  define: { __WEB_BUILD__: JSON.stringify(build), __APP_VERSION__: JSON.stringify(version) },
   server: {
     port: 5174,
     fs: { allow: [searchForWorkspaceRoot(root)] }

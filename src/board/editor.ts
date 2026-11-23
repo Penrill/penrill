@@ -13,6 +13,7 @@ import {
 } from './engine/serialize'
 import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
 import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
+import { bgPattern, withPattern } from './engine/surface'
 import { COMPASS_CELL } from './engine/compass'
 import { CM } from './engine/straightedge'
 import { formatAll, formatRange, fullRuns, textBBox, textFields, trimRunsEnd } from './engine/text'
@@ -820,7 +821,7 @@ export class Editor {
   loadData(data: BoardData): void {
     this.preview = null
     this.session.setState({ selectedIds: [] })
-    prefsStore.setState({ background: data.background })
+    prefsStore.setState(({ background }) => ({ background: withPattern(background, bgPattern(data.background)) }))
     this.scene.load(data.items)
     this.setCamera(data.camera)
   }
