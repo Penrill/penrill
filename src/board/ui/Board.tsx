@@ -1117,7 +1117,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           kind: 'ink', id: newId(),
           pointerId: e.pointerId,
           downTime: e.timeStamp,
-          provisionalStart: e.pointerType === 'pen' && e.pressure === 0,
+          provisionalStart: !ipad && e.pointerType === 'pen' && e.pressure === 0,
           start,
           live: {
             tool: isHl ? 'highlighter' : 'pen',
@@ -1169,12 +1169,15 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         if (e.pointerId !== fingerInk) return onTouchMove(e)
         touches.set(e.pointerId, local(e))
       }
-      if (e.pointerType === 'pen') lastPenTime = performance.now()
+      if (e.pointerType === 'pen') {
+        lastPenTime = performance.now()
+        if (gesture?.kind === 'ink' && gesture.pointerId === e.pointerId && e.timeStamp < gesture.downTime) return
+      }
       const p = local(e)
       hover = { sx: p.x, sy: p.y, pointerType: e.pointerType, buttons: e.buttons }
 
       if (gesture && 'pointerId' in gesture && gesture.pointerId === e.pointerId && e.buttons === 0) {
-        if (e.pointerType === 'pen' && !penInContact(e) && overlay.hasPointerCapture(e.pointerId)) {
+        if (e.pointerType === 'pen' && !penInContact(e) && (overlay.hasPointerCapture(e.pointerId) || (ipad && gesture.kind === 'ink'))) {
           // A captured pen can briefly lose both contact signals. Wait for up/cancel
           // or the next down without appending a hover position or splitting the stroke.
           clearTimeout(holdTimer)
@@ -1418,7 +1421,18 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         return onTouchUp(e)
       }
       const g = gesture
-      if (g && 'pointerId' in g && g.pointerId === e.pointerId) finishGesture()
+      if (g && 'pointerId' in g && g.pointerId === e.pointerId) {
+        if (g.kind === 'ink' && penGesture && e.pointerType === 'pen') {
+          if (e.timeStamp < g.downTime || (e.type === 'lostpointercapture' && overlay.hasPointerCapture(e.pointerId))) return
+          if (ipad && e.type === 'pointerup' && !g.snap && !g.held && !g.live.geom) {
+            // A short Pencil stroke can lift at a new position before the first move arrives.
+            const last = g.live.points[g.live.points.length - 1]
+            const [x, y] = pointFrom(e, false)
+            if (last && (last[0] !== x || last[1] !== y)) g.live.points.push([x, y, last[2]])
+          }
+        }
+        finishGesture()
+      }
       if (e.pointerType === 'pen') lastPenTime = performance.now()
     }
 
