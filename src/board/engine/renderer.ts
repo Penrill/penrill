@@ -1,3 +1,4 @@
+import { drawLaser, LASER, type LaserFrame } from './laser'
 import { ACCENT, accent } from './accent'
 import { drawBackground } from './background'
 import { viewportBBox } from '@penrill/core/camera'
@@ -186,7 +187,7 @@ export class BoardRenderer {
       hint?: { sx: number; sy: number; text: string } | null
       angleLabel?: { sx: number; sy: number; text: string } | null
       /** Laser pointer trail: world points with the time each was drawn. */
-      laser?: { points: readonly (readonly [number, number, number])[]; now: number; fade: number } | null
+      laser?: LaserFrame | null
     } = {}
   ): void {
     const ctx = this.overlay
@@ -391,40 +392,8 @@ export class BoardRenderer {
   }
 }
 
-const LASER = '#ff2d2d'
 /** Tint laid over selected items (the accent colour, see-through). */
 const SELECT_TINT = accent(0.38)
-
-/** Laser pointer: a glowing red trail in screen space that fades with age (never saved to the board). */
-function drawLaser(
-  ctx: CanvasRenderingContext2D,
-  cam: Camera,
-  dpr: number,
-  laser: { points: readonly (readonly [number, number, number])[]; now: number; fade: number }
-): void {
-  const pts = laser.points
-  if (!pts.length) return
-  ctx.save()
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.shadowColor = LASER
-  ctx.shadowBlur = 10
-  ctx.strokeStyle = LASER
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1]
-    const b = pts[i]
-    const life = 1 - (laser.now - b[2]) / laser.fade
-    if (life <= 0) continue
-    ctx.globalAlpha = Math.min(1, life * 1.4)
-    ctx.lineWidth = 2 + 3 * life
-    ctx.beginPath()
-    ctx.moveTo((a[0] - cam.x) * cam.zoom, (a[1] - cam.y) * cam.zoom)
-    ctx.lineTo((b[0] - cam.x) * cam.zoom, (b[1] - cam.y) * cam.zoom)
-    ctx.stroke()
-  }
-  ctx.restore()
-}
 
 /** The stroke being drawn (overlay canvas, camera transform already set). */
 function drawLive(ctx: CanvasRenderingContext2D, live: LiveStroke): void {

@@ -2,6 +2,12 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Coordinate planes, formula keyboard and laser pointer in 0.13.9
+
+- New coordinate planes start at −5 to 5 on each axis, including when plotting selected formulas. The spacing between grid marks stays the same.
+- Drag the handle at the top of the formula keyboard to move it while editing.
+- The laser pointer draws fast pen movements more efficiently. Lifting the pen and starting elsewhere leaves two separate trails.
+
 ## Image exports and Apple Pencil in 0.13.8
 
 - PNG exports and board thumbnails finish even when a picture on the board cannot load.

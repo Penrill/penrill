@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { BUILTIN_GRAPHS, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
+import { BUILTIN_GRAPHS, DEFAULT_PLANE, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
 import { lineSvgPath } from '../engine/ink'
 import { MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, shapeParts, type ShapeKind } from '@penrill/core/shapes'
 import type { GraphItem, GraphParams } from '@penrill/core/types'
@@ -232,7 +232,7 @@ export function GraphPanel({ close }: { close: () => void }) {
         className="menu-item"
         onClick={() => {
           close()
-          editor.session.setState({ graphDialog: { mode: 'insert', params: BUILTIN_GRAPHS[3].params } })
+          editor.session.setState({ graphDialog: { mode: 'insert', params: DEFAULT_PLANE } })
         }}
       >
         <span>{t('graph.custom')}</span>
@@ -242,7 +242,7 @@ export function GraphPanel({ close }: { close: () => void }) {
         onClick={() => {
           close()
           // Insert a plane right away and open the formula panel beside it.
-          const id = editor.insertGraph(BUILTIN_GRAPHS[3].params)
+          const id = editor.insertGraph(DEFAULT_PLANE)
           editor.session.setState({ fnPanel: { id, session: Date.now() } })
         }}
       >

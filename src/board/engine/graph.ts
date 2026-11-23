@@ -30,6 +30,8 @@ const plane = (xMin: number, xMax: number, yMin: number, yMax: number, unit = 24
   kind: 'plane', xMin, xMax, yMin, yMax, unit, labelStep, grid: false
 })
 
+export const DEFAULT_PLANE = plane(-5, 5, -5, 5)
+
 /** 3D axes. x is drawn towards the viewer (down-left, half length), so with unit 48 its steps land on paper dots. */
 const space = (max: number, unit = 48, labelStep = 1): GraphParams => ({
   kind: 'space', xMin: 0, xMax: max, yMin: 0, yMax: max, zMin: 0, zMax: max, unit, labelStep, grid: false

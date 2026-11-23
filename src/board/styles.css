@@ -1622,6 +1622,24 @@ button:disabled {
   user-select: none;
 }
 
+.keypad-grip {
+  height: 16px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+.keypad-grip:active {
+  cursor: grabbing;
+}
+.keypad-grip::before {
+  content: '';
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.4;
+}
+
 .keypad-top {
   display: grid;
   grid-template-columns: repeat(6, 1fr);

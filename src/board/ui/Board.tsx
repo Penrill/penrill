@@ -184,6 +184,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const frame = (): void => {
       raf = 0
       const ui = readUI()
+      const now = performance.now()
+      const laserVisible = trail.prune(now)
       if (baseDirty) {
         // Text being edited is shown by the text box instead.
         const editing = ui.textEdit?.id ?? ui.formulaEdit?.id
@@ -224,15 +226,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           compass: comp ? { c: comp, color: inkSlot().color, label: radiusLabel(ui.lang, comp.r), state: cs!.state } : null,
           hint: hover && hintText ? { sx: hover.sx, sy: hover.sy, text: hintText } : null,
           angleLabel,
-          laser: trail.points.length ? { points: trail.points, now: performance.now(), fade: LASER_FADE_MS } : null
+          laser: laserVisible ? { points: trail.points, now, fade: LASER_FADE_MS } : null
         })
       }
       baseDirty = false
       overlayDirty = false
       // Keep animating while the laser trail fades out.
-      if (trail.points.length) {
-        trail.prune(performance.now())
-        // One more frame after the last point expires clears it from the overlay.
+      if (laserVisible) {
         overlayDirty = true
         raf = requestAnimationFrame(frame)
       }
@@ -262,7 +262,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const sample = (e: PointerEvent): Sample => {
       const p = local(e)
       const w = screenToWorld(editor.camera, p.x, p.y)
-      return { sx: p.x, sy: p.y, x: w.x, y: w.y, pressure: e.pressure || 0.5, time: performance.now() }
+      return { sx: p.x, sy: p.y, x: w.x, y: w.y, pressure: e.pressure || 0.5, time: e.timeStamp }
     }
     /** A sample at a screen point (fingers: no pressure). */
     const sampleAt = (sx: number, sy: number): Sample => {

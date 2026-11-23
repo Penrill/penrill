@@ -1,5 +1,5 @@
 import { clampZoom, screenToWorld, zoomAt } from '@penrill/core/camera'
-import { BUILTIN_GRAPHS, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
+import { DEFAULT_PLANE, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
 import { plotFormula, plotHead, rowsToText } from './engine/formulaexpr'
 import { bboxOfPoints, newId } from '@penrill/core/geometry'
 import { loadImage, readFileAsDataURL } from './engine/images'
@@ -664,7 +664,7 @@ export class Editor {
     const fns = this.selectedPlots()
     const box = this.selectionBBox()
     if (!fns.length || !box) return
-    const p = sanitizeGraph({ ...BUILTIN_GRAPHS[3].params, fns })
+    const p = sanitizeGraph({ ...DEFAULT_PLANE, fns })
     const b0 = graphBBox({ ...p, ox: 0, oy: 0 })
     const snap = (v: number): number => Math.round(v / 24) * 24
     const g: GraphItem = {

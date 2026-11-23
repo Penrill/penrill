@@ -50,6 +50,10 @@ export function MathKeypad() {
   const [showHistory, setShowHistory] = useState(false)
   const hold = useRef<{ timer: number; opened: boolean } | null>(null)
   const repeat = useRef(0)
+  const panel = useRef<HTMLDivElement>(null)
+  const grip = useRef({ x: 0, y: 0 })
+  // Fractions of the available travel keep the panel in bounds when the window changes size.
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
 
   const open = !!target && active
   useEffect(() => {
@@ -138,7 +142,12 @@ export function MathKeypad() {
 
   return (
     <div
+      ref={panel}
       className="panel math-keypad"
+      style={position ? {
+        left: `${position.x}%`, top: `${position.y}%`, bottom: 'auto',
+        transform: `translate(-${position.x}%, -${position.y}%)`
+      } : undefined}
       // Keep the focus (and the caret) in the formula.
       onPointerDown={(e) => {
         e.preventDefault()
@@ -147,7 +156,7 @@ export function MathKeypad() {
       onMouseDown={(e) => e.preventDefault()}
     >
       {showHistory && (
-        <div className="panel keypad-history">
+        <div className="panel keypad-history" style={position && position.y < 50 ? { top: 'calc(100% + 6px)', bottom: 'auto' } : undefined}>
           {history.length === 0 && <p className="settings-hint">{t('keypad.historyEmpty')}</p>}
           {history.map((rows, i) => (
             <button
@@ -163,6 +172,28 @@ export function MathKeypad() {
           ))}
         </div>
       )}
+      <div
+        className="keypad-grip"
+        title={t('keypad.move')}
+        onPointerDown={(e) => {
+          if (!e.isPrimary || e.button !== 0 || !panel.current) return
+          const rect = panel.current.getBoundingClientRect()
+          grip.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+          e.currentTarget.setPointerCapture(e.pointerId)
+          setShowHistory(false)
+        }}
+        onPointerMove={(e) => {
+          const el = panel.current
+          const parent = el?.offsetParent
+          if (!el || !(parent instanceof HTMLElement) || !e.currentTarget.hasPointerCapture(e.pointerId)) return
+          const bounds = parent.getBoundingClientRect()
+          const percent = (offset: number, travel: number) => travel > 0 ? Math.max(0, Math.min(100, 100 * offset / travel)) : 0
+          setPosition({
+            x: percent(e.clientX - bounds.left - grip.current.x, parent.clientWidth - el.offsetWidth),
+            y: percent(e.clientY - bounds.top - grip.current.y, parent.clientHeight - el.offsetHeight)
+          })
+        }}
+      />
       <div className="keypad-top">
         <button className={`keypad-key flat ${letters ? 'active' : ''}`} title={t(letters ? 'keypad.numbers' : 'keypad.letters')} onClick={() => setLetters((v) => !v)}>
           {letters ? '123' : 'abc'}

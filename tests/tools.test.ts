@@ -6,7 +6,8 @@ import { Scene } from '@penrill/core/scene'
 import type { ImageItem, Item, StrokeItem } from '@penrill/core/types'
 import { itemsTouched } from '../src/board/tools/brushSelect.ts'
 import { beginErase, eraseAlong, eraseUnit, type EraseRecord } from '../src/board/tools/eraser.ts'
-import { LASER_FADE_MS, LaserTrail } from '../src/board/tools/laser.ts'
+import { drawLaser } from '../src/board/engine/laser.ts'
+import { beginLaser, LASER_FADE_MS, LaserTrail } from '../src/board/tools/laser.ts'
 import { createSessionStore } from '../src/board/session.ts'
 import { beginLasso } from '../src/board/tools/lasso.ts'
 import { beginPan } from '../src/board/tools/pan.ts'
@@ -168,4 +169,24 @@ test('pan moves the camera with the pointer', () => {
   const g = beginPan(ctx, pt(100, 100))
   g.move([pt(110, 90), pt(130, 80)], keys)
   assert.deepEqual(editor.camera, { x: -30, y: 20, zoom: 1 })
+})
+
+test('laser rendering batches fast pen samples and starts a separate path after lifting', () => {
+  const trail = new LaserTrail()
+  const { ctx } = fakeContext(new Scene())
+  const first = beginLaser(ctx, trail, pt(0, 0))
+  first.move(Array.from({ length: 216 }, (_, i) => ({ ...pt(i + 1, 0), time: i * 4 })), keys)
+  first.end()
+  beginLaser(ctx, trail, { ...pt(500, 200), time: 880 })
+  let strokes = 0
+  const moves: number[][] = []
+  const canvas = {
+    save() {}, restore() {}, setTransform() {}, beginPath() {}, lineTo() {},
+    moveTo(x: number, y: number) { moves.push([x, y]) },
+    stroke() { strokes++ }
+  }
+  drawLaser(canvas as unknown as CanvasRenderingContext2D, { x: 0, y: 0, zoom: 1 }, 1,
+    { points: trail.points, now: 880, fade: LASER_FADE_MS })
+  assert.ok(strokes > 0 && strokes <= 16)
+  assert.deepEqual(moves.at(-1), [500, 200])
 })
