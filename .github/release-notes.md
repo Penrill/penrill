@@ -2,6 +2,12 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Image exports and Apple Pencil in 0.13.8
+
+- PNG exports and board thumbnails finish even when a picture on the board cannot load.
+- Open boards redraw as their pictures load.
+- On iPad, short Apple Pencil strokes keep their final point. Late pointer events from an earlier stroke no longer cut the next stroke short.
+
 ## Editor dialogs and Apple Pencil in 0.13.7
 
 - The iPad drawing prompt opens after lifting the pen from the board. Dismissing it leaves your preference undecided for the next visit.
