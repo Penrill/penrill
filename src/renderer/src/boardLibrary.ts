@@ -9,6 +9,7 @@ import { prefsStore } from '../../board/store'
 import { platform } from './platform'
 import { connectFlow, onConnectHash } from './sync/connect'
 import { joinFlow } from './sync/join'
+import { canCopy } from './sync/links'
 import { parseConnectTarget } from '../../shared/connect'
 import { useApp, type HomeTab } from './appState'
 import { parseRoute, startRouter, type Route } from './router'
@@ -93,6 +94,7 @@ class BoardLibrary {
 
   /** Save the selection as a reusable template. */
   async saveSelectionAsTemplate(name: string): Promise<TemplateEntry | null> {
+    if (!canCopy(useApp.getState().board?.id)) return null
     const items = this.editor.selectedItems()
     if (!items.length) return null
     const bg = prefsStore.getState().background
@@ -105,6 +107,7 @@ class BoardLibrary {
 
   /** Replace a template's content with the selection (the UI asks for confirmation first). */
   async replaceTemplateWithSelection(id: string): Promise<boolean> {
+    if (!canCopy(useApp.getState().board?.id)) return false
     const items = this.editor.selectedItems()
     if (!items.length) return false
     const bg = prefsStore.getState().background
@@ -425,7 +428,7 @@ class BoardLibrary {
   async saveAsFile(boardId?: string): Promise<void> {
     const open = useApp.getState().board
     const targetId = boardId ?? open?.id
-    if (!targetId) return
+    if (!targetId || !canCopy(targetId)) return
     if (open && targetId === open.id) {
       await this.flush(true)
       const entry = await platform.library.saveAsFile(open.id, await encodeBoard(this.boardData()), open.title)
@@ -451,6 +454,7 @@ class BoardLibrary {
 
   /** Export the selection if there is one, otherwise the whole board. */
   async exportBoard(kind: 'png' | 'pdf'): Promise<void> {
+    if (!canCopy(useApp.getState().board?.id)) return
     const sel = this.editor.selectedItems()
     const items = sel.length ? sel : [...this.editor.scene.getItems()]
     // Exports are always on white paper (same pattern), even from the chalkboard: they get printed

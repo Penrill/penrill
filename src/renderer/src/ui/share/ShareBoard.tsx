@@ -1,6 +1,7 @@
 import { CheckIcon, ClipboardIcon, CloudArrowUpIcon, FolderIcon, ShareIcon, UserPlusIcon, XMarkIcon } from '@heroicons/react/16/solid'
 import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
+import { Alert, AlertActions, AlertDescription, AlertTitle } from '@penrill/ui/alert'
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '@penrill/ui/dialog'
 import { Description, Label } from '@penrill/ui/fieldset'
 import { Subheading } from '@penrill/ui/heading'
@@ -18,14 +19,15 @@ import { clientFor } from '../../sync/clients'
 import { syncCoordinator } from '../../sync/coordinator'
 import { drawLink } from '../../sync/join'
 import { refreshCommunity, useCommunity, useRemoteBoards } from '../../sync/librarySync'
-import { activeLink, linkBoard, useLinks, type Link } from '../../sync/links'
+import type { Copies } from '../../sync/api'
+import { activeLink, linkBoard, markShared, saveLink, useLinks, type Link } from '../../sync/links'
 import { Bar } from '../../../../board/ui/chrome'
 
 /** Whose a synced board is, when it is someone else's (shared with this account). */
 export function useOwner(link: Link | null): string | null {
   const rows = useRemoteBoards((s) => s.rows)
   if (!link) return null
-  const owner = rows.find((r) => r.id === link.remote)?.owner
+  const owner = link.owner ?? rows.find((r) => r.id === link.remote)?.owner
   return owner && owner !== link.user ? owner : null
 }
 
@@ -75,7 +77,10 @@ function LinkSection({ link, onTurnedOff }: { link: Link; onTurnedOff: () => voi
   const url = token ? drawLink(link.origin, token) : null
   const toggle = (on: boolean): void => {
     void run(async () => {
-      if (on) setToken(await client.turnOnBoardLink(link.remote))
+      if (on) {
+        setToken(await client.turnOnBoardLink(link.remote))
+        markShared(link)
+      }
       else {
         await client.turnOffBoardLink(link.remote)
         setToken(null)
@@ -118,6 +123,57 @@ function LinkSection({ link, onTurnedOff }: { link: Link; onTurnedOff: () => voi
   )
 }
 
+/** Whether the people the board is shared with may duplicate, export and copy it out. Off until the owner allows it. */
+function CopyingSection({ boardId, link }: { boardId: string; link: Link }) {
+  const t = useT()
+  const { busy, failed, run } = useAction()
+  const toggle = (on: boolean): void => {
+    void run(async () => {
+      await clientFor(link.origin).setBoardCopying(link.remote, on)
+      saveLink(boardId, { ...(activeLink(boardId) ?? link), copying: on })
+    })
+  }
+  return (
+    <section>
+      <SwitchField disabled={busy}>
+        <Label>{t('share.copyTitle')}</Label>
+        <Description>{t('share.copyHint')}</Description>
+        <Switch color="blue" checked={link.copying === true} onChange={toggle} />
+      </SwitchField>
+      {failed && <Failed>{t('people.failed')}</Failed>}
+    </section>
+  )
+}
+
+/**
+ * Asked before a shared board of this account is deleted or taken off the server: whether the people it
+ * is shared with lose their copies or keep them.
+ */
+export function SharedDeleteAlert({ title, onClose, onChoose }: { title: string; onClose: () => void; onChoose: (copies: Copies) => void }) {
+  const t = useT()
+  const choose = (copies: Copies) => () => {
+    onClose()
+    onChoose(copies)
+  }
+  return (
+    <Alert open onClose={onClose}>
+      <AlertTitle>{t('share.deleteTitle', { title })}</AlertTitle>
+      <AlertDescription>{t('share.deleteHint')}</AlertDescription>
+      <AlertActions>
+        <Button plain onClick={onClose}>
+          {t('common.cancel')}
+        </Button>
+        <Button outline onClick={choose('keep')}>
+          {t('share.deleteKeep')}
+        </Button>
+        <Button color="red" onClick={choose('remove')}>
+          {t('share.deleteRemove')}
+        </Button>
+      </AlertActions>
+    </Alert>
+  )
+}
+
 /** People let in by username, and guests who came by the link: they see the board and draw on it. */
 function PeopleSection({ link, version }: { link: Link; version: number }) {
   const t = useT()
@@ -138,7 +194,10 @@ function PeopleSection({ link, version }: { link: Link; version: number }) {
     })
   const add = (e: FormEvent): void => {
     e.preventDefault()
-    void change(() => client.addBoardPerson(link.remote, name.trim())).then((ok) => ok && setName(''))
+    void change(async () => {
+      await client.addBoardPerson(link.remote, name.trim())
+      markShared(link)
+    }).then((ok) => ok && setName(''))
   }
 
   return (
@@ -197,6 +256,7 @@ function FolderSection({ link }: { link: Link }) {
     e.preventDefault()
     void run(async () => {
       await clientFor(link.origin).shareBoard(chosen, link.remote)
+      markShared(link)
       await refreshCommunity(link.origin)
     })
   }
@@ -300,6 +360,7 @@ export function ShareBoardDialog({ boardId, title, onClose }: { boardId: string;
             <LinkSection link={link} onTurnedOff={() => setVersion((v) => v + 1)} />
             <PeopleSection link={link} version={version} />
             <FolderSection link={link} />
+            <CopyingSection boardId={boardId} link={link} />
           </>
         ) : (
           <NotOnServer boardId={boardId} onClose={onClose} />

@@ -1,5 +1,6 @@
 import { syncCoordinator } from './sync/coordinator'
 import { useEffect } from 'react'
+import { canCopy, useLinks } from './sync/links'
 import { BoardWorkspace } from '../../board/BoardWorkspace'
 import type { BoardFileActions } from '../../board/ui/Board'
 import { boardLibrary } from './boardLibrary'
@@ -9,6 +10,7 @@ import { JoinDialog } from './ui/JoinDialog'
 import { HomeScreen } from './ui/home/HomeScreen'
 import { MainMenu } from './ui/MainMenu'
 import { SaveSelectionTemplate } from './ui/SaveSelectionTemplate'
+import { DroppedBoards } from './ui/share/DroppedBoards'
 import { ShareButton } from './ui/share/ShareBoard'
 import { TemplatesMenu } from './ui/TemplatesMenu'
 import { AboutSection, UpdateBanner } from './ui/UpdateBanner'
@@ -33,6 +35,11 @@ const settings = {
 
 export function App() {
   const view = useApp((s) => s.view)
+  const boardId = useApp((s) => s.board?.id)
+  const links = useLinks((s) => s.version)
+  useEffect(() => {
+    boardLibrary.editor.copyLock = boardId && !canCopy(boardId) ? boardId : null
+  }, [boardId, links])
   useEffect(() => {
     const stop = syncCoordinator.start()
     void boardLibrary.start()
@@ -53,6 +60,7 @@ export function App() {
     >
       {view === 'board' && <BoardCursors />}
       <UpdateBanner />
+      <DroppedBoards />
       <JoinDialog />
       {view === 'home' && <HomeScreen settings={settings} />}
     </BoardWorkspace>

@@ -528,11 +528,22 @@ export class Editor {
 
   // ---------------------------------------------------------------- clipboard
 
+  /**
+   * Set by the app while the open board may not be copied out (its owner did not allow it): an id for
+   * that board. Items copied from it can be pasted back into it only, and other apps get nothing.
+   */
+  copyLock: string | null = null
+
   /** Handles a DOM copy/cut event. Returns true if it put board items on the clipboard. */
   copyToClipboard(e: ClipboardEvent, cut: boolean): boolean {
     const items = this.selectedItems()
     if (!items.length || !e.clipboardData) return false
     const file = serializeBoard({ items, background: prefsStore.getState().background, camera: this.camera })
+    if (this.copyLock) {
+      e.clipboardData.setData(CLIPBOARD_MIME, JSON.stringify({ ...file, lockedTo: this.copyLock }))
+      if (cut) this.deleteSelection()
+      return true
+    }
     e.clipboardData.setData(CLIPBOARD_MIME, JSON.stringify(file))
     // Only text selected: other apps get the words themselves.
     const onlyText = items.every((i) => i.type === 'text')
@@ -555,7 +566,10 @@ export class Editor {
     }
     if (json) {
       try {
-        const { items } = deserializeBoard(JSON.parse(json) as BoardFile)
+        const parsed = JSON.parse(json) as BoardFile & { lockedTo?: unknown }
+        // From a board that may not be copied out: only back into that board.
+        if (parsed.lockedTo !== undefined && parsed.lockedTo !== this.copyLock) return true
+        const { items } = deserializeBoard(parsed)
         this.placeAtCenter(items)
         return true
       } catch {

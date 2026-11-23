@@ -9,8 +9,8 @@ import { isAccessError, isAuthError } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { EditorDocument, type TitlePort } from './editorDocument'
-import { LibrarySync, publishBoard, serverCopyState, setStatus, statusFor, type SyncStatus } from './librarySync'
-import { activeLink, forgetServerCopy, linkBoard, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
+import { LibrarySync, publishBoard, serverCopyState, setStatus, settleServerCopy, statusFor, type SyncStatus } from './librarySync'
+import { activeLink, linkBoard, linkFor, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
 import { outboxFor } from './outbox'
 import { Presence } from './presence'
 import { webSocketTransport } from './transport'
@@ -161,8 +161,12 @@ class SyncCoordinator {
       onState: state => {
         const status = sessionStatus(state)
         if (status) setStatus(localId, status)
-        // Deleted on the server while open here: the board stays on this device, without sync.
-        if (state.status === 'no-access') void serverCopyState(link).then(state => state === 'gone' && forgetServerCopy(localId), () => undefined)
+        // Deleted on the server or no longer shared while open here: settle what stays on this device.
+        if (state.status === 'no-access') {
+          void serverCopyState(link)
+            .then(found => settleServerCopy(localId, linkFor(localId) ?? link, found))
+            .then(status => status && setStatus(localId, status), () => undefined)
+        }
       },
       onPeers: peers => presence.setPeers(peers),
       onSignal: (peer, data) => presence.receive(peer, data)
