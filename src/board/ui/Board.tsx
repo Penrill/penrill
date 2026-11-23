@@ -47,7 +47,7 @@ import { beginLasso } from '../tools/lasso'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
-import { inkSamples, penInContact, penWidth } from '../tools/penInput'
+import { inkSamples, penInContact, stylusStrategy } from '../tools/penInput'
 import { WheelSource } from '../engine/wheel'
 
 type StraightSlot = 'ruler' | 'setSquare'
@@ -159,6 +159,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     let gesture: Gesture | null = null
     let hover: Hover | null = null
     let spaceDown = false
+    const stylus = stylusStrategy(navigator)
     let penGesture = false
     let lastPenTime = -Infinity
     /** Last press on a text item (for double click / double tap = edit). */
@@ -660,8 +661,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const pointFrom = (e: PointerEvent, pressure: boolean): Point => {
       const p = local(e)
       const w = screenToWorld(editor.camera, p.x, p.y)
-      // Some tablets report 0 on the very first contact sample.
-      const pr = pressure ? penWidth(e) : 0.5
+      const pr = pressure ? stylus.pressure(e) : 0.5
       return [w.x, w.y, pr]
     }
 
@@ -1089,7 +1089,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const ui = readUI()
         const isHl = ui.tool === 'highlighter'
         const slot = isHl ? ui.highlighter : ui.pens[ui.activePen]
-        const pressure = e.pointerType === 'pen' && !isHl
+        const pressure = e.pointerType === 'pen' && !isHl && !slot.dash && prefsStore.getState()[stylus.preference]
         const start = pointFrom(e, pressure)
         gesture = {
           kind: 'ink', id: newId(),
@@ -1102,7 +1102,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             color: slot.color,
             size: slot.size,
             // Dashed / dotted ink is drawn along its centre line, so it has no pressure width.
-            pressure: pressure && !slot.dash,
+            pressure,
             points: [start],
             ...(slot.dash ? { dash: slot.dash } : {}),
             ...(slot.startCap ? { startCap: slot.startCap } : {}),

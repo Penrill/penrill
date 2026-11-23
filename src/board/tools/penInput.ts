@@ -15,7 +15,7 @@ export function inkSamples(e: PointerEvent, downTime: number): PointerEvent[] {
 }
 
 /** A tilted tip lays down a wider mark. Store the resulting width in the existing pressure channel. */
-export function penWidth(e: Pick<PointerEvent, 'pressure' | 'altitudeAngle' | 'tiltX' | 'tiltY'>): number {
+function tabletPressure(e: Pick<PointerEvent, 'pressure' | 'altitudeAngle' | 'tiltX' | 'tiltY'>): number {
   const radians = Math.PI / 180
   const altitude = e.altitudeAngle
   const tilt = Number.isFinite(altitude) && altitude < Math.PI / 2
@@ -23,4 +23,22 @@ export function penWidth(e: Pick<PointerEvent, 'pressure' | 'altitudeAngle' | 't
     : Math.sin(Math.atan(Math.hypot(Math.tan(e.tiltX * radians), Math.tan(e.tiltY * radians))))
   const pressure = Math.max(0.05, e.pressure)
   return pressure + (1 - pressure) * (tilt || 0) * 0.25
+}
+
+/** Pointer Events identify a pen, but do not expose its manufacturer. iPadOS
+ * also serves desktop pages with a Mac platform identifier. */
+export function stylusStrategy(platform: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'>) {
+  const ipad = /iPad/.test(platform.userAgent) ||
+    (platform.platform === 'MacIntel' && platform.maxTouchPoints > 1)
+  return ipad ? pencilStrategy : tabletStrategy
+}
+
+const pencilStrategy = {
+  preference: 'pencilPressure' as const,
+  pressure: (event: Pick<PointerEvent, 'pressure'>) => event.pressure
+}
+
+const tabletStrategy = {
+  preference: 'tabletPressure' as const,
+  pressure: tabletPressure
 }

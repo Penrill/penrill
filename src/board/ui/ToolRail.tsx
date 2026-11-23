@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ComponentProps, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useEditor, useSession } from '../editorContext'
 import { useT, type MessageKey } from '../i18n'
@@ -18,8 +18,42 @@ export const SELECT_MODES: { tool: Tool & ToolbarToolId; shortcut: ShortcutId; l
 
 export const isSelectMode = (tool: Tool): boolean => SELECT_MODES.some((m) => m.tool === tool)
 
+/** Select directly on pen release. Some iPad taps deliver pointerup without a click.
+ * Keep native click activation for the keyboard, mouse and touch. */
+function useToolActivation(select: () => void) {
+  const penDown = useRef<number | null>(null)
+  const handled = useRef(false)
+  return {
+    onPointerDown(e: PointerEvent<HTMLButtonElement>) {
+      handled.current = false
+      penDown.current = e.pointerType === 'pen' && e.button === 0 ? e.pointerId : null
+    },
+    onPointerCancel() {
+      penDown.current = null
+    },
+    onPointerUp(e: PointerEvent<HTMLButtonElement>) {
+      if (penDown.current !== e.pointerId) return
+      penDown.current = null
+      const button = e.currentTarget
+      if (!button.contains(button.ownerDocument.elementFromPoint(e.clientX, e.clientY))) return
+      handled.current = true
+      select()
+    },
+    onClick(e: MouseEvent<HTMLButtonElement>) {
+      if (!handled.current || e.detail === 0) select()
+      handled.current = false
+    }
+  }
+}
+
+function RailTool({ onSelect, ...props }: Omit<ComponentProps<typeof ToolButton>, 'onSelect'> & { onSelect: () => void }) {
+  const activation = useToolActivation(onSelect)
+  return <ToolButton {...props} {...activation} />
+}
+
 /** A pen, the highlighter or the eraser lying in the tray; the one in use slides out towards the board. */
 function TrayItem({ label, shortcut, active, onClick, children }: { label: string; shortcut?: string; active: boolean; onClick: () => void; children: ReactNode }) {
+  const activation = useToolActivation(onClick)
   return (
     <button
       type="button"
@@ -27,7 +61,7 @@ function TrayItem({ label, shortcut, active, onClick, children }: { label: strin
       aria-pressed={active}
       aria-keyshortcuts={shortcut}
       title={shortcut ? `${label} (${shortcut})` : label}
-      onClick={onClick}
+      {...activation}
       className={clsx(
         'group relative flex h-9 w-12 shrink-0 items-center overflow-visible rounded-xl transition-colors',
         active ? 'bg-blue-500/12 dark:bg-blue-500/25' : 'hover:bg-zinc-950/5 dark:hover:bg-white/10'
@@ -87,20 +121,20 @@ export function ToolRail() {
 
   const navigate = [
     mode && (
-      <ToolButton
+      <RailTool
         key="select"
         label={t(mode.label)}
         shortcut={shortcutKey(mode.shortcut)}
         active={selecting}
-        onClick={() => setTool(mode.tool)}
+        onSelect={() => setTool(mode.tool)}
       >
         {mode.icon}
-      </ToolButton>
+      </RailTool>
     ),
     show('pan') && (
-      <ToolButton key="pan" label={t('tool.pan')} active={tool === 'pan'} onClick={() => setTool('pan')}>
+      <RailTool key="pan" label={t('tool.pan')} active={tool === 'pan'} onSelect={() => setTool('pan')}>
         <HandIcon />
-      </ToolButton>
+      </RailTool>
     )
   ].filter(Boolean)
 
@@ -121,9 +155,9 @@ export function ToolRail() {
   ].filter(Boolean)
 
   const present = show('laser') && (
-    <ToolButton key="laser" label={t('toolbar.laser')} shortcut={shortcutKey('laser')} active={tool === 'laser'} onClick={() => setTool('laser')}>
+    <RailTool key="laser" label={t('toolbar.laser')} shortcut={shortcutKey('laser')} active={tool === 'laser'} onSelect={() => setTool('laser')}>
       <LaserIcon />
-    </ToolButton>
+    </RailTool>
   )
 
   const history = [

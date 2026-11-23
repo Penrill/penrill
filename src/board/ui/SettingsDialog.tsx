@@ -172,6 +172,8 @@ function PenAndMouseSettings() {
   const t = useT()
   // Hold-to-snap comes from the shape recognition module; without it there is nothing to set.
   const canSnap = !!useEditor().features.strokeRecognizer
+  const pencilPressure = usePrefs((s) => s.pencilPressure)
+  const tabletPressure = usePrefs((s) => s.tabletPressure)
   const penButtons = usePrefs((s) => s.penButtons)
   const setPenButton = usePrefs((s) => s.setPenButton)
   const wheel = usePrefs((s) => s.wheelMode)
@@ -181,6 +183,14 @@ function PenAndMouseSettings() {
   const seconds = (delay / 1000).toFixed(1)
   return (
     <>
+      <Group title={t('pen.pressure')}>
+        <Row label={t('pen.pencilPressure')}>
+          <Switch aria-label={t('pen.pencilPressure')} color="blue" checked={pencilPressure} onChange={(pencilPressure) => prefsStore.setState({ pencilPressure })} />
+        </Row>
+        <Row label={t('pen.tabletPressure')}>
+          <Switch aria-label={t('pen.tabletPressure')} color="blue" checked={tabletPressure} onChange={(tabletPressure) => prefsStore.setState({ tabletPressure })} />
+        </Row>
+      </Group>
       <Group title={t('pen.title')}>
         {PEN_BUTTONS.map((b) => (
           <Row key={b.key} label={t(b.label)}>

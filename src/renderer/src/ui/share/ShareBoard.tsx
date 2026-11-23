@@ -223,9 +223,23 @@ function PeopleSection({ link, version }: { link: Link; version: number }) {
           ))}
         </div>
       )}
-      <form className="mt-3 flex items-center gap-2" onSubmit={add}>
+      <form autoComplete="off" className="mt-3 flex items-center gap-2" onSubmit={add}>
         <div className="min-w-0 flex-1">
-          <Input required disabled={busy} aria-label={t('share.username')} placeholder={t('share.username')} value={name} onChange={(e) => setName(e.target.value)} />
+          <Input
+            name="board-recipient"
+            aria-label={t('share.recipient')}
+            placeholder={t('share.recipient')}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            data-1p-ignore="true"
+            data-lpignore="true"
+            required
+            disabled={busy}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
         </div>
         <Button type="submit" outline disabled={busy || !name.trim()}>
           <UserPlusIcon />

@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Pen input and board sharing in 0.13.3
+
+- iPad pens, including Apple Pencil, use the pressure reported by the browser. Tilting the pen keeps the same width at the same pressure.
+- In Settings, you can turn pressure sensitivity off independently for iPad pens and for Wacom and other pen tablets.
+- Lifting the pen on a tool in the drawing rail selects it immediately, including when the browser skips the click event.
+- The board sharing dialog asks for the person to invite and disables autocomplete on the recipient field.
+
 ## Pen input in 0.13.2
 
 - **Wacom tablets.** A stroke now filters out old hover positions that could draw a stray line from the centre of the screen.

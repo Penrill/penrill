@@ -122,6 +122,8 @@ export const PEN_SIZES = [1.5, 3, 5, 8, 12]
 export const HIGHLIGHTER_SIZES = [12, 18, 26, 36]
 
 export interface Prefs {
+  pencilPressure: boolean
+  tabletPressure: boolean
   penButtons: PenButtons
   setPenButton: (which: keyof PenButtons, action: PenAction) => void
   /** Colour and font size of new text. */
@@ -169,6 +171,8 @@ export const prefsStore = createStore<Prefs>()(
     (set) => ({
       shapeBases: {},
       selectRadius: 24,
+      pencilPressure: true,
+      tabletPressure: true,
       penButtons: DEFAULT_PEN_BUTTONS,
       setPenButton: (which, action) => set((s) => ({ penButtons: { ...s.penButtons, [which]: action } })),
       textStyle: { color: '#1e1e1e', size: 24 },
@@ -210,6 +214,8 @@ export const prefsStore = createStore<Prefs>()(
         return {
           ...current,
           ...p,
+          pencilPressure: p.pencilPressure !== false,
+          tabletPressure: p.tabletPressure !== false,
           penButtons: cleanPenButtons(p.penButtons),
           // White was removed from the palette: pens saved with it go back to black.
           ...(Array.isArray(p.pens) ? { pens: p.pens.map((pen) => (pen?.color?.toLowerCase() === '#ffffff' ? { ...pen, color: '#1e1e1e' } : pen)) } : {}),
@@ -247,6 +253,8 @@ export const prefsStore = createStore<Prefs>()(
         graphPresets: s.graphPresets,
         shapeBases: s.shapeBases,
         selectRadius: s.selectRadius,
+        pencilPressure: s.pencilPressure,
+        tabletPressure: s.tabletPressure,
         penButtons: s.penButtons,
         textStyle: s.textStyle,
         formulaStyle: s.formulaStyle,
