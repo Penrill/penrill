@@ -8,6 +8,8 @@
   and your boards follow you to every computer and to the web app. Share a board with people by username
   or with a draw link that needs no account.
 - **The web app moved to [app.penrill.com](https://app.penrill.com/).** There you can also open Penrill Cloud.
+- **Smoother cursors and drawing of the people on a shared board.** Their cursors glide instead of jumping,
+  and their lines grow evenly as they draw.
 
 ## Also in 0.12: Inkboard is now Penrill
 
