@@ -2,6 +2,12 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Finger drawing on iPad in 0.13.4
+
+- Draw with a finger as soon as you open a board. Use two fingers to pan and zoom.
+- After your first Pencil contact, choose whether one finger draws or moves the board. The recommended Pencil-only mode keeps one finger free for panning.
+- Penrill remembers your choice in this browser. You can change it in pen settings.
+
 ## Pen input and board sharing in 0.13.3
 
 - iPad pens, including Apple Pencil, use the pressure reported by the browser. Tilting the pen keeps the same width at the same pressure.

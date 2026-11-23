@@ -14,6 +14,7 @@ import { ShortcutsDialog } from './ui/ShortcutsDialog'
 import { TextEditor } from './ui/TextEditor'
 import { InsertBar } from './ui/InsertBar'
 import { ToolOptions } from './ui/ToolOptions'
+import { PencilInputChoice } from './ui/PencilInputChoice'
 import { ToolRail } from './ui/ToolRail'
 import { InstrumentTip } from './ui/InstrumentTip'
 import { ZoomControls } from './ui/ZoomControls'
@@ -65,6 +66,7 @@ export function BoardWorkspace({
     <EditorProvider editor={editor}>
     <div className="app">
       <div className={covered ? 'invisible contents' : 'contents'} inert={covered}>
+      <PencilInputChoice>
       <Board fileActions={fileActions} />
       <TextEditor />
       <FormulaEditor />
@@ -110,6 +112,7 @@ export function BoardWorkspace({
       <NoticeArea />
       <InstrumentTip />
       <ShortcutsDialog fileActions={!!fileActions} />
+      </PencilInputChoice>
       </div>
       {children}
     </div>

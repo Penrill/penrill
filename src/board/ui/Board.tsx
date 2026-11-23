@@ -40,6 +40,7 @@ import {
   type StraightState
 } from '../engine/straightedge'
 import { textBBox } from '../engine/text'
+import { allowsFingerInk } from '../modules/iPadInput'
 import { beginBrushSelect } from '../tools/brushSelect'
 import { beginErase } from '../tools/eraser'
 import { beginLaser, LASER_FADE_MS, LaserTrail } from '../tools/laser'
@@ -47,7 +48,7 @@ import { beginLasso } from '../tools/lasso'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
-import { inkSamples, penInContact, stylusStrategy } from '../tools/penInput'
+import { inkSamples, isIPad, penInContact, stylusStrategy } from '../tools/penInput'
 import { WheelSource } from '../engine/wheel'
 
 type StraightSlot = 'ruler' | 'setSquare'
@@ -160,6 +161,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     let hover: Hover | null = null
     let spaceDown = false
     const stylus = stylusStrategy(navigator)
+    const ipad = isIPad(navigator)
+    let fingerInk: number | null = null
     let penGesture = false
     let lastPenTime = -Infinity
     /** Last press on a text item (for double click / double tap = edit). */
@@ -696,7 +699,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       invalidate(false)
     }
 
-    const finishGesture = (): void => {
+    const finishGesture = (discardInk = false): void => {
       const g = gesture
       gesture = null
       penGesture = false
@@ -705,6 +708,11 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       angleLabel = null
       if (!g) return
       let committedInk = false
+      if (discardInk && g.kind === 'ink') {
+        editor.shareInk?.(g.id, g.live, true, false)
+        invalidate(false)
+        return
+      }
       if ('tool' in g) {
         g.tool.end()
       } else if (g.kind === 'ink' && g.held?.current.spec) {
@@ -777,6 +785,11 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     }
 
     const onTouchDown = (e: PointerEvent): void => {
+      if (fingerInk !== null) {
+        // A second contact turns provisional finger ink into a two-finger gesture.
+        fingerInk = null
+        finishGesture(true)
+      }
       // A finger on the board while a snapped shape is held makes it perfect (as in Procreate).
       if (gesture?.kind === 'ink' && gesture.held) {
         held2.add(e.pointerId)
@@ -795,6 +808,12 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const rh = touches.size === 1 && !ch && !ph && !sqh ? straightHitAt('ruler', p.x, p.y) : null
       const shSlot: StraightSlot | null = sqh ? 'setSquare' : rh ? 'ruler' : null
       const sh = sqh ?? rh
+      if (allowsFingerInk(ipad, prefsStore.getState().iPadFingerMode) && touches.size === 1 && !gesture &&
+          !ch && !ph && !sh && effectiveFor(e) === 'ink') {
+        fingerInk = e.pointerId
+        beginPointer(e)
+        return
+      }
       if (ph === 'settings') {
         togglePanel()
       } else if (ch === 'needle' || ch === 'body') {
@@ -866,10 +885,15 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     // ---------- pointer events ----------
     const onPointerDown = (e: PointerEvent): void => {
       if (e.pointerType === 'touch') return onTouchDown(e)
+      beginPointer(e)
+    }
+
+    const beginPointer = (e: PointerEvent): void => {
       if (e.pointerType === 'pen' && touches.size) {
         // A palm can land before the Pencil, especially on iPads without hover.
         touches.clear()
-        finishGesture()
+        finishGesture(fingerInk !== null)
+        fingerInk = null
       }
       // A new press can arrive after a missed release, even with a new pen ID.
       if (gesture && 'pointerId' in gesture && (gesture.pointerId === e.pointerId || (penGesture && e.pointerType === 'pen'))) {
@@ -1143,7 +1167,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     }
 
     const onPointerMove = (e: PointerEvent): void => {
-      if (e.pointerType === 'touch') return onTouchMove(e)
+      if (e.pointerType === 'touch') {
+        if (e.pointerId !== fingerInk) return onTouchMove(e)
+        touches.set(e.pointerId, local(e))
+      }
       if (e.pointerType === 'pen') lastPenTime = performance.now()
       const p = local(e)
       hover = { sx: p.x, sy: p.y, pointerType: e.pointerType, buttons: e.buttons }
@@ -1385,7 +1412,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     }
 
     const onPointerUp = (e: PointerEvent): void => {
-      if (e.pointerType === 'touch') return onTouchUp(e)
+      if (e.pointerType === 'touch') {
+        if (e.pointerId === fingerInk) {
+          fingerInk = null
+          finishGesture(e.type !== 'pointerup')
+        }
+        return onTouchUp(e)
+      }
       const g = gesture
       if (g && 'pointerId' in g && g.pointerId === e.pointerId) finishGesture()
       if (e.pointerType === 'pen') lastPenTime = performance.now()
@@ -1505,7 +1538,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
 
     // A Space released while another window had focus never sends keyup: don't stay stuck in pan mode.
     const onBlur = (): void => {
-      if (gesture && gesture.kind !== 'pinch') finishGesture()
+      finishGesture(fingerInk !== null)
+      fingerInk = null
+      touches.clear()
+      held2.clear()
       if (!spaceDown) return
       spaceDown = false
       updateCssCursor()

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { allowsFingerInk, shouldOfferPencilChoice } from "../src/board/modules/iPadInput.ts"
 import { inkSamples, penInContact, stylusStrategy } from '../src/board/tools/penInput.ts'
 
 function pen(timeStamp: number, pressure: number, buttons: number): PointerEvent {
@@ -46,4 +47,20 @@ test('iPad pen input preserves the full measured pressure range regardless of ti
     }
   }
   assert.equal(stylusStrategy({ platform: 'MacIntel', userAgent: 'Macintosh', maxTouchPoints: 0 }).preference, 'tabletPressure')
+})
+
+test('finger ink is available on a new iPad and only pen contact offers the choice', () => {
+  assert.ok(allowsFingerInk(true, null))
+  assert.ok(shouldOfferPencilChoice(true, null, 'pen'))
+  for (const pointer of ['mouse', 'touch']) assert.equal(shouldOfferPencilChoice(true, null, pointer), false)
+  assert.equal(shouldOfferPencilChoice(false, null, 'pen'), false)
+  assert.equal(allowsFingerInk(false, null), false)
+})
+
+test('both saved iPad modes suppress the prompt and route finger ink independently of other platforms', () => {
+  for (const mode of ['draw', 'pan'] as const) {
+    assert.equal(shouldOfferPencilChoice(true, mode, 'pen'), false)
+    assert.equal(allowsFingerInk(true, mode), mode === 'draw')
+    assert.equal(allowsFingerInk(false, mode), false)
+  }
 })

@@ -27,10 +27,13 @@ function tabletPressure(e: Pick<PointerEvent, 'pressure' | 'altitudeAngle' | 'ti
 
 /** Pointer Events identify a pen, but do not expose its manufacturer. iPadOS
  * also serves desktop pages with a Mac platform identifier. */
-export function stylusStrategy(platform: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'>) {
-  const ipad = /iPad/.test(platform.userAgent) ||
+export function isIPad(platform: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'>) {
+  return /iPad/.test(platform.userAgent) ||
     (platform.platform === 'MacIntel' && platform.maxTouchPoints > 1)
-  return ipad ? pencilStrategy : tabletStrategy
+}
+
+export function stylusStrategy(platform: Pick<Navigator, 'userAgent' | 'platform' | 'maxTouchPoints'>) {
+  return isIPad(platform) ? pencilStrategy : tabletStrategy
 }
 
 const pencilStrategy = {

@@ -14,6 +14,7 @@ import { useFeatures } from '../features'
 import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
 import { type PenAction, type PenButtons, type ThemePref, type WheelMode, SNAP_DELAY, prefsStore, usePrefs } from '../store'
 import { DEFAULT_TOOLBAR, isToolShown, withToolShown, type ToolbarToolId } from '../toolbarLayout'
+import { isIPad } from '../tools/penInput'
 import { Segmented } from './chrome'
 
 /** One setting: its name (and a line about it) on the left, the control on the right. */
@@ -172,6 +173,7 @@ function PenAndMouseSettings() {
   const t = useT()
   // Hold-to-snap comes from the shape recognition module; without it there is nothing to set.
   const canSnap = !!useEditor().features.strokeRecognizer
+  const fingerMode = usePrefs(s => s.iPadFingerMode)
   const pencilPressure = usePrefs((s) => s.pencilPressure)
   const tabletPressure = usePrefs((s) => s.tabletPressure)
   const penButtons = usePrefs((s) => s.penButtons)
@@ -183,6 +185,14 @@ function PenAndMouseSettings() {
   const seconds = (delay / 1000).toFixed(1)
   return (
     <>
+      {isIPad(navigator) && (
+        <Group title="iPad">
+          <Row label={t('pen.allowFinger')} description={t('pen.fingerSettingHint')}>
+            <Switch aria-label={t('pen.allowFinger')} color="blue" checked={fingerMode !== 'pan'}
+              onChange={draw => prefsStore.setState({ iPadFingerMode: draw ? 'draw' : 'pan' })} />
+          </Row>
+        </Group>
+      )}
       <Group title={t('pen.pressure')}>
         <Row label={t('pen.pencilPressure')}>
           <Switch aria-label={t('pen.pencilPressure')} color="blue" checked={pencilPressure} onChange={(pencilPressure) => prefsStore.setState({ pencilPressure })} />

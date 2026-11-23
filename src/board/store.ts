@@ -1,3 +1,4 @@
+import type { IPadFingerMode } from './modules/iPadInput'
 /**
  * User preferences: pens, colours, language, theme, toolbar layout and the like. They are shared by
  * every open board and survive restarts. What belongs to one open board (tool, selection, camera,
@@ -122,6 +123,7 @@ export const PEN_SIZES = [1.5, 3, 5, 8, 12]
 export const HIGHLIGHTER_SIZES = [12, 18, 26, 36]
 
 export interface Prefs {
+  iPadFingerMode: IPadFingerMode
   pencilPressure: boolean
   tabletPressure: boolean
   penButtons: PenButtons
@@ -171,6 +173,7 @@ export const prefsStore = createStore<Prefs>()(
     (set) => ({
       shapeBases: {},
       selectRadius: 24,
+      iPadFingerMode: null,
       pencilPressure: true,
       tabletPressure: true,
       penButtons: DEFAULT_PEN_BUTTONS,
@@ -214,6 +217,7 @@ export const prefsStore = createStore<Prefs>()(
         return {
           ...current,
           ...p,
+          iPadFingerMode: p.iPadFingerMode === 'draw' || p.iPadFingerMode === 'pan' ? p.iPadFingerMode : null,
           pencilPressure: p.pencilPressure !== false,
           tabletPressure: p.tabletPressure !== false,
           penButtons: cleanPenButtons(p.penButtons),
@@ -253,6 +257,7 @@ export const prefsStore = createStore<Prefs>()(
         graphPresets: s.graphPresets,
         shapeBases: s.shapeBases,
         selectRadius: s.selectRadius,
+        iPadFingerMode: s.iPadFingerMode,
         pencilPressure: s.pencilPressure,
         tabletPressure: s.tabletPressure,
         penButtons: s.penButtons,
