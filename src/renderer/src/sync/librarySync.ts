@@ -8,13 +8,14 @@ import { renderThumbnail } from '../../../board/engine/export'
 import { decodeBoard, encodeBoard } from '../../../board/engine/serialize'
 import { isBackgroundKind } from '../../../board/engine/surface'
 import type { BoardEntry } from '../../../shared/library'
+import { useApp } from '../appState'
 import { boardLibrary } from '../boardLibrary'
 import { platform } from '../platform'
 import { account } from './accounts'
-import { ApiError, isAccessError, isAuthError, isPermanent, type BoardContent, type Community, type RemoteBoard } from './api'
+import { ApiError, isAccessError, isAuthError, isPermanent, REMOVED, type BoardContent, type Community, type RemoteBoard } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
-import { allLinks, deletionDone, forgetServerCopy, linkedBoards, pendingDeletions, removeFromServer, saveLink, scopeOf, type Link } from './links'
+import { allLinks, copyOutcome, deletionDone, forgetServerCopy, linkedBoards, linkFor, pendingDeletions, removeFromServer, removeLink, saveLink, scopeOf, type CopyState, type Link } from './links'
 import { clearOutbox, outboxFor } from './outbox'
 import { refreshTemplates } from './templates'
 import { fromWire, toWire } from './wire'
@@ -64,16 +65,63 @@ export async function refreshCommunity(origin: string): Promise<void> {
 
 /**
  * Where a board missing from the server's list stands: just made (the list is older), deleted by its
- * owner, or no longer shared with this account. Network trouble throws.
+ * owner (`removed` when the owner took it off everyone's devices), or no longer shared with this
+ * account. Network trouble throws.
  */
-export async function serverCopyState(link: Link): Promise<'here' | 'gone' | 'denied'> {
+export async function serverCopyState(link: Link): Promise<CopyState> {
   try {
     await clientFor(link.origin).snapshot(link.remote)
     return 'here'
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return 'gone'
-    if (isAccessError(error) || isAuthError(error)) return 'denied'
+    if (error instanceof ApiError && error.status === 404) return error.reason === REMOVED ? 'removed' : 'gone'
+    if (isAuthError(error)) return 'signed-out'
+    if (isAccessError(error)) return 'denied'
     throw error
+  }
+}
+
+/** A board someone else owns that just left this device, for the notice that says so. */
+export interface DroppedBoard {
+  key: string
+  title: string
+  owner: string
+  why: 'denied' | 'removed'
+}
+
+export const useDroppedBoards = create<{ dropped: DroppedBoard[] }>(() => ({ dropped: [] }))
+
+/**
+ * Acts on what a check of the server copy found. A board someone else owns leaves this device when its
+ * owner stopped sharing it (`denied`) or deleted it for everyone (`removed`); a board deleted with
+ * copies kept, and this account's own boards, stay here without sync. Returns the status to show.
+ */
+export async function settleServerCopy(localId: string, link: Link, state: CopyState): Promise<SyncStatus | null> {
+  switch (copyOutcome(link, state)) {
+    case 'keep': return null
+    case 'drop':
+      await dropSharedBoard(localId, link, state === 'removed' ? 'removed' : 'denied')
+      return null
+    case 'forget':
+      forgetServerCopy(localId)
+      return 'synced'
+    case 'denied': return 'denied'
+  }
+}
+
+/** Takes a board someone else owns off this device for good: no trash, no sync, no outbox. */
+async function dropSharedBoard(localId: string, link: Link, why: 'denied' | 'removed'): Promise<void> {
+  if (!linkFor(localId)) return
+  const entry = (await platform.library.list()).boards.find(board => board.id === localId)
+  removeLink(localId)
+  await clearOutbox(scopeOf(link)).catch(() => undefined)
+  if (entry) {
+    if (useApp.getState().board?.id === localId) await boardLibrary.goHome()
+    if (!entry.deletedAt) await boardLibrary.deleteBoard(localId)
+    await platform.library.purge(localId)
+    await boardLibrary.refreshLibrary()
+    useDroppedBoards.setState(({ dropped }) => ({
+      dropped: [...dropped, { key: `${localId}:${Date.now()}`, title: entry.title, owner: link.owner ?? '', why }]
+    }))
   }
 }
 
@@ -87,10 +135,19 @@ export async function openRemote(origin: string, row: RemoteBoard): Promise<void
     }
     const { snapshot, items, background } = await remoteBoard(origin, row.id)
     const entry = await platform.library.create(snapshot.title, await encodeBoard({ items, background, camera: DEFAULT_CAMERA }))
-    saveLink(entry.id, { origin, user, remote: row.id, seq: snapshot.seq, published: true })
+    saveLink(entry.id, { origin, user, remote: row.id, seq: snapshot.seq, published: true, ...sharing(row) })
     return entry.id
   })
   if (!await boardLibrary.openBoard(localId)) throw new Error('Could not open the board')
+}
+
+/** Who owns a listed board and whether this account may copy it, as the link keeps it. */
+function sharing(row: RemoteBoard): Pick<Link, 'owner' | 'copying'> {
+  return {
+    owner: row.owner || undefined,
+    // Servers before 0.5 cannot keep a board from being copied, so their boards can be.
+    copying: row.copying ?? true
+  }
 }
 
 export class LibrarySync {
@@ -158,7 +215,7 @@ export class LibrarySync {
     for (const [localId, link] of pendingDeletions()) {
       if (account(link.origin)?.name !== link.user) continue
       try {
-        if (link.published) await clientFor(link.origin).deleteBoard(link.remote)
+        if (link.published) await clientFor(link.origin).deleteBoard(link.remote, link.copies)
       } catch (error) {
         // Not this account's board (403) or already gone (404): nothing left to delete.
         if (!isAccessError(error)) {
@@ -187,7 +244,16 @@ export class LibrarySync {
       await this.community(origin)
     }
     const seqs = new Map(rows.map(row => [row.id, row.seq]))
+    const listed = new Map(rows.map(row => [row.id, row]))
     for (const [localId, link] of boards) {
+      const row = listed.get(link.remote)
+      if (!row) continue
+      const { owner, copying } = sharing(row)
+      if (owner !== link.owner || copying !== link.copying) saveLink(localId, { ...link, owner, copying, shared: row.shared })
+      else if (row.shared !== link.shared) saveLink(localId, { ...link, shared: row.shared }, true)
+    }
+    for (const [localId, staleLink] of boards) {
+      const link = linkFor(localId) ?? staleLink
       if (this.isLive(localId)) continue
       try {
         setStatus(localId, await this.syncBoard(localId, link, entries.get(localId)!, seqs))
@@ -198,7 +264,7 @@ export class LibrarySync {
     }
   }
 
-  private async syncBoard(localId: string, link: Link, entry: BoardEntry, seqs: Map<string, number>): Promise<'synced' | 'denied'> {
+  private async syncBoard(localId: string, link: Link, entry: BoardEntry, seqs: Map<string, number>): Promise<SyncStatus> {
     const client = clientFor(link.origin)
     const codec = assetCodec(client, link.remote)
     if (!link.published) {
@@ -212,6 +278,10 @@ export class LibrarySync {
         await client.submit(link.remote, await codec.encode(change))
         await outbox.confirm(change.id)
       } catch (error) {
+        if (isAccessError(error)) {
+          const state = await serverCopyState(link)
+          if (state !== 'here') return await settleServerCopy(localId, link, state) ?? 'synced'
+        }
         if (!(error instanceof PermanentError) && (!isPermanent(error) || isAuthError(error) || isAccessError(error))) throw error
         this.log.warn('Dropped a change the server can never accept', { board: link.remote, change: change.id, reason: String(error) })
         await outbox.remove(change.id)
@@ -219,12 +289,9 @@ export class LibrarySync {
     }
     const seq = seqs.get(link.remote)
     if (seq === undefined && link.seq !== null && link.published) {
-      const state = await serverCopyState(link)
-      if (state === 'gone') {
-        forgetServerCopy(localId)
-        return 'synced'
-      }
-      if (state === 'denied') return 'denied'
+      const status = await settleServerCopy(localId, link, await serverCopyState(link))
+      if (status) return status
+      if (!linkFor(localId)) return 'synced'
     } else if (seq !== link.seq) await this.pull(localId, link, entry)
     if (!this.isLive(localId)) await outbox.prune()
     return 'synced'

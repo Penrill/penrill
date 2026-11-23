@@ -25,7 +25,17 @@ export interface RemoteBoard {
   updated: string
   /** Who made it. Empty for boards from before accounts, missing on servers before 0.3. */
   owner?: string
+  /** Whether this account may duplicate, export or copy it out. Missing on servers before 0.5. */
+  copying?: boolean
+  /** For its owner: someone else can open it. Missing on servers before 0.5. */
+  shared?: boolean
 }
+
+/** What happens to the copies of the people a board was shared with when its owner deletes it. */
+export type Copies = 'keep' | 'remove'
+
+/** The 404 reason of a board its owner deleted and took off everyone's devices. */
+export const REMOVED = 'removed'
 
 export interface Community {
   folders: { id: string; name: string; owner: string }[]
@@ -168,9 +178,17 @@ export class PenrillClient {
     }
   }
 
-  /** Removes one of this account's boards from the server; devices still syncing it find it gone. */
-  async deleteBoard(id: string): Promise<void> {
-    await this.call({ method: 'DELETE', path: `/api/boards/${id}` })
+  /**
+   * Removes one of this account's boards from the server; devices still syncing it find it gone. With
+   * `remove` the people it was shared with lose their copies too, otherwise they keep them.
+   */
+  async deleteBoard(id: string, copies: Copies = 'keep'): Promise<void> {
+    await this.call({ method: 'DELETE', path: `/api/boards/${id}`, query: copies === 'remove' ? { copies } : undefined })
+  }
+
+  /** Lets the people a board is shared with duplicate, export and copy it out, or stops them. */
+  async setBoardCopying(id: string, allowed: boolean): Promise<void> {
+    await this.call({ method: 'PUT', path: `/api/boards/${id}/copying`, ...jsonBody({ allowed }) })
   }
 
   async submit(id: string, change: Change): Promise<number> {

@@ -34,9 +34,9 @@ import { account } from '../../sync/accounts'
 import type { RemoteBoard } from '../../sync/api'
 import { syncCoordinator } from '../../sync/coordinator'
 import { openRemote, remoteBoard, useRemoteBoards, useSyncStatus } from '../../sync/librarySync'
-import { activeLink, allLinks, forgetServerCopy, hiddenRemotes, hideRemote, linkBoard, linkFor, removeFromServer, stopSyncing, useLinks } from '../../sync/links'
+import { activeLink, allLinks, canCopy, forgetServerCopy, hiddenRemotes, hideRemote, linkBoard, linkFor, removeFromServer, saveLink, stopSyncing, useLinks } from '../../sync/links'
 import { BoardTagsDialog, ConfirmAlert, RenameDialog } from './dialogs'
-import { canShareBoard, ShareBoardDialog, useOwner } from '../share/ShareBoard'
+import { canShareBoard, ShareBoardDialog, SharedDeleteAlert, useOwner } from '../share/ShareBoard'
 import { Card, CardBadges, CardGrid, CardMeta, CardTitle, EmptyState, PageHeader, Picture, Section, TagDot, tagBadgeColor, useImageUrl } from './parts'
 
 const lib = platform.library
@@ -79,7 +79,7 @@ function CardMenu({ children }: { children: ReactNode }) {
 function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
   const t = useT()
   const lang = usePrefs((s) => s.lang)
-  const [dialog, setDialog] = useState<'rename' | 'tags' | 'purge' | 'share' | null>(null)
+  const [dialog, setDialog] = useState<'rename' | 'tags' | 'purge' | 'share' | 'deleteShared' | 'stopShared' | null>(null)
   const status = useSyncStatus((s) => s.states[entry.id])
   useLinks((s) => s.version)
   const link = activeLink(entry.id)
@@ -91,6 +91,19 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
   const open = (): void => void boardLibrary.openBoard(entry.id)
   const folder = entry.filePath?.split(/[\\/]/).slice(-2, -1)[0]
   const close = (): void => setDialog(null)
+  const copyable = canCopy(entry.id)
+  // A board of this account that others can open: deleting it or taking it off the server first asks about their copies.
+  const sharedByMe = !!link && !owner && !!link.shared
+  const remove = (): void => void boardLibrary.deleteBoard(entry.id).then(refresh)
+  const stop = (): void => {
+    stopSyncing(entry.id)
+    void syncCoordinator.refresh().then(refresh)
+  }
+  const choose = (then: () => void) => (copies: 'keep' | 'remove'): void => {
+    const current = linkFor(entry.id)
+    if (current) saveLink(entry.id, { ...current, copies }, true)
+    then()
+  }
 
   const menu = deleted ? (
     <CardMenu>
@@ -125,10 +138,12 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
       </DropdownItem>
       {!entry.missing && (
         <>
-          <DropdownItem onClick={run(() => lib.duplicate(entry.id))}>
-            <DocumentDuplicateIcon />
-            <DropdownLabel>{t('card.duplicate')}</DropdownLabel>
-          </DropdownItem>
+          {copyable && (
+            <DropdownItem onClick={run(() => lib.duplicate(entry.id))}>
+              <DocumentDuplicateIcon />
+              <DropdownLabel>{t('card.duplicate')}</DropdownLabel>
+            </DropdownItem>
+          )}
           {!link && account(destination.origin) && (
             <DropdownItem
               onClick={run(async () => {
@@ -146,20 +161,19 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
               <DropdownLabel>{t('folders.shareMenu')}</DropdownLabel>
             </DropdownItem>
           )}
-          {link && (
-            <DropdownItem title={t('sync.stopBoardHint')} onClick={run(async () => {
-                stopSyncing(entry.id)
-                await syncCoordinator.refresh()
-              })}>
+          {link && copyable && (
+            <DropdownItem title={t('sync.stopBoardHint')} onClick={() => (sharedByMe ? setDialog('stopShared') : stop())}>
               <CloudIcon />
               <DropdownLabel>{t('sync.stopBoard')}</DropdownLabel>
             </DropdownItem>
           )}
-          <DropdownItem onClick={run(() => boardLibrary.saveAsFile(entry.id))}>
-            <ArrowUpTrayIcon />
-            <DropdownLabel>{t('card.saveAsFile')}</DropdownLabel>
-          </DropdownItem>
-          {entry.kind === 'file' && platform.capabilities.showInFolder && (
+          {copyable && (
+            <DropdownItem onClick={run(() => boardLibrary.saveAsFile(entry.id))}>
+              <ArrowUpTrayIcon />
+              <DropdownLabel>{t('card.saveAsFile')}</DropdownLabel>
+            </DropdownItem>
+          )}
+          {copyable && entry.kind === 'file' && platform.capabilities.showInFolder && (
             <DropdownItem onClick={run(() => lib.showInFolder(entry.id))}>
               <FolderOpenIcon />
               <DropdownLabel>{t('card.showInFolder')}</DropdownLabel>
@@ -168,7 +182,7 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
         </>
       )}
       <DropdownDivider />
-      <DropdownItem title={entry.kind === 'file' ? t('card.removeFromListHint') : undefined} onClick={run(() => boardLibrary.deleteBoard(entry.id))}>
+      <DropdownItem title={entry.kind === 'file' ? t('card.removeFromListHint') : undefined} onClick={() => (sharedByMe ? setDialog('deleteShared') : remove())}>
         <TrashIcon />
         <DropdownLabel>{t(entry.kind === 'file' ? 'card.removeFromList' : 'card.delete')}</DropdownLabel>
       </DropdownItem>
@@ -202,7 +216,7 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
               {status === 'denied' || status === 'offline' ? t(`storage.${status}`) : t('sync.badge')}
             </Badge>
           )}
-          {link && status === 'denied' && (
+          {link && status === 'denied' && copyable && (
             <Button plain className="-my-1 text-xs!" title={t('storage.deniedHelp')} onClick={run(async () => {
               forgetServerCopy(entry.id)
               await syncCoordinator.refresh()
@@ -230,6 +244,8 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
       />
       {dialog === 'tags' && <BoardTagsDialog open entry={entry} tags={tags} onClose={close} />}
       {dialog === 'share' && <ShareBoardDialog boardId={entry.id} title={entry.title} onClose={close} />}
+      {dialog === 'deleteShared' && <SharedDeleteAlert title={entry.title} onClose={close} onChoose={choose(remove)} />}
+      {dialog === 'stopShared' && <SharedDeleteAlert title={entry.title} onClose={close} onChoose={choose(stop)} />}
       <ConfirmAlert
         open={dialog === 'purge'}
         message={t('card.confirmDeleteForever', { title: entry.title })}

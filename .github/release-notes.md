@@ -8,6 +8,11 @@
   and your boards follow you to every computer and to the web app. Share a board with people by username
   or with a draw link that needs no account.
 - **The web app moved to [app.penrill.com](https://app.penrill.com/).** There you can also open Penrill Cloud.
+- **You decide whether a shared board can be copied.** In *Share* turn on *Allow copying and export* to let
+  people duplicate it, save it as a file, export it or copy things out of it. It is off for every board until you
+  turn it on.
+- **Stopping sharing takes the board away.** When you take someone off a board, or turn its link off, the board
+  leaves their devices. When you delete a shared board, Penrill asks whether they keep a copy.
 - **Smoother cursors and drawing of the people on a shared board.** Their cursors glide instead of jumping,
   and their lines grow evenly as they draw.
 

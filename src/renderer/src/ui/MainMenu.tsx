@@ -2,7 +2,7 @@ import {
   CloudIcon, CloudArrowUpIcon, ComputerDesktopIcon, SignalSlashIcon,
   ExclamationTriangleIcon, ArrowPathIcon
 } from '@heroicons/react/24/outline'
-import { activeLink, useLinks } from '../sync/links'
+import { activeLink, canCopy, useLinks } from '../sync/links'
 import { useSyncStatus } from '../sync/librarySync'
 import * as Headless from '@headlessui/react'
 import { Dropdown, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownShortcut } from '@penrill/ui/dropdown'
@@ -106,6 +106,8 @@ export function MainMenu() {
   const editor = useEditor()
   const board = useApp((s) => s.board)
   const hasSelection = useSession((s) => s.selectedIds.length > 0)
+  useLinks((s) => s.version)
+  const copyable = canCopy(board?.id)
   const appVersion = useApp((s) => s.appVersion)
   const keys = (display: string): string[] => display.split('+')
   return (
@@ -130,22 +132,26 @@ export function MainMenu() {
             <DropdownLabel>{t('menu.openFile')}</DropdownLabel>
             <DropdownShortcut keys={keys('Ctrl+O')} />
           </DropdownItem>
-          <DropdownDivider />
-          <DropdownItem onClick={() => void boardLibrary.saveAsFile()}>
-            <DropdownLabel>{t('menu.saveAsFile')}</DropdownLabel>
-            <DropdownShortcut keys={keys('Ctrl+Shift+S')} />
-          </DropdownItem>
-          {board?.kind === 'file' && platform.capabilities.showInFolder && (
-            <DropdownItem onClick={() => void platform.library.showInFolder(board.id)}>
-              <DropdownLabel>{t('menu.showInFolder')}</DropdownLabel>
-            </DropdownItem>
+          {copyable && (
+            <>
+              <DropdownDivider />
+              <DropdownItem onClick={() => void boardLibrary.saveAsFile()}>
+                <DropdownLabel>{t('menu.saveAsFile')}</DropdownLabel>
+                <DropdownShortcut keys={keys('Ctrl+Shift+S')} />
+              </DropdownItem>
+              {board?.kind === 'file' && platform.capabilities.showInFolder && (
+                <DropdownItem onClick={() => void platform.library.showInFolder(board.id)}>
+                  <DropdownLabel>{t('menu.showInFolder')}</DropdownLabel>
+                </DropdownItem>
+              )}
+              <DropdownItem onClick={() => void boardLibrary.exportBoard('png')}>
+                <DropdownLabel>{t(hasSelection ? 'menu.exportSelPng' : 'menu.exportPng')}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => void boardLibrary.exportBoard('pdf')}>
+                <DropdownLabel>{t(hasSelection ? 'menu.exportSelPdf' : 'menu.exportPdf')}</DropdownLabel>
+              </DropdownItem>
+            </>
           )}
-          <DropdownItem onClick={() => void boardLibrary.exportBoard('png')}>
-            <DropdownLabel>{t(hasSelection ? 'menu.exportSelPng' : 'menu.exportPng')}</DropdownLabel>
-          </DropdownItem>
-          <DropdownItem onClick={() => void boardLibrary.exportBoard('pdf')}>
-            <DropdownLabel>{t(hasSelection ? 'menu.exportSelPdf' : 'menu.exportPdf')}</DropdownLabel>
-          </DropdownItem>
           <DropdownDivider />
           <DropdownItem onClick={() => editor.session.setState({ shortcutsOpen: true })}>
             <DropdownLabel>{t('shortcuts.title')}</DropdownLabel>

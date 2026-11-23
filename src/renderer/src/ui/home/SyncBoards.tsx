@@ -12,7 +12,8 @@ import { boardLibrary } from '../../boardLibrary'
 import { cloudOrigin } from '../../storagePreference'
 import { syncCoordinator } from '../../sync/coordinator'
 import { useSyncStatus } from '../../sync/librarySync'
-import { activeLink, linkBoard, setSyncsNewBoards, stopSyncing, syncsNewBoards, useLinks } from '../../sync/links'
+import { activeLink, canCopy, linkBoard, linkFor, saveLink, setSyncsNewBoards, sharedWithMe, stopSyncing, syncsNewBoards, useLinks } from '../../sync/links'
+import { SharedDeleteAlert } from '../share/ShareBoard'
 import { useDeviceBoards } from './BoardsPage'
 import { Picture, useImageUrl } from './parts'
 
@@ -116,10 +117,19 @@ export function SyncedBoards({ origin }: { origin: string }) {
   const states = useSyncStatus((s) => s.states)
   const boards = liveBoards(useDeviceBoards())
   const synced = boards.filter((b) => activeLink(b.id)).length
-  const set = (id: string, on: boolean): void => {
-    if (on) linkBoard(id, origin)
-    else stopSyncing(id)
+  // A shared board of this account asks first what happens to the copies of the people it is shared with.
+  const [asking, setAsking] = useState<BoardEntry | null>(null)
+  const stop = (id: string): void => {
+    stopSyncing(id)
     void syncCoordinator.refresh()
+  }
+  const set = (entry: BoardEntry, on: boolean): void => {
+    const link = activeLink(entry.id)
+    if (on) {
+      linkBoard(entry.id, origin)
+      void syncCoordinator.refresh()
+    } else if (link?.shared && !sharedWithMe(link)) setAsking(entry)
+    else stop(entry.id)
   }
   return (
     <section className="mt-12">
@@ -144,13 +154,25 @@ export function SyncedBoards({ origin }: { origin: string }) {
                     {on && (status === 'offline' || status === 'denied') && (
                       <Badge color={status === 'denied' ? 'red' : 'amber'}>{t(`storage.${status}`)}</Badge>
                     )}
-                    <Switch color="blue" aria-label={b.title} checked={on} onChange={(value) => set(b.id, value)} />
+                    {/* A board someone else shared without copying stays synced: unsynced, it would become a free copy. */}
+                    <Switch color="blue" aria-label={b.title} checked={on} disabled={on && !canCopy(b.id)} onChange={(value) => set(b, value)} />
                   </span>
                 }
               />
             )
           })}
         </ul>
+      )}
+      {asking && (
+        <SharedDeleteAlert
+          title={asking.title}
+          onClose={() => setAsking(null)}
+          onChoose={(copies) => {
+            const link = linkFor(asking.id)
+            if (link) saveLink(asking.id, { ...link, copies }, true)
+            stop(asking.id)
+          }}
+        />
       )}
     </section>
   )

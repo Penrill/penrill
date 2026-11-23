@@ -9,6 +9,14 @@ export interface Link {
   published: boolean
   /** Seen in this device's trash; once the board is gone from there, its server copy goes too. */
   trashed?: boolean
+  /** Who owns the board on the server, once known. */
+  owner?: string
+  /** For a board someone else owns: whether they let this account copy and export it. */
+  copying?: boolean
+  /** For the owner: someone else can open the board. */
+  shared?: boolean
+  /** For the owner's shared board: what its deletion does to the copies of the people it was shared with. */
+  copies?: 'keep' | 'remove'
 }
 
 const PREFIX = 'penrill-link:'
@@ -28,6 +36,43 @@ export function linkFor(localId: string): Link | null {
 export function activeLink(localId: string): Link | null {
   const link = linkFor(localId)
   return link && account(link.origin)?.name === link.user ? link : null
+}
+
+/** A board someone else owns and shared with this account. */
+export const sharedWithMe = (link: Link) => !!link.owner && link.owner !== link.user
+
+/**
+ * Whether the board may be duplicated, saved as a file, exported or copied out of. Boards of this device and of
+ * this account always; boards shared with it only when their owner allows it.
+ */
+export function canCopy(localId: string | null | undefined): boolean {
+  const link = localId ? linkFor(localId) : null
+  return !link || !sharedWithMe(link) || link.copying === true
+}
+
+/** What a check of the server copy found about a board missing from the server's list. */
+export type CopyState = 'here' | 'gone' | 'removed' | 'denied' | 'signed-out'
+
+/**
+ * What to do with this device's copy: `drop` a board someone else owns when they stopped sharing it or
+ * deleted it for everyone; `forget` the server copy of a board deleted with copies kept (and of this
+ * account's own boards), keeping it here; `denied` while signed out or without access to one's own board.
+ */
+export function copyOutcome(link: Link, state: CopyState): 'keep' | 'drop' | 'forget' | 'denied' {
+  if (state === 'here') return 'keep'
+  // Signed out is not a lost share: the board waits for this account to sign in again.
+  if (state === 'signed-out') return 'denied'
+  if (sharedWithMe(link) && (state === 'denied' || state === 'removed')) return 'drop'
+  return state === 'denied' ? 'denied' : 'forget'
+}
+
+/** The owner just let someone onto the board: deleting it now asks what happens to their copies. */
+export function markShared(link: Link): void {
+  for (const [localId, known] of allLinks()) {
+    if (known.origin === link.origin && known.user === link.user && known.remote === link.remote && !known.shared) {
+      saveLink(localId, { ...known, shared: true }, true)
+    }
+  }
 }
 
 export function saveLink(localId: string, link: Link, quiet = false): void {
