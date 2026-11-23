@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { panBy, screenToWorld, zoomAt } from '@penrill/core/camera'
 import { bboxOfPoints, newId } from '@penrill/core/geometry'
-import { setImageLoadListener } from '../engine/images'
 import {
   BoardRenderer,
   END_HANDLE_R,
@@ -246,7 +245,6 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     }
     const detach = editor.attach(invalidate)
     const toolContext: ToolContext = { editor, scene, session, prefs: () => prefsStore.getState(), invalidate }
-    setImageLoadListener(() => invalidate(true))
 
     // ---------- helpers ----------
     const capture = (id: number): void => {

@@ -1,9 +1,10 @@
 const cache = new Map<string, HTMLImageElement>()
-let onLoad: () => void = () => {}
+const listeners = new Set<() => void>()
 
 /** Called when a not-yet-decoded image finishes loading so the board can redraw. */
-export function setImageLoadListener(fn: () => void): void {
-  onLoad = fn
+export function subscribeImageLoad(fn: () => void): () => void {
+  listeners.add(fn)
+  return () => { listeners.delete(fn) }
 }
 
 export function getImage(src: string): HTMLImageElement {
@@ -11,7 +12,9 @@ export function getImage(src: string): HTMLImageElement {
   if (!img) {
     img = new Image()
     img.decoding = 'async'
-    img.onload = () => onLoad()
+    img.onload = () => {
+      for (const notify of listeners) notify()
+    }
     img.src = src
     cache.set(src, img)
   }
@@ -20,7 +23,9 @@ export function getImage(src: string): HTMLImageElement {
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
   const img = getImage(src)
-  if (img.complete && img.naturalWidth > 0) return Promise.resolve(img)
+  if (img.complete) {
+    return img.naturalWidth > 0 ? Promise.resolve(img) : Promise.reject(new Error('Image failed to load'))
+  }
   return new Promise((resolve, reject) => {
     img.addEventListener('load', () => resolve(img), { once: true })
     img.addEventListener('error', () => reject(new Error('Image failed to load')), { once: true })

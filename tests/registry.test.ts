@@ -52,3 +52,15 @@ test('items whose module is missing are left out of exports, not broken', () => 
   const reg = new FeatureRegistry([strokesModule])
   assert.equal(reg.svg(sampleGraphs[0]), '')
 })
+
+test('raster preparation waits for registered item resources', async () => {
+  const prepared: string[] = []
+  const reg = new FeatureRegistry([{ id: 'sample', items: { graph: {
+    async prepare(item) {
+      await Promise.resolve()
+      prepared.push(item.id)
+    }
+  } } }])
+  await reg.prepare([sampleGraphs[0], sampleFormulas[0]])
+  assert.deepEqual(prepared, [sampleGraphs[0].id])
+})

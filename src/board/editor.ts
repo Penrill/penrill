@@ -58,6 +58,9 @@ export class Editor {
 
   constructor(modules: readonly FeatureModule[]) {
     this.features = new FeatureRegistry(modules)
+    for (const module of modules) {
+      if (module.subscribeRedraw) this.unsubscribe.push(module.subscribeRedraw(() => this.invalidate(true)))
+    }
     this.scene.subscribe(() => {
       // Drop selected ids that no longer exist (e.g. after undo).
       const sel = this.session.getState().selectedIds

@@ -1,4 +1,4 @@
-import { getImage } from '../engine/images'
+import { getImage, loadImage, subscribeImageLoad } from '../engine/images'
 import type { FeatureModule } from '../registry'
 
 const r2 = (v: number): string => (Math.round(v * 100) / 100).toString()
@@ -7,10 +7,15 @@ const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/"/g, '&quot
 /** Pictures pasted or dropped onto the board, kept at their original resolution. */
 export const imagesModule: FeatureModule = {
   id: 'images',
+  subscribeRedraw: subscribeImageLoad,
   items: {
     image: {
+      async prepare(it) {
+        // A broken picture should not prevent the remaining items from being exported.
+        await loadImage(it.src).catch(() => undefined)
+      },
       draw(ctx, it) {
-        // Not decoded yet: drawn as soon as it loads (setImageLoadListener redraws the board).
+        // Not decoded yet: drawn as soon as it loads.
         const img = getImage(it.src)
         if (img.complete && img.naturalWidth > 0) ctx.drawImage(img, it.x, it.y, it.w, it.h)
       },

@@ -1,17 +1,11 @@
 import { drawBackground } from './background'
 import { patternSvg } from './paperSvg'
 import { SMUDGE_TILE, smudgeDataUrl } from './chalkTexture'
-import { loadImage } from './images'
 import { drawItems } from './renderer'
 import { isChalk, surfaceColor, withInkSurface } from './surface'
 import { unionBBox } from './transform'
 import type { BackgroundKind, BBox, Camera, Item } from '@penrill/core/types'
 import type { FeatureRegistry } from '../registry'
-
-/** Make sure every image is decoded before drawing off-screen (otherwise it would be skipped). */
-async function ensureImages(items: readonly Item[]): Promise<void> {
-  await Promise.all(items.filter((i) => i.type === 'image').map((i) => loadImage(i.src).catch(() => null)))
-}
 
 function contentBox(items: readonly Item[], pad: number): BBox {
   const b = unionBBox([...items]) ?? { minX: 0, minY: 0, maxX: 640, maxY: 400 }
@@ -29,7 +23,7 @@ async function renderToBlob(
   kinds: FeatureRegistry,
   quality?: number
 ): Promise<Uint8Array> {
-  await ensureImages(items)
+  await kinds.prepare(items)
   const canvas = new OffscreenCanvas(W, H)
   const ctx = canvas.getContext('2d')!
   // Centre the content box in the output.

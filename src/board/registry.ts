@@ -18,6 +18,8 @@ type ItemOf<K extends Item['type']> = Extract<Item, { type: K }>
 
 /** How one kind of board item is drawn: as a display list, or (not converted yet) by its own code. */
 export interface ItemKind<T extends Item = Item> {
+  /** Wait for resources needed to draw this item offscreen. */
+  prepare?: (item: T) => Promise<void>
   display?: (item: T) => Prim
   draw?: (ctx: Ctx, item: T) => void
   svg?: (item: T) => string
@@ -44,6 +46,8 @@ export interface FormulaEvaluator {
 
 export interface FeatureModule {
   id: string
+  /** Notify this editor when an external resource changes the drawing. */
+  subscribeRedraw?: (redraw: () => void) => () => void
   items?: { [K in Item['type']]?: ItemKind<ItemOf<K>> }
   strokeRecognizer?: StrokeRecognizer
   formulaEvaluator?: FormulaEvaluator
@@ -69,6 +73,15 @@ export class FeatureRegistry {
 
   has(id: string): boolean {
     return this.modules.some((m) => m.id === id)
+  }
+
+  async prepare(items: readonly Item[]): Promise<void> {
+    const pending: Promise<void>[] = []
+    for (const item of items) {
+      const prepare = this.kinds.get(item.type)?.prepare
+      if (prepare) pending.push(prepare(item))
+    }
+    await Promise.all(pending)
   }
 
   /** Draws one item in board coordinates, in the colours of the current surface (withInkSurface). */

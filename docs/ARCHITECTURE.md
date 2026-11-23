@@ -89,6 +89,10 @@ registry (`src/board/registry.ts`, `editor.features`):
 
 - The renderer, thumbnails and every export draw items with `editor.features.draw / svg`; none of
   them switch on the item type any more.
+- Before drawing a thumbnail or PNG, the exporter awaits the registered item kinds' optional
+  `prepare` hooks. The images module handles decoding and skips broken images. Modules can
+  subscribe an editor to resource changes through `subscribeRedraw`. Each editor releases its
+  own subscriptions when disposed.
 - The pen asks `features.strokeRecognizer` and the formula editor `features.formulaEvaluator`;
   without the module the behaviour (and its setting) is simply not there.
 - A module that owns an item type is needed to show such items, so keep item modules in and switch
@@ -159,9 +163,9 @@ Only where there are really two or more ways to do something:
 - **State machines for tools**: each tool handles pointer down, move, up and cancel on its own,
   instead of one big event handler.
 - **Strategy**: shape recognisers, ways to plot a graph, eraser modes, export formats, storage.
-- **Registry**: features register their item types, tools, commands, texts and shortcuts; a
-  feature that is switched off is simply not registered.
-- **Composition root**: `createEditor({ features, platform, preferences })` instead of a global
+- **Registry**: features register item drawing, resource preparation and optional behaviours.
+  Tools, commands, UI texts and shortcuts still have separate owners.
+- **Composition root**: `createEditor({ modules })` instead of a global
   editor, so a page can hold several boards and tests need no DOM.
 
 ## Steps
