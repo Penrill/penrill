@@ -2,6 +2,10 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## About credits in 0.13.6
+
+- Settings → About now credits Penrill in both English and Ukrainian.
+
 ## Shared boards and browser updates in 0.13.5
 
 - Choose paper or chalkboard on your own device. Everyone on a shared board still sees the same ruling.
