@@ -58,8 +58,8 @@ export interface Session {
   gizmo3dOverride: boolean | null
   /** Transform axis frame for the 3D rotation gizmo ('local' rotates with solid; 'world' stays aligned to room). */
   gizmo3dSpace: 'local' | 'world'
-  /** Open Settings dialog to a section ('general' or 'shapes'), or null when closed. */
-  settingsSection: 'general' | 'shapes' | null
+  /** Open Settings dialog to a section, or null when closed. */
+  settingsSection: 'general' | 'layout' | 'shapes' | 'toolbar' | null
   setTool: (tool: Tool) => void
   selectPen: (index: number) => void
 }

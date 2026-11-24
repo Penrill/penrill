@@ -1,6 +1,8 @@
+import clsx from 'clsx'
 import { useEffect, type ReactNode } from 'react'
 import type { Editor } from './editor'
-import { EditorProvider } from './editorContext'
+import { EditorProvider, useSession } from './editorContext'
+import { usePrefs } from './store'
 import { useAppTheme } from './theme'
 import { BoardActions } from './ui/BoardActions'
 import { FormulaEditor } from './ui/FormulaEditor'
@@ -14,10 +16,9 @@ import { ShapeElementPopover } from './modules/shapeEditor/ShapeElementPopover'
 import { ShapePanel } from './modules/shapeEditor/ShapePanel'
 import { ShortcutsDialog } from './ui/ShortcutsDialog'
 import { TextEditor } from './ui/TextEditor'
-import { InsertBar } from './ui/InsertBar'
+import { ToolBar } from './ui/ToolBar'
 import { ToolOptions } from './ui/ToolOptions'
 import { PencilInputChoice } from './ui/PencilInputChoice'
-import { ToolRail } from './ui/ToolRail'
 import { InstrumentTip } from './ui/InstrumentTip'
 import { ZoomControls } from './ui/ZoomControls'
 import { NoticeArea } from './ui/notices'
@@ -28,7 +29,7 @@ interface BoardWorkspaceProps {
   fileActions?: BoardFileActions
   /** Top left: the app's board menu (all boards, file actions, the board's name). */
   menu?: ReactNode
-  /** The app's templates button, shown in the insert bar. */
+  /** The app's templates button, shown in the insert bar (or unified toolbar). */
   extraTools?: ReactNode
   /** Top right, before the board's background and settings: the app's way to share the board. */
   share?: ReactNode
@@ -47,8 +48,187 @@ interface BoardWorkspaceProps {
   children?: ReactNode
 }
 
+function WorkspaceChrome({
+  menu,
+  extraTools,
+  share,
+  storageSettings,
+  about,
+  fixedLanguage,
+  hideExperimental
+}: Pick<
+  BoardWorkspaceProps,
+  'menu' | 'extraTools' | 'share' | 'storageSettings' | 'about' | 'fixedLanguage' | 'hideExperimental'
+>) {
+  const layout = usePrefs((s) => s.workspaceLayout)
+  const formulaEdit = useSession((s) => s.formulaEdit)
+
+  const merged = layout.insertDock === 'merged'
+  const showStrip = layout.optionsMode === 'strip'
+  const popoverOptions = !showStrip
+
+  const toolsBar = (edge: 'top' | 'bottom' | 'left' | 'right') => (
+    <ToolBar
+      key={`tools-${edge}`}
+      scope={merged ? 'merged' : 'drawing'}
+      edge={edge}
+      templates={merged ? extraTools : undefined}
+      insertLabels={false}
+      popoverOptions={popoverOptions}
+      collapseSelectTools={layout.collapseSelectTools}
+    />
+  )
+
+  const insertBar = (edge: 'top' | 'bottom' | 'left' | 'right') => (
+    <ToolBar
+      key={`insert-${edge}`}
+      scope="insert"
+      edge={edge}
+      templates={extraTools}
+      insertLabels={layout.insertLabels}
+      popoverOptions={popoverOptions}
+    />
+  )
+
+  // Assemble bars for each edge declaratively from WorkspaceLayout.
+  const topBars: ReactNode[] = []
+  if (layout.toolsDock === 'top') topBars.push(toolsBar('top'))
+  if (!merged && layout.insertDock === 'top') topBars.push(insertBar('top'))
+  if (showStrip && layout.optionsDock === 'top') {
+    topBars.push(<ToolOptions key="options-top" edge="top" collapseSelectTools={layout.collapseSelectTools} />)
+  }
+
+  const leftBars: ReactNode[] = []
+  if (layout.toolsDock === 'left') leftBars.push(toolsBar('left'))
+  if (!merged && layout.insertDock === 'left') leftBars.push(insertBar('left'))
+
+  const rightBars: ReactNode[] = []
+  if (layout.toolsDock === 'right') rightBars.push(toolsBar('right'))
+  if (!merged && layout.insertDock === 'right') rightBars.push(insertBar('right'))
+
+  // Bottom-center bars step aside while the on-screen math keypad occupies bottom centre.
+  const bottomCenterBars: ReactNode[] = []
+  if (!formulaEdit) {
+    if (showStrip && layout.optionsDock === 'bottom') {
+      bottomCenterBars.push(<ToolOptions key="options-bottom" edge="bottom" collapseSelectTools={layout.collapseSelectTools} />)
+    }
+    if (layout.toolsDock === 'bottom') bottomCenterBars.push(toolsBar('bottom'))
+    if (!merged && layout.insertDock === 'bottom') bottomCenterBars.push(insertBar('bottom'))
+  }
+
+  const hasWideTopBar = layout.toolsDock === 'top' || (!merged && layout.insertDock === 'top')
+  const hasWideBottomBar = layout.toolsDock === 'bottom'
+  const topPrimary = topBars[0] ?? null
+  const topSecondary = topBars.slice(1)
+
+  const hasBottom =
+    layout.zoomDock === 'bottom-left' ||
+    layout.zoomDock === 'bottom-right' ||
+    bottomCenterBars.length > 0
+
+  return (
+    <>
+      <div
+        data-chrome="top"
+        className={clsx(
+          'pointer-events-none absolute inset-x-3 top-3 z-10 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2',
+          hasWideTopBar ? 'lg:grid-cols-[auto_minmax(0,1fr)_auto]' : 'lg:grid-cols-[1fr_auto_1fr]'
+        )}
+      >
+        <div className="flex min-w-0 justify-start">{menu}</div>
+        {topPrimary && (
+          <div className="col-span-2 row-start-2 flex min-w-0 justify-center empty:hidden lg:col-span-1 lg:col-start-2 lg:row-start-1">
+            {topPrimary}
+          </div>
+        )}
+        <div className="col-start-2 row-start-1 flex items-start justify-end gap-2 lg:col-start-3">
+          {layout.zoomDock === 'top-right' && <ZoomControls />}
+          {share}
+          <BoardActions
+            storageSettings={storageSettings}
+            about={about}
+            fixedLanguage={fixedLanguage}
+            hideExperimental={hideExperimental}
+            templates={!!extraTools}
+          />
+        </div>
+        {topSecondary.length > 0 && (
+          <div className="col-span-full flex min-w-0 flex-col items-center gap-2 empty:hidden">
+            {topSecondary}
+          </div>
+        )}
+      </div>
+
+      {leftBars.length > 0 && (
+        <div
+          data-chrome="left"
+          className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center gap-2"
+        >
+          {leftBars}
+        </div>
+      )}
+
+      {rightBars.length > 0 && (
+        <div
+          data-chrome="right"
+          className="pointer-events-none absolute inset-y-0 right-3 z-10 flex items-center gap-2"
+        >
+          {rightBars}
+        </div>
+      )}
+
+      {hasBottom && (
+        <div
+          data-chrome="bottom"
+          className={clsx(
+            'pointer-events-none absolute inset-x-3 bottom-3 z-10 grid items-end gap-x-3 gap-y-2',
+            layout.zoomDock === 'bottom-left'
+              ? 'grid-cols-[auto_minmax(0,1fr)]'
+              : layout.zoomDock === 'bottom-right'
+                ? 'grid-cols-[minmax(0,1fr)_auto]'
+                : 'grid-cols-1',
+            hasWideBottomBar ? 'lg:grid-cols-[auto_minmax(0,1fr)_auto]' : 'lg:grid-cols-[1fr_auto_1fr]'
+          )}
+        >
+          {layout.zoomDock === 'bottom-left' && (
+            <div className="flex justify-start lg:col-start-1">
+              <ZoomControls />
+            </div>
+          )}
+          {bottomCenterBars.length > 0 && (
+            <div
+              className={clsx(
+                'flex min-w-0 flex-col items-center gap-2 empty:hidden lg:col-start-2',
+                layout.zoomDock === 'bottom-left' ? 'col-start-2' : 'col-start-1'
+              )}
+            >
+              {bottomCenterBars}
+            </div>
+          )}
+          {layout.zoomDock === 'bottom-right' && (
+            <div className="col-start-2 flex justify-end lg:col-start-3">
+              <ZoomControls />
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 export function BoardWorkspace({
-  editor, fileActions, menu, extraTools, share, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
+  editor,
+  fileActions,
+  menu,
+  extraTools,
+  share,
+  selectionActions,
+  storageSettings,
+  about,
+  fixedLanguage,
+  hideExperimental = false,
+  covered = false,
+  children
 }: BoardWorkspaceProps) {
   useAppTheme()
   useEffect(() => {
@@ -66,60 +246,35 @@ export function BoardWorkspace({
   }, [])
   return (
     <EditorProvider editor={editor}>
-    <div className="app">
-      <div className={covered ? 'invisible contents' : 'contents'} inert={covered}>
-      <PencilInputChoice>
-        <Board fileActions={fileActions} />
-      </PencilInputChoice>
-      <TextEditor />
-      <FormulaEditor />
-      <SelectionToolbar actions={selectionActions} />
-      <ShapeElementPopover />
-      {/* The chrome: each place on the screen has one job. Top: the board (left), how the current
-          tool draws (centre), background and settings (right). Left: the drawing tools. Bottom:
-          things to put on the board (centre) and the view (right). */}
-      <div
-        data-chrome="top"
-        className="pointer-events-none absolute inset-x-3 top-3 z-10 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 lg:grid-cols-[1fr_auto_1fr]"
-      >
-        <div className="flex min-w-0 justify-start">{menu}</div>
-        <div className="col-span-2 row-start-2 flex min-w-0 justify-center lg:col-span-1 lg:col-start-2 lg:row-start-1">
-          <ToolOptions />
-        </div>
-        <div className="col-start-2 row-start-1 flex items-start justify-end gap-2 lg:col-start-3">
-          {share}
-          <BoardActions
+      <div className="app">
+        <div className={covered ? 'invisible contents' : 'contents'} inert={covered}>
+          <PencilInputChoice>
+            <Board fileActions={fileActions} />
+          </PencilInputChoice>
+          <TextEditor />
+          <FormulaEditor />
+          <SelectionToolbar actions={selectionActions} />
+          <ShapeElementPopover />
+          <WorkspaceChrome
+            menu={menu}
+            extraTools={extraTools}
+            share={share}
             storageSettings={storageSettings}
             about={about}
             fixedLanguage={fixedLanguage}
             hideExperimental={hideExperimental}
-            templates={!!extraTools}
           />
+          <GraphDialog />
+          <FunctionPanel />
+          <ShapePanel />
+          <InstrumentPanel />
+          <MathKeypad />
+          <NoticeArea />
+          <InstrumentTip />
+          <ShortcutsDialog fileActions={!!fileActions} />
         </div>
+        {children}
       </div>
-      <ToolRail />
-      <div
-        data-chrome="bottom"
-        className="pointer-events-none absolute inset-x-3 bottom-3 z-10 grid grid-cols-[1fr_auto] items-end gap-3 lg:grid-cols-[1fr_auto_1fr]"
-      >
-        <div className="flex min-w-0 justify-center lg:col-start-2">
-          <InsertBar templates={extraTools} />
-        </div>
-        <div className="flex justify-end lg:col-start-3">
-          <ZoomControls />
-        </div>
-      </div>
-      <GraphDialog />
-      <FunctionPanel />
-      <ShapePanel />
-      <InstrumentPanel />
-      <MathKeypad />
-      <NoticeArea />
-      <InstrumentTip />
-      <ShortcutsDialog fileActions={!!fileActions} />
-      </div>
-      {children}
-    </div>
     </EditorProvider>
   )
 }

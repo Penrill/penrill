@@ -11,7 +11,14 @@ import type { GraphPreset } from './engine/graph'
 import type { ShapeKind } from '@penrill/core/shapes'
 import { validateRows, type Cursor, type FormulaState, type Row } from '@penrill/math/formula'
 import { cleanInstrumentPrefs, DEFAULT_INSTRUMENTS, type InstrumentPrefs } from './engine/instruments'
-import { cleanToolbarLayout, type ToolbarItemId } from './toolbarLayout'
+import { cleanToolbarLayout, insertDefaultDividers, isToolbarDivider, type ToolbarItemId } from './toolbarLayout'
+import {
+  cleanWorkspaceLayout,
+  DEFAULT_WORKSPACE_LAYOUT,
+  WORKSPACE_PRESETS,
+  type WorkspaceLayout,
+  type WorkspacePresetId
+} from './workspaceLayout'
 import type { FullRun } from './engine/text'
 import { moveStorageKey } from '../shared/legacyStorage'
 import type { BackgroundKind, LineCap, LineDash } from '@penrill/core/types'
@@ -195,6 +202,10 @@ export interface Prefs {
   /** Instrument tips the user closed ("protractor", "compass"); they don't show again. */
   hiddenTips: string[]
   toolbarLayout: ToolbarItemId[] | null
+  workspaceLayout: WorkspaceLayout
+  setWorkspaceLayout: (patch: Partial<WorkspaceLayout>) => void
+  applyWorkspacePreset: (preset: WorkspacePresetId) => void
+  resetWorkspaceLayout: () => void
   updatePen: (index: number, patch: Partial<InkSlot>) => void
   updateHighlighter: (patch: Partial<InkSlot>) => void
   setBackground: (bg: BackgroundKind) => void
@@ -236,6 +247,10 @@ export const prefsStore = createStore<Prefs>()(
       instruments: DEFAULT_INSTRUMENTS,
       hiddenTips: [],
       toolbarLayout: null,
+      workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
+      setWorkspaceLayout: (patch) => set((s) => ({ workspaceLayout: { ...s.workspaceLayout, ...patch } })),
+      applyWorkspacePreset: (preset) => set({ workspaceLayout: { ...WORKSPACE_PRESETS[preset] } }),
+      resetWorkspaceLayout: () => set({ workspaceLayout: { ...DEFAULT_WORKSPACE_LAYOUT } }),
       updatePen: (index, patch) =>
         set((s) => ({ pens: s.pens.map((p, i) => (i === index ? { ...p, ...patch } : p)) })),
       updateHighlighter: (patch) => set((s) => ({ highlighter: { ...s.highlighter, ...patch } })),
@@ -247,11 +262,17 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 2,
+      version: 3,
       migrate: (persisted, version) => {
-        const state = (persisted ?? {}) as Prefs
+        let state = (persisted ?? {}) as Prefs
         if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
-          return { ...state, shapeDefaults: { ...state.shapeDefaults, gizmo3d: true } }
+          state = { ...state, shapeDefaults: { ...state.shapeDefaults, gizmo3d: true } }
+        }
+        if (version < 3 && Array.isArray(state.toolbarLayout)) {
+          const cleaned = cleanToolbarLayout(state.toolbarLayout)
+          if (cleaned && !cleaned.some((id) => isToolbarDivider(id))) {
+            state = { ...state, toolbarLayout: insertDefaultDividers(cleaned) }
+          }
         }
         return state
       },
@@ -282,6 +303,7 @@ export const prefsStore = createStore<Prefs>()(
           instruments: cleanInstrumentPrefs(p.instruments),
           shapeDefaults: cleanShapeDefaults(p.shapeDefaults),
           toolbarLayout: cleanToolbarLayout(p.toolbarLayout),
+          workspaceLayout: cleanWorkspaceLayout(p.workspaceLayout),
           hiddenTips: Array.isArray(p.hiddenTips) ? p.hiddenTips.filter((x) => typeof x === 'string') : [],
           formulaHistory: cleanFormulaHistory(p.formulaHistory)
         }
@@ -312,7 +334,8 @@ export const prefsStore = createStore<Prefs>()(
         formulaHistory: s.formulaHistory,
         hiddenTips: s.hiddenTips,
         instruments: s.instruments,
-        toolbarLayout: s.toolbarLayout
+        toolbarLayout: s.toolbarLayout,
+        workspaceLayout: s.workspaceLayout
       })
     }
   )

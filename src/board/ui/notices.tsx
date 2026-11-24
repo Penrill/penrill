@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useT } from '../i18n'
+import { usePrefs } from '../store'
 
 // Short notices (tips and updates) all appear in one place, the bottom-left corner,
 // and go away by themselves: a notice that waits to be closed only gets in the way of drawing.
@@ -10,17 +11,26 @@ import { useT } from '../i18n'
 const AREA_ID = 'penrill-notices'
 
 /**
- * Where notices stack: bottom left, clear of the drawing rail, the insert bar and the zoom. On
- * narrower windows the bottom bars take the whole width, so notices sit just above them.
+ * Where notices stack: bottom left, kept clear of bottom-left zoom controls or bottom-center bars.
  */
 export function NoticeArea() {
+  const layout = usePrefs((s) => s.workspaceLayout)
+  const zoomBottomLeft = layout.zoomDock === 'bottom-left'
+  const hasBottomCenter =
+    layout.toolsDock === 'bottom' ||
+    (layout.insertDock === 'bottom') ||
+    (layout.optionsMode === 'strip' && layout.optionsDock === 'bottom')
   return (
     <div
       id={AREA_ID}
       aria-live="polite"
       className={clsx(
-        'pointer-events-none fixed bottom-[5.25rem] left-3 z-[70] flex w-80 max-w-[calc(100vw-1.5rem)] flex-col-reverse items-start gap-2',
-        'lg:bottom-3 lg:max-w-[min(20rem,calc(50vw-16.5rem))]'
+        'pointer-events-none fixed left-3 z-[70] flex w-80 max-w-[calc(100vw-1.5rem)] flex-col-reverse items-start gap-2',
+        zoomBottomLeft
+          ? 'bottom-[4.5rem]'
+          : hasBottomCenter
+            ? 'bottom-[5.25rem] lg:bottom-3 lg:max-w-[min(20rem,calc(50vw-16.5rem))]'
+            : 'bottom-3'
       )}
     />
   )

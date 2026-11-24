@@ -12,23 +12,43 @@ const base = (p: SVGProps<SVGSVGElement>): SVGProps<SVGSVGElement> => ({
   ...p
 })
 
-/** Lays a vertical (26 × 44) drawing on its side, tip to the right, for the pen tray. */
-function Upright({ lying, children }: { lying?: boolean; children: ReactNode }) {
-  return lying ? (
-    <svg width="40" height="24" viewBox="0 0 44 26" aria-hidden>
-      <g transform="translate(0 26) rotate(-90)">{children}</g>
-    </svg>
-  ) : (
+export type PenDirection = 'down' | 'up' | 'right' | 'left'
+
+/** Orients a vertical (26 x 44) drawing so its tip points toward the board from any edge. */
+function Upright({ lying, direction, children }: { lying?: boolean; direction?: PenDirection; children: ReactNode }) {
+  const dir: PenDirection = direction ?? (lying ? 'right' : 'down')
+  if (dir === 'right') {
+    return (
+      <svg width="40" height="24" viewBox="0 0 44 26" aria-hidden>
+        <g transform="translate(0 26) rotate(-90)">{children}</g>
+      </svg>
+    )
+  }
+  if (dir === 'left') {
+    return (
+      <svg width="40" height="24" viewBox="0 0 44 26" aria-hidden>
+        <g transform="translate(44 0) rotate(90)">{children}</g>
+      </svg>
+    )
+  }
+  if (dir === 'up') {
+    return (
+      <svg width="24" height="38" viewBox="0 0 26 44" aria-hidden>
+        <g transform="rotate(180 13 22)">{children}</g>
+      </svg>
+    )
+  }
+  return (
     <svg width="24" height="38" viewBox="0 0 26 44" aria-hidden>
       {children}
     </svg>
   )
 }
 
-/** A pen; the tip and band take the ink colour. `lying`: on its side, tip to the right. */
-export function PenIcon({ color, highlighter, lying }: { color: string; highlighter?: boolean; lying?: boolean }) {
+/** A pen; the tip and band take the ink colour. `direction` points the tip toward the canvas. */
+export function PenIcon({ color, highlighter, lying, direction }: { color: string; highlighter?: boolean; lying?: boolean; direction?: PenDirection }) {
   return (
-    <Upright lying={lying}>
+    <Upright lying={lying} direction={direction}>
       {highlighter ? (
         <>
           <path d="M8 4 h10 v24 l-2 6 h-6 l-2 -6 z" fill="#f4f4f6" stroke="#8a8d96" strokeWidth="1.2" />
@@ -46,8 +66,8 @@ export function PenIcon({ color, highlighter, lying }: { color: string; highligh
   )
 }
 
-export const EraserIcon = ({ lying }: { lying?: boolean }) => (
-  <Upright lying={lying}>
+export const EraserIcon = ({ lying, direction }: { lying?: boolean; direction?: PenDirection }) => (
+  <Upright lying={lying} direction={direction}>
     <path d="M7 6 h12 v22 h-12 z" fill="#f4f4f6" stroke="#8a8d96" strokeWidth="1.2" />
     <path d="M7 28 h12 v10 a2 2 0 0 1 -2 2 h-8 a2 2 0 0 1 -2 -2 z" fill="#ff8fa3" stroke="#8a8d96" strokeWidth="1.2" />
   </Upright>

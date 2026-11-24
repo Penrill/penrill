@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 // dock.ts reads the DOM only inside functions these tests don't call.
-import { fitBox } from '../src/board/ui/dock.ts'
+import { fitBox, fitPopoverForEdge } from '../src/board/ui/dock.ts'
 
 const area = { w: 1000, h: 700, top: 84 }
 const inside = (f: { left: number; top: number }, w: number, h: number): void => {
@@ -50,4 +50,27 @@ test('prefers below when asked and it fits', () => {
   const f = fitBox({ left: 400, right: 440, top: 300, bottom: 340 }, 240, 200, area, 'below')
   assert.equal(f.side, 'below')
   assert.equal(f.top, 348)
+})
+
+test('fitBox keeps clear of both left and right docked rails when room allows', () => {
+  const withRails = { w: 1000, h: 700, top: 84, left: 80, right: 920 }
+  const leftClamped = fitBox({ left: 40, right: 80, top: 300, bottom: 340 }, 200, 40, withRails)
+  assert.equal(leftClamped.left, 80)
+  const rightClamped = fitBox({ left: 900, right: 940, top: 300, bottom: 340 }, 200, 40, withRails)
+  assert.equal(rightClamped.left, 920 - 8 - 200)
+})
+
+test('fitPopoverForEdge opens inward from each screen edge and stays inside viewport', () => {
+  const vp = { w: 1000, h: 700 }
+  const fromTop = fitPopoverForEdge({ left: 450, right: 490, top: 12, bottom: 52 }, 260, 220, 'top', vp)
+  assert.equal(fromTop.top, 60)
+
+  const fromBottom = fitPopoverForEdge({ left: 450, right: 490, top: 648, bottom: 688 }, 260, 220, 'bottom', vp)
+  assert.equal(fromBottom.top, 648 - 8 - 220)
+
+  const fromLeft = fitPopoverForEdge({ left: 12, right: 60, top: 300, bottom: 340 }, 260, 220, 'left', vp)
+  assert.equal(fromLeft.left, 68)
+
+  const fromRight = fitPopoverForEdge({ left: 940, right: 988, top: 300, bottom: 340 }, 260, 220, 'right', vp)
+  assert.equal(fromRight.left, 940 - 8 - 260)
 })

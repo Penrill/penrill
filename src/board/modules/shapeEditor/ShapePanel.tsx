@@ -7,6 +7,7 @@ import { isLinear, isTriangle, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditor, useSession } from '../../editorContext'
 import { useT, type MessageKey } from '../../i18n'
+import { usePrefs } from '../../store'
 import { PanelTitle } from '../../ui/chrome'
 import { dockBeside } from '../../ui/dock'
 import { BaseRow, ShapePreview } from '../../ui/InsertMenus'
@@ -30,6 +31,7 @@ export function ShapePanel() {
   const open = useSession((s) => s.shapePanel)
   const selectedIds = useSession((s) => s.selectedIds)
   const active = useSession((s) => s.active)
+  const workspaceLayout = usePrefs((s) => s.workspaceLayout)
   useSession((s) => s.sceneVersion)
 
   const panelRef = useRef<HTMLDivElement>(null)
@@ -69,7 +71,12 @@ export function ShapePanel() {
     setAnchorPos(dockBeside(dockBox, editor.camera, PANEL_W, h))
   })
 
-  // Keep safe maxHeight updated on viewport resize.
+  // Keep safe placement updated on viewport resize or chrome layout change.
+  useEffect(() => {
+    if (!visible || dragPos) return
+    setAnchorPos(null)
+  }, [workspaceLayout, visible, dragPos])
+
   useEffect(() => {
     if (!visible) return
     const onResize = (): void => {

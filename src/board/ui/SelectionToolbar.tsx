@@ -5,7 +5,7 @@ import { editableShape } from '@penrill/core/shapeItems'
 import { fullRuns, TEXT_SIZES } from '../engine/text'
 import type { FormulaItem, ShapeItem, StrokeItem, TextItem } from '@penrill/core/types'
 import { useT } from '../i18n'
-import { PEN_COLORS, PEN_SIZES } from '../store'
+import { PEN_COLORS, PEN_SIZES, usePrefs } from '../store'
 import { DuplicateIcon, FitIcon, FormulaIcon, FunctionIcon, GearIcon, GroupIcon, LockIcon, ShapesIcon, StyleIcon, TextIcon, TrashIcon, UngroupIcon, UnlockIcon } from './icons'
 import { LineStyleControls, SizeSlider } from './LineStyle'
 import { fitBox, screenArea } from './dock'
@@ -20,9 +20,10 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   const active = useSession((s) => s.active)
   const fnPanel = useSession((s) => s.fnPanel)
   const shapePanel = useSession((s) => s.shapePanel)
-  // Re-render when the camera or items move so the bar follows the selection.
+  // Re-render when the camera, items or workspace chrome layout change so the bar stays clear of edges.
   useSession((s) => s.camera)
   useSession((s) => s.sceneVersion)
+  usePrefs((s) => s.workspaceLayout)
   const [styling, setStyling] = useState(false)
   const closeStyle = useCallback(() => setStyling(false), [])
   const ref = useRef<HTMLDivElement>(null)

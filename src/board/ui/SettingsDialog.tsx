@@ -1,5 +1,5 @@
 import * as Headless from '@headlessui/react'
-import { BeakerIcon, Cog6ToothIcon, CubeIcon, InformationCircleIcon, LinkIcon, LinkSlashIcon, PencilIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
+import { BeakerIcon, Cog6ToothIcon, CubeIcon, InformationCircleIcon, LinkIcon, LinkSlashIcon, PencilIcon, RectangleGroupIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { Dialog, DialogTitle } from '@penrill/ui/dialog'
 import { Select } from '@penrill/ui/select'
 import { Switch } from '@penrill/ui/switch'
@@ -13,10 +13,11 @@ import { useEditor } from '../editorContext'
 import { useFeatures } from '../features'
 import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
 import { type PenAction, type PenButtons, type ThemePref, type WheelMode, SNAP_DELAY, prefsStore, usePrefs } from '../store'
-import { DEFAULT_TOOLBAR, isToolShown, withToolShown, type ToolbarToolId } from '../toolbarLayout'
 import { isIPad } from '../tools/penInput'
 import { ShapeSettingsGroup } from '../modules/shapeEditor/ShapeSettingsGroup'
 import { Segmented } from './chrome'
+import { LayoutSettings } from './LayoutSettings'
+import { ToolbarOrderSettings } from './ToolbarOrderSettings'
 
 /** One setting: its name (and a line about it) on the left, the control on the right. */
 function Row({ label, description, children }: { label: ReactNode; description?: ReactNode; children: ReactNode }) {
@@ -254,52 +255,6 @@ function PenAndMouseSettings() {
   )
 }
 
-const TOOL_LABELS: Record<Exclude<ToolbarToolId, 'divider'>, MessageKey> = {
-  select: 'select.lasso',
-  brushSelect: 'select.brush',
-  move: 'select.move',
-  pan: 'toolbar.pan',
-  pen1: 'toolbar.pen1',
-  pen2: 'toolbar.pen2',
-  pen3: 'toolbar.pen3',
-  highlighter: 'toolbar.highlighter',
-  eraser: 'toolbar.eraser',
-  laser: 'toolbar.laser',
-  undo: 'toolbar.undo',
-  redo: 'toolbar.redo',
-  text: 'insert.text',
-  formula: 'insert.formula',
-  shapes: 'insert.shapes',
-  graph: 'insert.graph',
-  templates: 'tpl.title',
-  image: 'insert.image',
-  instruments: 'toolbar.instruments'
-}
-
-const INSERT_TOOLS: ToolbarToolId[] = ['text', 'formula', 'shapes', 'graph', 'instruments', 'image', 'templates']
-
-function ToolbarSettings({ templates }: { templates: boolean }) {
-  const t = useT()
-  const layout = usePrefs((s) => s.toolbarLayout)
-  const tools = DEFAULT_TOOLBAR.filter((id) => id !== 'templates' || templates)
-  const row = (id: Exclude<ToolbarToolId, 'divider'>): ReactNode => (
-    <Row key={id} label={t(TOOL_LABELS[id])}>
-      <Switch
-        color="blue"
-        checked={isToolShown(layout, id)}
-        onChange={(on) => prefsStore.setState({ toolbarLayout: withToolShown(layout, id, on) })}
-      />
-    </Row>
-  )
-  return (
-    <>
-      <Text>{t('settings.toolbarHint')}</Text>
-      <Group title={t('rail.label')}>{tools.filter((id) => !INSERT_TOOLS.includes(id)).map(row)}</Group>
-      <Group title={t('insert.label')}>{tools.filter((id) => INSERT_TOOLS.includes(id)).map(row)}</Group>
-    </>
-  )
-}
-
 function ExperimentalSettings() {
   const t = useT()
   const flags = useFeatures((s) => s.flags)
@@ -318,8 +273,8 @@ function ExperimentalSettings() {
 export interface SettingsDialogProps {
   open: boolean
   onClose: () => void
-  /** When opened via a direct link (e.g. from Shapes), focus General and scroll to that group. */
-  focusSection?: 'general' | 'shapes' | null
+  /** When opened via a direct link (e.g. from Shapes), focus that section. */
+  focusSection?: 'general' | 'layout' | 'shapes' | 'toolbar' | null
   /** App-provided sections (backup folder, version and updates); left out where they don't apply. */
   storageSettings?: ReactNode
   about?: ReactNode
@@ -346,9 +301,10 @@ export function SettingsDialog({ open, onClose, focusSection, storageSettings, a
   }, [open])
   const sections: { id: string; label: MessageKey; icon: ReactNode; content: ReactNode }[] = [
     { id: 'general', label: 'settings.general', icon: <Cog6ToothIcon />, content: <GeneralSettings fixedLanguage={fixedLanguage} /> },
+    { id: 'layout', label: 'settings.layout', icon: <RectangleGroupIcon />, content: <LayoutSettings /> },
     { id: 'pen', label: 'settings.pen', icon: <PencilIcon />, content: <PenAndMouseSettings /> },
     ...(hasShapeEditor ? [{ id: 'shapes', label: 'shapes.title' as MessageKey, icon: <CubeIcon />, content: <ShapeSettingsGroup /> }] : []),
-    { id: 'toolbar', label: 'settings.toolbar', icon: <Squares2X2Icon />, content: <ToolbarSettings templates={templates} /> }
+    { id: 'toolbar', label: 'settings.toolbar', icon: <Squares2X2Icon />, content: <ToolbarOrderSettings templates={templates} /> }
   ]
   if (storageSettings) sections.push({ id: 'storage', label: 'settings.storage', icon: <CircleStackIcon />, content: storageSettings })
   if (!hideExperimental) sections.push({ id: 'experimental', label: 'settings.experimental', icon: <BeakerIcon />, content: <ExperimentalSettings /> })

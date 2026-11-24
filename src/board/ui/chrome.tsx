@@ -1,10 +1,46 @@
 import * as Headless from '@headlessui/react'
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/20/solid'
 import clsx from 'clsx'
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react'
+import {
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+  type RefObject
+} from 'react'
+import { createPortal } from 'react-dom'
+import { useT } from '../i18n'
+import type { DockEdge } from '../workspaceLayout'
+import { fitPopoverForEdge } from './dock'
 
 // The board's chrome, in Catalyst's style (packages/ui). Every bar over the board is a Bar; tools
-// are ToolButtons (icon only, in the drawing rail and the top bars) or InsertButtons (icon and a
-// label, in the insert bar). One hover look and one selected look everywhere.
+// are ToolButtons (icon only) or InsertButtons (icon and a label, collapsing to ToolButtons when
+// rendered inside a compact, vertical or merged bar). One hover look and one selected look everywhere.
+
+export interface ChromeBarContextValue {
+  edge: DockEdge
+  compact: boolean
+}
+
+const ChromeBarContext = createContext<ChromeBarContextValue>({ edge: 'bottom', compact: false })
+
+export function ChromeBarProvider({
+  edge,
+  compact,
+  children
+}: ChromeBarContextValue & { children: ReactNode }) {
+  return <ChromeBarContext.Provider value={{ edge, compact }}>{children}</ChromeBarContext.Provider>
+}
+
+export function useChromeBar(): ChromeBarContextValue {
+  return useContext(ChromeBarContext)
+}
 
 /**
  * A floating bar over the board. Opaque on purpose, unlike Catalyst's frosted menus: the board
@@ -55,7 +91,7 @@ type ToolButtonProps = {
   children: ReactNode
 } & Omit<ComponentPropsWithoutRef<'button'>, 'children'>
 
-/** A square icon button: a tool in the drawing rail, or an action in a top bar. */
+/** A square icon button: a tool in any bar, or an action in a top bar. */
 export const ToolButton = forwardRef<HTMLButtonElement, ToolButtonProps>(function ToolButton(
   { label, shortcut, active, className, children, ...props },
   ref
@@ -86,16 +122,27 @@ type InsertButtonProps = {
   active?: boolean
 } & Omit<ComponentPropsWithoutRef<'button'>, 'children'>
 
-/** An icon with its name under it: what the insert bar puts on the board. */
+/**
+ * An icon with its name under it (in a standalone horizontal insert bar), automatically collapsing
+ * to a compact square ToolButton inside compact, vertical or merged bars.
+ */
 export const InsertButton = forwardRef<HTMLButtonElement, InsertButtonProps>(function InsertButton(
-  { icon, label, active, className, ...props },
+  { icon, label, active, className, title, ...props },
   ref
 ) {
+  const { compact } = useChromeBar()
+  if (compact) {
+    return (
+      <ToolButton ref={ref} label={title ?? label} active={active} className={className} {...props}>
+        {icon}
+      </ToolButton>
+    )
+  }
   return (
     <button
       ref={ref}
       type="button"
-      title={label}
+      title={title ?? label}
       {...props}
       className={clsx(
         className,
@@ -109,6 +156,117 @@ export const InsertButton = forwardRef<HTMLButtonElement, InsertButtonProps>(fun
     </button>
   )
 })
+
+/**
+ * A floating Bar that scrolls gracefully when tools exceed the available width or height.
+ * Horizontal bars gain subtle scroll chevrons and wheel-to-horizontal scrolling only when overflowing.
+ */
+export function ScrollableBar({
+  vertical,
+  label,
+  className,
+  children
+}: {
+  vertical: boolean
+  label: string
+  className?: string
+  children: ReactNode
+}) {
+  const t = useT()
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [scroll, setScroll] = useState({ left: false, right: false })
+
+  const updateScroll = useCallback(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+    const left = vp.scrollLeft > 1
+    const right = vp.scrollLeft + vp.clientWidth < vp.scrollWidth - 1
+    setScroll((prev) => (prev.left === left && prev.right === right ? prev : { left, right }))
+  }, [])
+
+  useLayoutEffect(() => {
+    if (vertical) return
+    const vp = viewportRef.current
+    const content = contentRef.current
+    if (!vp || !content) return
+    updateScroll()
+    const ro = new ResizeObserver(updateScroll)
+    ro.observe(vp)
+    ro.observe(content)
+    const wheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey && !e.metaKey && !e.deltaX && vp.scrollWidth > vp.clientWidth) {
+        e.preventDefault()
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? vp.clientWidth : 1
+        vp.scrollLeft += e.deltaY * unit
+      }
+    }
+    vp.addEventListener('wheel', wheel, { passive: false })
+    vp.addEventListener('scroll', updateScroll, { passive: true })
+    return () => {
+      ro.disconnect()
+      vp.removeEventListener('wheel', wheel)
+      vp.removeEventListener('scroll', updateScroll)
+    }
+  }, [vertical, updateScroll])
+
+  if (vertical) {
+    return (
+      <Bar
+        role="toolbar"
+        aria-label={label}
+        aria-orientation="vertical"
+        className={clsx(
+          className,
+          'flex max-h-[calc(100dvh-8.5rem)] w-14 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden [scrollbar-width:none]'
+        )}
+      >
+        {children}
+      </Bar>
+    )
+  }
+
+  const overflowing = scroll.left || scroll.right
+  return (
+    <Bar
+      role="toolbar"
+      aria-label={label}
+      aria-orientation="horizontal"
+      className={clsx(className, 'flex max-w-full min-w-0 items-center gap-0.5')}
+    >
+      {overflowing && (
+        <button
+          type="button"
+          aria-label={t('toolbar.scrollLeft')}
+          disabled={!scroll.left}
+          onClick={() => viewportRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+          className={clsx('flex size-8 shrink-0 items-center justify-center rounded-xl', selectable)}
+        >
+          <ChevronLeftIcon className="size-4" />
+        </button>
+      )}
+      <div
+        ref={viewportRef}
+        className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none]"
+      >
+        <div ref={contentRef} className="flex items-center gap-0.5">
+          {children}
+        </div>
+      </div>
+      {overflowing && (
+        <button
+          type="button"
+          aria-label={t('toolbar.scrollRight')}
+          disabled={!scroll.right}
+          onClick={() => viewportRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+          className={clsx('flex size-8 shrink-0 items-center justify-center rounded-xl', selectable)}
+        >
+          <ChevronRightIcon className="size-4" />
+        </button>
+      )}
+    </Bar>
+  )
+}
 
 /** A small panel that opens from a bar button (Headless UI popover, placed by `anchor`). */
 export function FlyoutPanel({
@@ -126,6 +284,89 @@ export function FlyoutPanel({
         'dark:bg-zinc-800 dark:ring-white/10'
       )}
     />
+  )
+}
+
+/**
+ * A controlled Catalyst popover portaled to document.body so scrollable toolbars never clip it.
+ * Used when clicking an already-active tool opens its options in popover mode.
+ */
+export function AnchoredPopover({
+  anchorRef,
+  edge,
+  onClose,
+  className,
+  children
+}: {
+  anchorRef: RefObject<HTMLElement | null>
+  edge: DockEdge
+  onClose: () => void
+  className?: string
+  children: ReactNode
+}) {
+  const panelRef = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
+
+  const place = useCallback(() => {
+    const anchor = anchorRef.current
+    const panel = panelRef.current
+    if (!anchor || !panel) return
+    const rect = anchor.getBoundingClientRect()
+    const fit = fitPopoverForEdge(rect, panel.offsetWidth || 260, panel.offsetHeight || 200, edge, {
+      w: window.innerWidth,
+      h: window.innerHeight
+    })
+    setPos(fit)
+  }, [anchorRef, edge])
+
+  useLayoutEffect(() => {
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [place])
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent): void => {
+      const target = e.target as Node | null
+      if (!target) return
+      if (panelRef.current?.contains(target)) return
+      if (anchorRef.current?.contains(target)) return
+      closeRef.current()
+    }
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.code !== 'Escape' || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault()
+      closeRef.current()
+    }
+    window.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [anchorRef])
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      role="dialog"
+      onPointerDown={(e) => e.stopPropagation()}
+      style={pos ? { left: pos.left, top: pos.top, maxHeight: pos.maxHeight } : { left: -9999, top: -9999 }}
+      className={clsx(
+        className,
+        'fixed z-[80] overflow-y-auto rounded-2xl bg-white p-3 shadow-xl ring-1 ring-zinc-950/10',
+        'dark:bg-zinc-800 dark:ring-white/10'
+      )}
+    >
+      {children}
+    </div>,
+    document.body
   )
 }
 
