@@ -282,10 +282,12 @@ export interface SettingsDialogProps {
   hideExperimental?: boolean
   /** The app has board templates (their switch in the toolbar section). */
   templates?: boolean
+  /** Open the live on-board workspace customizer (available when Settings was opened from a board). */
+  onCustomizeBoard?: () => void
 }
 
 /** Settings of the app, not of one board: a dialog with its sections listed on the left. */
-export function SettingsDialog({ open, onClose, focusSection, storageSettings, about, fixedLanguage, hideExperimental, templates = false }: SettingsDialogProps) {
+export function SettingsDialog({ open, onClose, focusSection, storageSettings, about, fixedLanguage, hideExperimental, templates = false, onCustomizeBoard }: SettingsDialogProps) {
   const editor = useEditor()
   const t = useT()
   const hasShapeEditor = !!editor.features.shapeEditor
@@ -301,10 +303,10 @@ export function SettingsDialog({ open, onClose, focusSection, storageSettings, a
   }, [open])
   const sections: { id: string; label: MessageKey; icon: ReactNode; content: ReactNode }[] = [
     { id: 'general', label: 'settings.general', icon: <Cog6ToothIcon />, content: <GeneralSettings fixedLanguage={fixedLanguage} /> },
-    { id: 'layout', label: 'settings.layout', icon: <RectangleGroupIcon />, content: <LayoutSettings /> },
+    { id: 'layout', label: 'settings.layout', icon: <RectangleGroupIcon />, content: <LayoutSettings onCustomizeBoard={onCustomizeBoard} /> },
     { id: 'pen', label: 'settings.pen', icon: <PencilIcon />, content: <PenAndMouseSettings /> },
     ...(hasShapeEditor ? [{ id: 'shapes', label: 'shapes.title' as MessageKey, icon: <CubeIcon />, content: <ShapeSettingsGroup /> }] : []),
-    { id: 'toolbar', label: 'settings.toolbar', icon: <Squares2X2Icon />, content: <ToolbarOrderSettings templates={templates} /> }
+    { id: 'toolbar', label: 'settings.toolbar', icon: <Squares2X2Icon />, content: <ToolbarOrderSettings templates={templates} onCustomizeBoard={onCustomizeBoard} /> }
   ]
   if (storageSettings) sections.push({ id: 'storage', label: 'settings.storage', icon: <CircleStackIcon />, content: storageSettings })
   if (!hideExperimental) sections.push({ id: 'experimental', label: 'settings.experimental', icon: <BeakerIcon />, content: <ExperimentalSettings /> })

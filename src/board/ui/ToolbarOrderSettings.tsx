@@ -1,134 +1,71 @@
 import { ArrowPathIcon, Bars2Icon, ChevronDownIcon, ChevronUpIcon, PlusIcon, XMarkIcon } from '@heroicons/react/20/solid'
-import { Badge } from '@penrill/ui/badge'
 import { Button } from '@penrill/ui/button'
 import { Subheading } from '@penrill/ui/heading'
+import { Select } from '@penrill/ui/select'
 import { Text } from '@penrill/ui/text'
 import clsx from 'clsx'
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useT, type MessageKey } from '../i18n'
-import { shortcutKey, type ShortcutId } from '../shortcuts'
+import { shortcutKey } from '../shortcuts'
 import { prefsStore, usePrefs } from '../store'
+import { isToolbarDivider, type ConcreteToolId, type ToolbarItemId } from '../toolbarLayout'
 import {
-  addToolbarDivider,
-  DEFAULT_TOOLBAR,
-  isInsertTool,
-  isToolbarDivider,
-  moveToolbarItem,
-  removeToolbarItem,
-  resolveToolbarItems,
-  withToolShown,
-  type ConcreteToolId,
-  type ToolbarItemId
-} from '../toolbarLayout'
-import {
-  AxesIcon,
-  BrushSelectIcon,
-  EraserIcon,
-  FormulaIcon,
-  HandIcon,
-  ImageIcon,
-  LaserIcon,
-  LassoIcon,
-  MoveIcon,
-  PenIcon,
-  RedoIcon,
-  RulerIcon,
-  ShapesIcon,
-  StampIcon,
-  TextIcon,
-  UndoIcon
-} from './icons'
+  DEFAULT_WORKSPACE_LAYOUT,
+  DOCK_EDGES,
+  edgeDocksEqual,
+  hiddenToolsInDocks,
+  placeToolInDock,
+  removeItemFromDocks,
+  type DockEdge
+} from '../workspaceLayout'
+import { Segmented } from './chrome'
+import { ToolbarSettingsIcon } from './icons'
+import { TOOL_LABELS, TOOL_SHORTCUTS, ToolMiniIcon } from './toolMeta'
 
-const TOOL_LABELS: Record<ConcreteToolId, MessageKey> = {
-  select: 'select.lasso',
-  brushSelect: 'select.brush',
-  move: 'select.move',
-  pan: 'toolbar.pan',
-  pen1: 'toolbar.pen1',
-  pen2: 'toolbar.pen2',
-  pen3: 'toolbar.pen3',
-  highlighter: 'toolbar.highlighter',
-  eraser: 'toolbar.eraser',
-  laser: 'toolbar.laser',
-  undo: 'toolbar.undo',
-  redo: 'toolbar.redo',
-  text: 'insert.text',
-  formula: 'insert.formula',
-  shapes: 'insert.shapes',
-  graph: 'insert.graph',
-  templates: 'tpl.title',
-  image: 'insert.image',
-  instruments: 'toolbar.instruments'
-}
-
-const TOOL_SHORTCUTS: Partial<Record<ConcreteToolId, ShortcutId>> = {
-  select: 'lasso',
-  brushSelect: 'brushSelect',
-  move: 'move',
-  pen1: 'pen1',
-  pen2: 'pen2',
-  pen3: 'pen3',
-  highlighter: 'highlighter',
-  eraser: 'eraser',
-  laser: 'laser',
-  undo: 'undo',
-  redo: 'redo'
-}
-
-function ToolMiniIcon({ id }: { id: ConcreteToolId }) {
-  const { pens, highlighter } = usePrefs(useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter })))
-  const icon = ((): ReactNode => {
-    switch (id) {
-      case 'select': return <LassoIcon />
-      case 'brushSelect': return <BrushSelectIcon />
-      case 'move': return <MoveIcon />
-      case 'pan': return <HandIcon />
-      case 'pen1': return <PenIcon color={pens[0].color} direction="down" />
-      case 'pen2': return <PenIcon color={pens[1].color} direction="down" />
-      case 'pen3': return <PenIcon color={pens[2].color} direction="down" />
-      case 'highlighter': return <PenIcon color={highlighter.color} highlighter direction="down" />
-      case 'eraser': return <EraserIcon direction="down" />
-      case 'laser': return <LaserIcon />
-      case 'undo': return <UndoIcon />
-      case 'redo': return <RedoIcon />
-      case 'text': return <TextIcon />
-      case 'formula': return <FormulaIcon />
-      case 'shapes': return <ShapesIcon />
-      case 'graph': return <AxesIcon />
-      case 'instruments': return <RulerIcon />
-      case 'image': return <ImageIcon />
-      case 'templates': return <StampIcon />
-    }
-  })()
-  return (
-    <span className="flex size-6 shrink-0 items-center justify-center text-zinc-700 dark:text-zinc-200 [&>svg]:max-h-5 [&>svg]:max-w-5">
-      {icon}
-    </span>
-  )
+const EDGE_LABELS: Record<DockEdge, MessageKey> = {
+  top: 'layout.edge.top',
+  left: 'layout.edge.left',
+  right: 'layout.edge.right',
+  bottom: 'layout.edge.bottom'
 }
 
 /**
- * Settings -> Tools: reorder toolbar buttons by dragging or arrow buttons, add/remove dividers,
- * and show or hide individual tools. Works identically across merged and split workspace layouts.
+ * Settings -> Tools: inspect and edit the tools and dividers docked to any of the four screen edges
+ * (reorder by dragging or arrows, move a button to another edge, add/remove dividers, show/hide tools),
+ * or launch live on-board drag-and-drop customization.
  */
-export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
+export function ToolbarOrderSettings({
+  templates,
+  onCustomizeBoard
+}: {
+  templates: boolean
+  onCustomizeBoard?: () => void
+}) {
   const t = useT()
-  const layout = usePrefs((s) => s.toolbarLayout)
-  const merged = usePrefs((s) => s.workspaceLayout.insertDock === 'merged')
-  const items = resolveToolbarItems(layout)
+  const docks = usePrefs((s) => s.workspaceLayout.docks)
+  const [selectedEdge, setSelectedEdge] = useState<DockEdge>(() => {
+    for (const edge of ['left', 'top', 'bottom', 'right'] as const) {
+      if (docks[edge].length > 0) return edge
+    }
+    return 'left'
+  })
 
-  // Keep each visible row's true index inside `items` so edits preserve hidden `templates` cleanly.
-  const rows = items
+  const edgeItems = docks[selectedEdge]
+  const rows = edgeItems
     .map((id, index) => ({ id, index }))
     .filter((row) => row.id !== 'templates' || templates)
 
-  const hiddenTools = DEFAULT_TOOLBAR.filter((id) => (id !== 'templates' || templates) && !items.includes(id))
+  const hiddenTools = hiddenToolsInDocks(docks, templates)
+  const isDefaultDocks = edgeDocksEqual(docks, DEFAULT_WORKSPACE_LAYOUT.docks)
 
   const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map())
   const dragState = useRef<{ pointerId: number; fromRowPos: number } | null>(null)
   const [draggingRowPos, setDraggingRowPos] = useState<number | null>(null)
   const [dropRowPos, setDropRowPos] = useState<number | null>(null)
+
+  const setDocks = (nextDocks: typeof docks): void => {
+    prefsStore.getState().setWorkspaceLayout({ docks: nextDocks })
+  }
 
   const computeDropPos = (clientY: number): number => {
     for (let i = 0; i < rows.length; i++) {
@@ -162,10 +99,11 @@ export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
     setDraggingRowPos(null)
     setDropRowPos(null)
     if (commit && targetRowPos !== null && targetRowPos !== cur.fromRowPos) {
-      const fromIndex = rows[cur.fromRowPos]?.index
+      const id = rows[cur.fromRowPos]?.id
       const toIndex = rows[targetRowPos]?.index
-      if (fromIndex !== undefined && toIndex !== undefined) {
-        prefsStore.setState({ toolbarLayout: moveToolbarItem(layout, fromIndex, toIndex) })
+      if (id !== undefined && toIndex !== undefined) {
+        const targetSlot = cur.fromRowPos < targetRowPos ? toIndex + 1 : toIndex
+        setDocks(placeToolInDock(docks, id, selectedEdge, targetSlot))
       }
     }
   }
@@ -173,38 +111,63 @@ export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
   const moveBy = (rowPos: number, delta: -1 | 1): void => {
     const nextRowPos = rowPos + delta
     if (nextRowPos < 0 || nextRowPos >= rows.length) return
-    prefsStore.setState({
-      toolbarLayout: moveToolbarItem(layout, rows[rowPos].index, rows[nextRowPos].index)
-    })
+    const id = rows[rowPos].id
+    const targetIndex = rows[nextRowPos].index
+    const slot = delta > 0 ? targetIndex + 1 : targetIndex
+    setDocks(placeToolInDock(docks, id, selectedEdge, slot))
+  }
+
+  const moveToEdge = (id: ToolbarItemId, nextEdge: DockEdge): void => {
+    if (nextEdge === selectedEdge) return
+    setDocks(placeToolInDock(docks, id, nextEdge))
   }
 
   const remove = (id: ToolbarItemId): void => {
-    prefsStore.setState({ toolbarLayout: removeToolbarItem(layout, id) })
+    setDocks(removeItemFromDocks(docks, id))
   }
 
   const addDivider = (): void => {
-    prefsStore.setState({ toolbarLayout: addToolbarDivider(layout, 0) })
+    setDocks(placeToolInDock(docks, 'divider', selectedEdge, 0))
   }
 
   const showTool = (id: ConcreteToolId): void => {
-    prefsStore.setState({ toolbarLayout: withToolShown(layout, id, true) })
+    setDocks(placeToolInDock(docks, id, selectedEdge))
   }
 
   const iconBtn =
     'flex size-7 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors enabled:hover:bg-zinc-950/5 enabled:hover:text-zinc-950 disabled:opacity-30 dark:text-zinc-400 dark:enabled:hover:bg-white/10 dark:enabled:hover:text-white'
 
+  const countEdgeTools = (edge: DockEdge): number =>
+    docks[edge].filter((id) => !isToolbarDivider(id) && (id !== 'templates' || templates)).length
+
   return (
     <>
-      <Text>{t(merged ? 'toolbar.orderHintMerged' : 'toolbar.orderHintSplit')}</Text>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Text className="min-w-0 flex-1">{t('toolbar.orderHintEdges')}</Text>
+        {onCustomizeBoard && (
+          <Button color="blue" onClick={onCustomizeBoard}>
+            <ToolbarSettingsIcon width={16} height={16} />
+            {t('customize.openOnBoard')}
+          </Button>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-        <Subheading level={3}>{t('toolbar.shown')}</Subheading>
+        <Segmented<DockEdge>
+          label={t('toolbar.edge')}
+          value={selectedEdge}
+          onChange={setSelectedEdge}
+          options={(['left', 'top', 'bottom', 'right'] as const).map((edge) => ({
+            value: edge,
+            label: `${t(EDGE_LABELS[edge])} (${countEdgeTools(edge)})`
+          }))}
+        />
         <div className="flex items-center gap-2">
           <Button outline onClick={addDivider}>
             <PlusIcon data-slot="icon" />
             {t('toolbar.addDivider')}
           </Button>
-          <Button plain disabled={layout === null} onClick={() => prefsStore.setState({ toolbarLayout: null })}>
+          <Button plain disabled={isDefaultDocks} onClick={() => setDocks(DEFAULT_WORKSPACE_LAYOUT.docks)}>
             <ArrowPathIcon data-slot="icon" />
             {t('toolbar.reset')}
           </Button>
@@ -213,7 +176,7 @@ export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
 
       {rows.length === 0 ? (
         <div className="mt-3 rounded-xl border border-dashed border-zinc-950/15 px-4 py-6 text-center text-sm/5 text-zinc-500 dark:border-white/15 dark:text-zinc-400">
-          {t('toolbar.empty')}
+          {t('toolbar.edgeEmpty')}
         </div>
       ) : (
         <div className="mt-3 overflow-hidden rounded-xl ring-1 ring-zinc-950/10 dark:ring-white/10">
@@ -233,7 +196,7 @@ export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
                     else rowRefs.current.delete(rowPos)
                   }}
                   className={clsx(
-                    'relative flex items-center gap-2.5 px-2.5 py-2 transition-colors',
+                    'relative flex items-center gap-2 px-2.5 py-2 transition-colors',
                     divider ? 'bg-zinc-950/2 dark:bg-white/2' : 'bg-white dark:bg-zinc-800/40',
                     isDragging && 'opacity-50'
                   )}
@@ -266,16 +229,24 @@ export function ToolbarOrderSettings({ templates }: { templates: boolean }) {
                       <span className="min-w-0 flex-1 truncate text-sm/5 font-medium text-zinc-950 dark:text-white">
                         {t(TOOL_LABELS[id])}
                       </span>
-                      {!merged && (
-                        <Badge color="zinc" className="hidden text-[11px]! sm:inline-flex">
-                          {t(isInsertTool(id) ? 'insert.label' : 'rail.label')}
-                        </Badge>
-                      )}
                       {sc && (
-                        <kbd className="rounded-md border border-zinc-950/10 bg-zinc-50 px-1.5 py-0.5 text-[11px]/4 font-medium text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                        <kbd className="hidden rounded-md border border-zinc-950/10 bg-zinc-50 px-1.5 py-0.5 text-[11px]/4 font-medium text-zinc-500 sm:inline-block dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
                           {sc}
                         </kbd>
                       )}
+                      <div className="w-24 shrink-0">
+                        <Select
+                          aria-label={t('toolbar.edge')}
+                          value={selectedEdge}
+                          onChange={(e) => moveToEdge(id, e.target.value as DockEdge)}
+                        >
+                          {DOCK_EDGES.map((edge) => (
+                            <option key={edge} value={edge}>
+                              {t(EDGE_LABELS[edge])}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                     </>
                   )}
 

@@ -60,6 +60,8 @@ export interface Session {
   gizmo3dSpace: 'local' | 'world'
   /** Open Settings dialog to a section, or null when closed. */
   settingsSection: 'general' | 'layout' | 'shapes' | 'toolbar' | null
+  /** Live on-board workspace drag-and-drop customization mode. */
+  customizingWorkspace: boolean
   setTool: (tool: Tool) => void
   selectPen: (index: number) => void
 }
@@ -95,6 +97,7 @@ export function createSessionStore(): SessionStore {
     gizmo3dOverride: null,
     gizmo3dSpace: 'local',
     settingsSection: null,
+    customizingWorkspace: false,
     setTool: (tool) => set({ tool }),
     selectPen: (index) => set({ tool: 'pen', activePen: index })
   }))

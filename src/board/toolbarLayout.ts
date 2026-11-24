@@ -319,3 +319,64 @@ export function projectBarItems(
   while (out.length > 0 && out[out.length - 1].kind === 'divider') out.pop()
   return out
 }
+
+/** True when an edge bar has at least one tool and every tool on it is an insert tool. */
+export function isInsertOnlyBar(items: readonly ToolbarItemId[]): boolean {
+  let hasTool = false
+  for (const item of items) {
+    if (isToolbarDivider(item)) continue
+    hasTool = true
+    if (!isInsertTool(item)) return false
+  }
+  return hasTool
+}
+
+/**
+ * Project a single screen edge's ordered item list into renderable bar entries.
+ * In `customizing` mode every concrete tool and divider is shown individually so it can be dragged.
+ */
+export function projectEdgeBarItems(
+  items: readonly ToolbarItemId[],
+  options: { templates?: boolean; collapseSelect?: boolean; customizing?: boolean } = {}
+): ProjectedBarItem[] {
+  const { templates = true, collapseSelect = false, customizing = false } = options
+  if (customizing) {
+    const out: ProjectedBarItem[] = []
+    for (const item of items) {
+      if (isToolbarDivider(item)) {
+        out.push({ kind: 'divider', id: item })
+      } else if (item === 'templates' && !templates) {
+        continue
+      } else {
+        out.push({ kind: 'tool', id: item })
+      }
+    }
+    return out
+  }
+
+  const visibleSelectModes = items.filter((id): id is SelectToolId => isSelectTool(id))
+  const shouldCollapseSelect = collapseSelect && visibleSelectModes.length > 1
+  const out: ProjectedBarItem[] = []
+  let selectEmitted = false
+
+  for (const item of items) {
+    if (isToolbarDivider(item)) {
+      if (out.length > 0 && out[out.length - 1].kind !== 'divider') {
+        out.push({ kind: 'divider', id: item })
+      }
+      continue
+    }
+    if (item === 'templates' && !templates) continue
+    if (shouldCollapseSelect && isSelectTool(item)) {
+      if (!selectEmitted) {
+        out.push({ kind: 'selectGroup', modes: visibleSelectModes })
+        selectEmitted = true
+      }
+      continue
+    }
+    out.push({ kind: 'tool', id: item })
+  }
+
+  while (out.length > 0 && out[out.length - 1].kind === 'divider') out.pop()
+  return out
+}

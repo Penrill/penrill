@@ -1,4 +1,5 @@
 import * as Headless from '@headlessui/react'
+import { Bars2Icon } from '@heroicons/react/20/solid'
 import clsx from 'clsx'
 import type { ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -7,12 +8,13 @@ import { TEXT_SIZES } from '../engine/text'
 import { useT } from '../i18n'
 import { shortcutKey } from '../shortcuts'
 import { HIGHLIGHTER_COLORS, HIGHLIGHTER_SIZES, PEN_COLORS, PEN_SIZES, type InkSlot, prefsStore, usePrefs } from '../store'
-import { isToolShown, type SelectToolId } from '../toolbarLayout'
-import { flyoutAnchor, type OptionsDock } from '../workspaceLayout'
+import type { SelectToolId } from '../toolbarLayout'
+import { allPlacedTools, flyoutAnchor, type OptionsDock } from '../workspaceLayout'
 import { Bar, BarDivider, FlyoutPanel, PanelTitle, Segmented, ToolButton } from './chrome'
 import { StyleIcon } from './icons'
 import { LineStyleControls, SizeSlider } from './LineStyle'
 import { isSelectMode, SELECT_MODES } from './ToolBar'
+import { useWorkspaceCustomize } from './WorkspaceCustomizer'
 
 function Swatches({
   colors,
@@ -377,11 +379,42 @@ export function ToolOptions({
   collapseSelectTools?: boolean
 }) {
   const t = useT()
+  const customize = useWorkspaceCustomize()
   const { tool, activePen, formulaEdit } = useSession(useShallow((s) => ({ tool: s.tool, activePen: s.activePen, formulaEdit: s.formulaEdit })))
-  const { pens, highlighter, layout } = usePrefs(useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter, layout: s.toolbarLayout })))
+  const { pens, highlighter } = usePrefs(useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter })))
+  const placed = allPlacedTools(customize.layout.docks)
   // Ways of selecting the user shows, plus the one in use (its key works even when hidden).
-  const selectModes = SELECT_MODES.filter((m) => isToolShown(layout, m.tool) || m.tool === tool)
+  const selectModes = SELECT_MODES.filter((m) => placed.has(m.tool) || m.tool === tool)
   const { updatePen, updateHighlighter } = prefsStore.getState()
+
+  if (customize.active) {
+    const isDragged = customize.dragging?.kind === 'options'
+    return (
+      <div
+        ref={(el) => customize.registerOptionsZone(edge, el)}
+        role="toolbar"
+        aria-label={t('options.label')}
+        className="flex max-w-full min-w-0 justify-center"
+      >
+        <Bar
+          onPointerDown={(e) => customize.startDrag(e, { kind: 'options' })}
+          title={t('customize.dragOptions')}
+          className={clsx(
+            'flex cursor-grab touch-none items-center gap-2 px-2.5 py-1.5 transition-opacity active:cursor-grabbing',
+            isDragged && 'opacity-40'
+          )}
+        >
+          <Bars2Icon className="size-4 rotate-90 text-zinc-400 dark:text-zinc-500" />
+          <span className="text-xs/5 font-semibold text-zinc-700 dark:text-zinc-200">{t('options.label')}</span>
+          <span className="flex items-center gap-1" aria-hidden>
+            {PEN_COLORS.slice(0, 5).map((c) => (
+              <span key={c} style={{ background: c }} className="size-3.5 rounded-full ring-1 ring-zinc-950/15 dark:ring-white/20" />
+            ))}
+          </span>
+        </Bar>
+      </div>
+    )
+  }
 
   let content: ReactNode = null
   if (formulaEdit) content = null

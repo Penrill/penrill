@@ -7,9 +7,11 @@ import {
   DEFAULT_TOOLBAR,
   DEFAULT_TOOLBAR_WITH_DIVIDERS,
   insertDefaultDividers,
+  isInsertOnlyBar,
   isToolShown,
   moveToolbarItem,
   projectBarItems,
+  projectEdgeBarItems,
   removeToolbarItem,
   sanitizeDividers,
   withToolShown
@@ -128,4 +130,33 @@ test('insertDefaultDividers migrates flat v0.13 lists without losing hidden tool
     drawing.map((i) => (i.kind === 'divider' ? '|' : i.kind === 'selectGroup' ? 'selectGroup' : i.id)),
     ['selectGroup', 'pan', '|', 'pen1', 'pen2', '|', 'undo', 'redo']
   )
+})
+
+test('projectEdgeBarItems expands tools and dividers during customizing and collapses cleanly in normal mode', () => {
+  const edge = ['divider:lead', 'select', 'brushSelect', 'move', 'divider:a', 'divider:b', 'pen1', 'divider:tail'] as const
+  const normal = projectEdgeBarItems(edge, { collapseSelect: true, customizing: false })
+  assert.deepEqual(
+    normal.map((i) => (i.kind === 'divider' ? '|' : i.kind === 'selectGroup' ? `select:${i.modes.join(',')}` : i.id)),
+    ['select:select,brushSelect,move', '|', 'pen1']
+  )
+
+  const editing = projectEdgeBarItems(edge, { collapseSelect: true, customizing: true })
+  assert.deepEqual(
+    editing.map((i) => (i.kind === 'divider' ? i.id : i.kind === 'tool' ? i.id : 'group')),
+    ['divider:lead', 'select', 'brushSelect', 'move', 'divider:a', 'divider:b', 'pen1', 'divider:tail']
+  )
+
+  // Single select tool on a bar is kept as an ordinary tool button even with collapseSelect enabled.
+  const lone = projectEdgeBarItems(['move', 'pen1'], { collapseSelect: true, customizing: false })
+  assert.deepEqual(
+    lone.map((i) => (i.kind === 'tool' ? i.id : i.kind)),
+    ['move', 'pen1']
+  )
+})
+
+test('isInsertOnlyBar distinguishes insert-only bars from mixed or empty bars', () => {
+  assert.equal(isInsertOnlyBar([]), false)
+  assert.equal(isInsertOnlyBar(['divider:1']), false)
+  assert.equal(isInsertOnlyBar(['text', 'divider:1', 'shapes', 'templates']), true)
+  assert.equal(isInsertOnlyBar(['text', 'undo']), false)
 })

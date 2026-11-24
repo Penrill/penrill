@@ -17,8 +17,7 @@ export function NoticeArea() {
   const layout = usePrefs((s) => s.workspaceLayout)
   const zoomBottomLeft = layout.zoomDock === 'bottom-left'
   const hasBottomCenter =
-    layout.toolsDock === 'bottom' ||
-    (layout.insertDock === 'bottom') ||
+    layout.docks.bottom.length > 0 ||
     (layout.optionsMode === 'strip' && layout.optionsDock === 'bottom')
   return (
     <div

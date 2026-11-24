@@ -26,16 +26,23 @@ import { fitPopoverForEdge } from './dock'
 export interface ChromeBarContextValue {
   edge: DockEdge
   compact: boolean
+  showShortcuts: boolean
 }
 
-const ChromeBarContext = createContext<ChromeBarContextValue>({ edge: 'bottom', compact: false })
+const ChromeBarContext = createContext<ChromeBarContextValue>({ edge: 'bottom', compact: false, showShortcuts: false })
 
 export function ChromeBarProvider({
   edge,
   compact,
+  showShortcuts = false,
   children
-}: ChromeBarContextValue & { children: ReactNode }) {
-  return <ChromeBarContext.Provider value={{ edge, compact }}>{children}</ChromeBarContext.Provider>
+}: {
+  edge: DockEdge
+  compact: boolean
+  showShortcuts?: boolean
+  children: ReactNode
+}) {
+  return <ChromeBarContext.Provider value={{ edge, compact, showShortcuts }}>{children}</ChromeBarContext.Provider>
 }
 
 export function useChromeBar(): ChromeBarContextValue {
@@ -96,6 +103,8 @@ export const ToolButton = forwardRef<HTMLButtonElement, ToolButtonProps>(functio
   { label, shortcut, active, className, children, ...props },
   ref
 ) {
+  const { showShortcuts } = useChromeBar()
+  const showKey = showShortcuts && !!shortcut && shortcut.length <= 2
   return (
     <button
       ref={ref}
@@ -112,6 +121,14 @@ export const ToolButton = forwardRef<HTMLButtonElement, ToolButtonProps>(functio
       )}
     >
       {children}
+      {showKey && (
+        <kbd
+          aria-hidden
+          className="pointer-events-none absolute right-0.5 bottom-0.5 rounded px-0.5 text-[9px]/3 font-semibold text-zinc-400 dark:text-zinc-500"
+        >
+          {shortcut}
+        </kbd>
+      )}
     </button>
   )
 })
@@ -165,17 +182,29 @@ export function ScrollableBar({
   vertical,
   label,
   className,
+  onBarEl,
+  onViewportEl,
   children
 }: {
   vertical: boolean
   label: string
   className?: string
+  onBarEl?: (el: HTMLDivElement | null) => void
+  onViewportEl?: (el: HTMLDivElement | null) => void
   children: ReactNode
 }) {
   const t = useT()
   const viewportRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const [scroll, setScroll] = useState({ left: false, right: false })
+
+  const setViewport = useCallback(
+    (el: HTMLDivElement | null) => {
+      viewportRef.current = el
+      onViewportEl?.(el)
+    },
+    [onViewportEl]
+  )
 
   const updateScroll = useCallback(() => {
     const vp = viewportRef.current
@@ -212,27 +241,37 @@ export function ScrollableBar({
 
   if (vertical) {
     return (
-      <Bar
+      <div
+        ref={(el) => {
+          onBarEl?.(el)
+          setViewport(el)
+        }}
         role="toolbar"
         aria-label={label}
         aria-orientation="vertical"
         className={clsx(
           className,
-          'flex max-h-[calc(100dvh-8.5rem)] w-14 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden [scrollbar-width:none]'
+          'pointer-events-auto flex max-h-[calc(100dvh-8.5rem)] w-14 flex-col items-center gap-0.5 overflow-y-auto overflow-x-hidden rounded-2xl bg-white p-1 shadow-lg ring-1 shadow-zinc-950/5 ring-zinc-950/10 [scrollbar-width:none]',
+          'dark:bg-zinc-800 dark:shadow-black/30 dark:ring-white/10'
         )}
       >
         {children}
-      </Bar>
+      </div>
     )
   }
 
   const overflowing = scroll.left || scroll.right
   return (
-    <Bar
+    <div
+      ref={onBarEl}
       role="toolbar"
       aria-label={label}
       aria-orientation="horizontal"
-      className={clsx(className, 'flex max-w-full min-w-0 items-center gap-0.5')}
+      className={clsx(
+        className,
+        'pointer-events-auto flex max-w-full min-w-0 items-center gap-0.5 rounded-2xl bg-white p-1 shadow-lg ring-1 shadow-zinc-950/5 ring-zinc-950/10',
+        'dark:bg-zinc-800 dark:shadow-black/30 dark:ring-white/10'
+      )}
     >
       {overflowing && (
         <button
@@ -246,7 +285,7 @@ export function ScrollableBar({
         </button>
       )}
       <div
-        ref={viewportRef}
+        ref={setViewport}
         className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none]"
       >
         <div ref={contentRef} className="flex items-center gap-0.5">
@@ -264,7 +303,7 @@ export function ScrollableBar({
           <ChevronRightIcon className="size-4" />
         </button>
       )}
-    </Bar>
+    </div>
   )
 }
 

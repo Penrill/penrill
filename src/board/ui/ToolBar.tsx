@@ -1,4 +1,5 @@
 import * as Headless from '@headlessui/react'
+import { Bars2Icon } from '@heroicons/react/20/solid'
 import clsx from 'clsx'
 import {
   forwardRef,
@@ -6,6 +7,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type ReactNode
@@ -16,12 +18,20 @@ import { useT, type MessageKey } from '../i18n'
 import { shortcutKey, type ShortcutId } from '../shortcuts'
 import { HIGHLIGHTER_COLORS, HIGHLIGHTER_SIZES, PEN_COLORS, PEN_SIZES, prefsStore, type Tool, usePrefs } from '../store'
 import {
-  projectBarItems,
-  type BarScope,
+  isInsertOnlyBar,
+  projectEdgeBarItems,
   type ConcreteToolId,
-  type SelectToolId
+  type SelectToolId,
+  type ToolbarItemId
 } from '../toolbarLayout'
-import { flyoutAnchor, isVerticalDock, penDirection, type DockEdge } from '../workspaceLayout'
+import {
+  flyoutAnchor,
+  isVerticalDock,
+  penDirection,
+  placeToolInDock,
+  removeItemFromDocks,
+  type DockEdge
+} from '../workspaceLayout'
 import {
   AnchoredPopover,
   BarDivider,
@@ -29,7 +39,8 @@ import {
   FlyoutPanel,
   InsertButton,
   ScrollableBar,
-  ToolButton
+  ToolButton,
+  useChromeBar
 } from './chrome'
 import {
   AxesIcon,
@@ -50,6 +61,8 @@ import {
 } from './icons'
 import { GraphPanel, InstrumentsPanel, ShapesPanel, useInstrumentRows } from './InsertMenus'
 import { EraserOptionsCard, InkOptionsCard, SelectOptionsCard, TextOptionsCard } from './ToolOptions'
+import { TOOL_LABELS, TOOL_SHORTCUTS, ToolMiniIcon } from './toolMeta'
+import { useWorkspaceCustomize } from './WorkspaceCustomizer'
 
 /** The three ways to select; may collapse into one button or show individually. */
 export const SELECT_MODES: { tool: Tool & SelectToolId; shortcut: ShortcutId; label: MessageKey; icon: ReactNode }[] = [
@@ -115,7 +128,9 @@ const TrayItem = forwardRef<
   ref
 ) {
   const activation = useToolActivation(onClick)
+  const { showShortcuts } = useChromeBar()
   const vertical = isVerticalDock(edge)
+  const showKey = showShortcuts && !!shortcut && shortcut.length <= 2
   const motionClass =
     edge === 'left'
       ? active
@@ -157,6 +172,17 @@ const TrayItem = forwardRef<
       <span className={clsx('block transition-transform duration-200 ease-out motion-reduce:transition-none', motionClass)}>
         {children}
       </span>
+      {showKey && (
+        <kbd
+          aria-hidden
+          className={clsx(
+            'pointer-events-none absolute rounded px-0.5 text-[9px]/3 font-semibold text-zinc-400 dark:text-zinc-500',
+            edge === 'right' ? 'bottom-0.5 left-0.5' : 'right-0.5 bottom-0.5'
+          )}
+        >
+          {shortcut}
+        </kbd>
+      )}
     </button>
   )
 })
@@ -189,32 +215,37 @@ function InsertFlyout({
 type PopoverKind = 'pen0' | 'pen1' | 'pen2' | 'highlighter' | 'eraser' | 'text' | 'selectGroup' | 'shapeStyle'
 
 export interface ToolBarProps {
-  scope: BarScope
   edge: DockEdge
+  items: readonly ToolbarItemId[]
   templates?: ReactNode
-  /** Show text labels under icons in a standalone horizontal insert bar. */
+  /** Show text labels under icons on horizontal bars that contain only insert tools. */
   insertLabels?: boolean
   /** Open tool options in a popover when clicking an already-active tool (or right-clicking). */
   popoverOptions?: boolean
-  /** Collapse lasso, brush select and move into a single button. */
+  /** Collapse lasso, brush select and move into a single button when multiple sit on this bar. */
   collapseSelectTools?: boolean
+  /** Show short single-key shortcut badges on toolbar buttons. */
+  showShortcutBadges?: boolean
 }
 
 /**
- * Adaptive board toolbar: renders drawing tools, insert tools, or a unified merged toolbar on any
- * edge of the screen, with automatic orientation, flyout direction, horizontal overflow scrolling,
- * custom order & dividers, and optional click-to-open tool option popovers.
+ * Adaptive board toolbar: renders any ordered list of tools and dividers docked to any of the
+ * four screen edges. Supports normal interaction and live drag-and-drop editing in Customize Mode.
  */
 export function ToolBar({
-  scope,
   edge,
+  items: rawItems,
   templates,
   insertLabels = false,
   popoverOptions = false,
-  collapseSelectTools = true
+  collapseSelectTools = true,
+  showShortcutBadges = false
 }: ToolBarProps) {
   const editor = useEditor()
   const t = useT()
+  const customize = useWorkspaceCustomize()
+  const customizing = customize.active
+
   const { tool, activePen, canUndo, canRedo, formulaEdit } = useSession(
     useShallow((s) => ({
       tool: s.tool,
@@ -224,16 +255,15 @@ export function ToolBar({
       formulaEdit: s.formulaEdit
     }))
   )
-  const { pens, highlighter, layout } = usePrefs(
-    useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter, layout: s.toolbarLayout }))
-  )
+  const { pens, highlighter } = usePrefs(useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter })))
   const { setTool, selectPen } = editor.session.getState()
   const { updatePen, updateHighlighter } = prefsStore.getState()
   const instrumentsOn = useInstrumentRows().some((r) => r.on)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const vertical = isVerticalDock(edge)
-  const compact = scope !== 'insert' || vertical || !insertLabels
+  const insertOnly = isInsertOnlyBar(rawItems)
+  const compact = customizing || vertical || !insertLabels || !insertOnly
   const dir = penDirection(edge)
 
   // Remember the last-used selection mode for the collapsed Select button.
@@ -256,8 +286,8 @@ export function ToolBar({
   }, [tool, activePen])
 
   useEffect(() => {
-    if (!popoverOptions || formulaEdit) setOpenPopover(null)
-  }, [popoverOptions, formulaEdit, edge])
+    if (!popoverOptions || formulaEdit || customizing) setOpenPopover(null)
+  }, [popoverOptions, formulaEdit, edge, customizing])
 
   const bindRef = (kind: PopoverKind) => (el: HTMLButtonElement | null) => {
     buttonRefs.current[kind] = el
@@ -268,18 +298,160 @@ export function ToolBar({
   }
 
   const onContextOpen = (kind: PopoverKind) => (e: MouseEvent<HTMLButtonElement>): void => {
-    if (!popoverOptions) return
+    if (!popoverOptions || customizing) return
     e.preventDefault()
     togglePopover(kind)
   }
 
-  const items = projectBarItems(layout, scope, {
+  const projected = projectEdgeBarItems(rawItems, {
     templates: !!templates,
-    collapseSelect: collapseSelectTools
+    collapseSelect: collapseSelectTools,
+    customizing
   })
 
-  const canInsertImages = scope === 'insert' || scope === 'merged'
-  const barLabel = t(scope === 'insert' ? 'insert.label' : 'rail.label')
+  const canInsertImages = rawItems.includes('image')
+  const barLabel = t(insertOnly ? 'insert.label' : 'rail.label')
+
+  // Highlight bar when a whole bar is being dragged over this edge.
+  const mergeHighlight = customize.dropTarget?.kind === 'edge-bar' && customize.dropTarget.edge === edge
+  const barDragging = customize.dragging?.kind === 'bar' && customize.dragging.fromEdge === edge
+
+  if (customizing) {
+    const slotDropIndex =
+      customize.dropTarget?.kind === 'edge-slot' && customize.dropTarget.edge === edge
+        ? customize.dropTarget.index
+        : null
+
+    const handleKey = (e: KeyboardEvent<HTMLButtonElement>, id: ToolbarItemId, slotIndex: number): void => {
+      if (e.code === 'Delete' || e.code === 'Backspace') {
+        e.preventDefault()
+        customize.updateDraft((prev) => ({ ...prev, docks: removeItemFromDocks(prev.docks, id) }))
+        return
+      }
+      const prevKey = vertical ? 'ArrowUp' : 'ArrowLeft'
+      const nextKey = vertical ? 'ArrowDown' : 'ArrowRight'
+      if (e.code === prevKey && slotIndex > 0) {
+        e.preventDefault()
+        customize.updateDraft((prev) => ({ ...prev, docks: placeToolInDock(prev.docks, id, edge, slotIndex - 1) }))
+      } else if (e.code === nextKey && slotIndex < projected.length - 1) {
+        e.preventDefault()
+        customize.updateDraft((prev) => ({ ...prev, docks: placeToolInDock(prev.docks, id, edge, slotIndex + 2) }))
+      }
+    }
+
+    return (
+      <ChromeBarProvider edge={edge} compact showShortcuts={showShortcutBadges}>
+        <div className="relative flex items-center justify-center">
+          <ScrollableBar
+            vertical={vertical}
+            label={barLabel}
+            onBarEl={(el) => customize.registerEdgeEl(edge, el)}
+            onViewportEl={(el) => customize.registerEdgeViewport(edge, el)}
+            className={clsx(
+              'transition-all',
+              barDragging && 'opacity-45',
+              mergeHighlight && 'ring-2! ring-blue-500! dark:ring-blue-400!'
+            )}
+          >
+            {/* Whole-bar drag handle */}
+            <button
+              type="button"
+              draggable={false}
+              aria-label={t('customize.dragBar')}
+              title={t('customize.dragBar')}
+              onPointerDown={(e) => customize.startDrag(e, { kind: 'bar', fromEdge: edge })}
+              className={clsx(
+                'flex shrink-0 cursor-grab touch-none items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-zinc-950/5 hover:text-zinc-700 active:cursor-grabbing dark:text-zinc-500 dark:hover:bg-white/10 dark:hover:text-zinc-200',
+                vertical ? 'h-7 w-10' : 'h-10 w-7'
+              )}
+            >
+              <Bars2Icon className={clsx('size-4', !vertical && 'rotate-90')} />
+            </button>
+
+            {projected.map((entry, idx) => {
+              const itemId: ToolbarItemId = entry.kind === 'divider' ? (entry.id as ToolbarItemId) : entry.kind === 'tool' ? entry.id : 'select'
+              const isItemDragged = customize.dragging?.kind === 'item' && customize.dragging.id === itemId
+              const showBefore = slotDropIndex === idx
+              const showAfter = idx === projected.length - 1 && slotDropIndex !== null && slotDropIndex >= projected.length
+              const isDivider = entry.kind === 'divider'
+              const sc = !isDivider && entry.kind === 'tool' && TOOL_SHORTCUTS[entry.id] ? shortcutKey(TOOL_SHORTCUTS[entry.id]!) : undefined
+              const showKey = showShortcutBadges && !!sc && sc.length <= 2
+
+              return (
+                <div
+                  key={itemId}
+                  data-customize-slot={idx}
+                  className={clsx('relative flex shrink-0 items-center justify-center', isItemDragged && 'opacity-30')}
+                >
+                  {showBefore && (
+                    <span
+                      aria-hidden
+                      className={clsx(
+                        'pointer-events-none absolute z-10 rounded-full bg-blue-500',
+                        vertical ? 'inset-x-1 -top-0.5 h-0.5' : 'inset-y-1 -left-0.5 w-0.5'
+                      )}
+                    />
+                  )}
+                  {showAfter && (
+                    <span
+                      aria-hidden
+                      className={clsx(
+                        'pointer-events-none absolute z-10 rounded-full bg-blue-500',
+                        vertical ? 'inset-x-1 -bottom-0.5 h-0.5' : 'inset-y-1 -right-0.5 w-0.5'
+                      )}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    draggable={false}
+                    aria-label={isDivider ? t('toolbar.divider') : entry.kind === 'tool' ? t(TOOL_LABELS[entry.id]) : ''}
+                    title={isDivider ? t('toolbar.divider') : entry.kind === 'tool' ? t(TOOL_LABELS[entry.id]) : ''}
+                    onPointerDown={(e) => customize.startDrag(e, { kind: 'item', id: itemId, fromEdge: edge })}
+                    onKeyDown={(e) => handleKey(e, itemId, idx)}
+                    className={clsx(
+                      'relative flex shrink-0 cursor-grab touch-none items-center justify-center rounded-xl transition-colors hover:bg-zinc-950/5 active:cursor-grabbing dark:hover:bg-white/10',
+                      isDivider
+                        ? vertical
+                          ? 'h-5 w-10'
+                          : 'h-10 w-5'
+                        : 'size-10'
+                    )}
+                  >
+                    {isDivider ? (
+                      <span
+                        className={clsx(
+                          'rounded-full bg-zinc-400/70 dark:bg-zinc-500/70',
+                          vertical ? 'h-0.5 w-6' : 'h-6 w-0.5'
+                        )}
+                      />
+                    ) : entry.kind === 'tool' ? (
+                      <>
+                        <ToolMiniIcon id={entry.id} />
+                        {showKey && (
+                          <kbd
+                            aria-hidden
+                            className="pointer-events-none absolute right-0.5 bottom-0.5 rounded px-0.5 text-[9px]/3 font-semibold text-zinc-400 dark:text-zinc-500"
+                          >
+                            {sc}
+                          </kbd>
+                        )}
+                      </>
+                    ) : null}
+                  </button>
+                </div>
+              )
+            })}
+          </ScrollableBar>
+
+          {mergeHighlight && (
+            <span className="pointer-events-none absolute -bottom-7 left-1/2 -translate-x-1/2 rounded-md bg-blue-600 px-2 py-0.5 text-[11px]/4 font-semibold whitespace-nowrap text-white shadow">
+              {t('customize.mergeBarHere')}
+            </span>
+          )}
+        </div>
+      </ChromeBarProvider>
+    )
+  }
 
   const renderSelectButton = (id: SelectToolId): ReactNode => {
     const mode = SELECT_MODES.find((m) => m.tool === id)
@@ -541,16 +713,17 @@ export function ToolBar({
   }
 
   let selectGroupModes: SelectToolId[] = []
-  const rendered = items.map((entry) => {
+  const rendered = projected.map((entry) => {
     if (entry.kind === 'divider') return <BarDivider key={entry.id} vertical={!vertical} />
     if (entry.kind === 'selectGroup') {
       selectGroupModes = entry.modes
       const selecting = isSelectMode(tool)
-      const currentModeId = selecting && entry.modes.includes(tool as SelectToolId)
-        ? (tool as SelectToolId)
-        : entry.modes.includes(lastSelect.current)
-          ? lastSelect.current
-          : entry.modes[0]
+      const currentModeId =
+        selecting && entry.modes.includes(tool as SelectToolId)
+          ? (tool as SelectToolId)
+          : entry.modes.includes(lastSelect.current)
+            ? lastSelect.current
+            : entry.modes[0]
       const mode = SELECT_MODES.find((m) => m.tool === currentModeId) ?? SELECT_MODES[0]
       const canOpenSelectPopover = popoverOptions && entry.modes.length > 1
       return (
@@ -627,8 +800,8 @@ export function ToolBar({
   }
 
   return (
-    <ChromeBarProvider edge={edge} compact={compact}>
-      {items.length > 0 && (
+    <ChromeBarProvider edge={edge} compact={compact} showShortcuts={showShortcutBadges}>
+      {projected.length > 0 && (
         <ScrollableBar vertical={vertical} label={barLabel}>
           {rendered}
         </ScrollableBar>

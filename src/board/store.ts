@@ -13,9 +13,13 @@ import { validateRows, type Cursor, type FormulaState, type Row } from '@penrill
 import { cleanInstrumentPrefs, DEFAULT_INSTRUMENTS, type InstrumentPrefs } from './engine/instruments'
 import { cleanToolbarLayout, insertDefaultDividers, isToolbarDivider, type ToolbarItemId } from './toolbarLayout'
 import {
+  cleanCustomPresets,
   cleanWorkspaceLayout,
+  cloneWorkspaceLayout,
   DEFAULT_WORKSPACE_LAYOUT,
+  migrateLegacyLayout,
   WORKSPACE_PRESETS,
+  type CustomWorkspacePreset,
   type WorkspaceLayout,
   type WorkspacePresetId
 } from './workspaceLayout'
@@ -201,11 +205,18 @@ export interface Prefs {
   instruments: InstrumentPrefs
   /** Instrument tips the user closed ("protractor", "compass"); they don't show again. */
   hiddenTips: string[]
+  /** Kept only for legacy compatibility; active tool placement lives in `workspaceLayout.docks`. */
   toolbarLayout: ToolbarItemId[] | null
   workspaceLayout: WorkspaceLayout
+  customPresets: CustomWorkspacePreset[]
   setWorkspaceLayout: (patch: Partial<WorkspaceLayout>) => void
+  replaceWorkspaceLayout: (layout: WorkspaceLayout) => void
   applyWorkspacePreset: (preset: WorkspacePresetId) => void
   resetWorkspaceLayout: () => void
+  saveCustomPreset: (name: string, layout?: WorkspaceLayout) => CustomWorkspacePreset
+  updateCustomPreset: (id: string, layout?: WorkspaceLayout) => void
+  renameCustomPreset: (id: string, name: string) => void
+  deleteCustomPreset: (id: string) => void
   updatePen: (index: number, patch: Partial<InkSlot>) => void
   updateHighlighter: (patch: Partial<InkSlot>) => void
   setBackground: (bg: BackgroundKind) => void
@@ -247,10 +258,45 @@ export const prefsStore = createStore<Prefs>()(
       instruments: DEFAULT_INSTRUMENTS,
       hiddenTips: [],
       toolbarLayout: null,
-      workspaceLayout: DEFAULT_WORKSPACE_LAYOUT,
-      setWorkspaceLayout: (patch) => set((s) => ({ workspaceLayout: { ...s.workspaceLayout, ...patch } })),
-      applyWorkspacePreset: (preset) => set({ workspaceLayout: { ...WORKSPACE_PRESETS[preset] } }),
-      resetWorkspaceLayout: () => set({ workspaceLayout: { ...DEFAULT_WORKSPACE_LAYOUT } }),
+      workspaceLayout: cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT),
+      customPresets: [],
+      setWorkspaceLayout: (patch) =>
+        set((s) => ({
+          workspaceLayout: {
+            ...s.workspaceLayout,
+            ...patch,
+            docks: patch.docks ? cloneWorkspaceLayout({ ...s.workspaceLayout, docks: patch.docks }).docks : s.workspaceLayout.docks
+          }
+        })),
+      replaceWorkspaceLayout: (layout) => set({ workspaceLayout: cloneWorkspaceLayout(layout) }),
+      applyWorkspacePreset: (preset) => set({ workspaceLayout: cloneWorkspaceLayout(WORKSPACE_PRESETS[preset]) }),
+      resetWorkspaceLayout: () => set({ workspaceLayout: cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT) }),
+      saveCustomPreset: (name, layout) => {
+        const trimmed = name.trim().slice(0, 60) || 'Preset'
+        const preset: CustomWorkspacePreset = {
+          id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          name: trimmed,
+          layout: cloneWorkspaceLayout(layout ?? prefsStore.getState().workspaceLayout),
+          updatedAt: Date.now()
+        }
+        set((s) => ({ customPresets: [...s.customPresets, preset] }))
+        return preset
+      },
+      updateCustomPreset: (id, layout) =>
+        set((s) => ({
+          customPresets: s.customPresets.map((p) =>
+            p.id === id ? { ...p, layout: cloneWorkspaceLayout(layout ?? s.workspaceLayout), updatedAt: Date.now() } : p
+          )
+        })),
+      renameCustomPreset: (id, name) => {
+        const trimmed = name.trim().slice(0, 60)
+        if (!trimmed) return
+        set((s) => ({
+          customPresets: s.customPresets.map((p) => (p.id === id ? { ...p, name: trimmed, updatedAt: Date.now() } : p))
+        }))
+      },
+      deleteCustomPreset: (id) =>
+        set((s) => ({ customPresets: s.customPresets.filter((p) => p.id !== id) })),
       updatePen: (index, patch) =>
         set((s) => ({ pens: s.pens.map((p, i) => (i === index ? { ...p, ...patch } : p)) })),
       updateHighlighter: (patch) => set((s) => ({ highlighter: { ...s.highlighter, ...patch } })),
@@ -262,7 +308,7 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => {
         let state = (persisted ?? {}) as Prefs
         if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
@@ -272,6 +318,13 @@ export const prefsStore = createStore<Prefs>()(
           const cleaned = cleanToolbarLayout(state.toolbarLayout)
           if (cleaned && !cleaned.some((id) => isToolbarDivider(id))) {
             state = { ...state, toolbarLayout: insertDefaultDividers(cleaned) }
+          }
+        }
+        if (version < 4) {
+          state = {
+            ...state,
+            workspaceLayout: migrateLegacyLayout(state.workspaceLayout, state.toolbarLayout),
+            customPresets: cleanCustomPresets((state as { customPresets?: unknown }).customPresets)
           }
         }
         return state
@@ -303,7 +356,8 @@ export const prefsStore = createStore<Prefs>()(
           instruments: cleanInstrumentPrefs(p.instruments),
           shapeDefaults: cleanShapeDefaults(p.shapeDefaults),
           toolbarLayout: cleanToolbarLayout(p.toolbarLayout),
-          workspaceLayout: cleanWorkspaceLayout(p.workspaceLayout),
+          workspaceLayout: cleanWorkspaceLayout(p.workspaceLayout, p.toolbarLayout),
+          customPresets: cleanCustomPresets(p.customPresets),
           hiddenTips: Array.isArray(p.hiddenTips) ? p.hiddenTips.filter((x) => typeof x === 'string') : [],
           formulaHistory: cleanFormulaHistory(p.formulaHistory)
         }
@@ -335,7 +389,8 @@ export const prefsStore = createStore<Prefs>()(
         hiddenTips: s.hiddenTips,
         instruments: s.instruments,
         toolbarLayout: s.toolbarLayout,
-        workspaceLayout: s.workspaceLayout
+        workspaceLayout: s.workspaceLayout,
+        customPresets: s.customPresets
       })
     }
   )
