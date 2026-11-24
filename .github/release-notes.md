@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Updated default layout and 4-edge tool options in 0.13.12
+
+- **New default board layout.** Drawing and navigation tools sit at the top with the tool options strip right below them, insert tools (text, formulas, shapes, graphs, instruments, images and templates) sit on the left rail, and the bottom edge stays open. The previous left-rail + bottom-insert layout remains available as the *Left rail* preset.
+- **Tool options on any edge.** The tool options bar can now dock vertically to the left or right edge as well as top and bottom, both in Settings → Layout and by dragging in Customize mode.
+- **Centred bottom and top bars.** Bottom and top toolbars stay centred on the window regardless of where the zoom controls are docked.
+- **Click outside to finish customizing.** Clicking the dimmed board area outside the customizer card saves your layout changes and closes Customize mode (Cancel and Escape still discard changes).
+
 ## Customizable workspace layouts and presets in 0.13.11
 
 - **Built-in layout presets, including the classic top bar.** Open Settings → Layout to switch between *Default*, *Top bar* (all tools in one horizontally scrolling bar at the top, like earlier releases), *Right rail* and *Bottom dock*, or switch tool options between an always-visible strip and click-to-open popovers.
