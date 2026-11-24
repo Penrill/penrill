@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Customizable workspace layouts and presets in 0.13.11
+
+- **Built-in layout presets, including the classic top bar.** Open Settings → Layout to switch between *Default*, *Top bar* (all tools in one horizontally scrolling bar at the top, like earlier releases), *Right rail* and *Bottom dock*, or switch tool options between an always-visible strip and click-to-open popovers.
+- **Live drag-and-drop customization on the board.** Click the sliders button in the top-right bar (or *Customize on board* in Settings) to drag any tool or divider onto any of the four screen edges, drag entire bars to move or merge them, move the tool options strip between top and bottom, move zoom controls to any corner, or drop tools into the central palette to hide them.
+- **Save your own workspace presets.** Save any custom panel arrangement under your own name, preview it as a miniature layout card, switch between saved presets in one click, and update, rename or delete them at any time.
+- **Optional shortcut badges and 4-edge tool settings.** Toggle single-key shortcut labels (`1`, `2`, `3`, `E`, `V`) on toolbar buttons, choose whether insert buttons show text labels and whether selection tools share one button, and manage tools per screen edge in Settings → Tools.
+
 ## Interactive 2D and 3D shapes in 0.13.10
 
 - **Direct editing on every 2D and 3D shape.** Drag corners and vertices directly on triangles, rectangles, rhombuses, parallelograms, trapezoids, polygons, stars, ellipses, cubes, prisms, pyramids, cylinders, cones and spheres. Hold `Alt` (or click *Free vertices*) to move individual vertices freely in 2D or 3D, and hold `Ctrl` (`⌘` on macOS) to snap shapes and vertices to the paper grid.
