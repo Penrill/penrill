@@ -61,6 +61,9 @@ export interface ShapeSpec {
   by: number
   /** Number of base sides for pyramids and prisms. */
   base?: number
+  /** Circles constructed from a triangle's vertices, recalculated when its box changes. */
+  incircle?: boolean
+  circumcircle?: boolean
 }
 
 export type LineDash = 'dashed' | 'dotted'

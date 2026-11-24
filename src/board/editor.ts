@@ -11,7 +11,7 @@ import {
   type BoardData,
   type BoardFile
 } from './engine/serialize'
-import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
+import { editableShape, patchShapeSpec, regenerateShape } from '@penrill/core/shapeItems'
 import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
 import { bgPattern, withPattern } from './engine/surface'
 import { COMPASS_CELL } from './engine/compass'
@@ -175,10 +175,13 @@ export class Editor {
 
   undo(): void {
     this.scene.undo()
+    // A restored construction may have more parts than the shape it replaced.
+    this.setSelection(this.selectedItems())
   }
 
   redo(): void {
     this.scene.redo()
+    this.setSelection(this.selectedItems())
   }
 
   // ---------------------------------------------------------------- selection
@@ -491,8 +494,7 @@ export class Editor {
   updateShape(patch: Partial<ShapeSpec>): void {
     const sel = editableShape(this.selectedItems())
     if (!sel || sel.parts.some((p) => p.locked)) return
-    const spec: ShapeSpec = { ...sel.spec, ...patch }
-    if (!patch.base && spec.kind !== sel.spec.kind) delete spec.base
+    const spec = patchShapeSpec(sel.spec, patch)
     const gid = sel.parts[0].groupId
     const inUserGroup = !!gid && this.scene.getItems().some((i) => i.groupId === gid && !sel.parts.includes(i as StrokeItem))
     const next = regenerateShape(sel.parts, spec, () => this.scene.allocZ(), inUserGroup)

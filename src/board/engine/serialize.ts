@@ -26,13 +26,15 @@ export const FORMAT = 'inkboard'
  * 8 = chalkboard surface (`chalk-<pattern>` backgrounds).
  * 9 = school paper patterns (`math`, `hand`, `slant` backgrounds, on paper or chalkboard).
  * 10 = turned images, texts and formulas (`rot`; turned ink needs nothing new, its points turn).
+ * 11 = triangle incircles and circumcircles, oblique pyramids (editable shape specifications).
  * Readers accept ≤ this; older apps refuse newer files instead of silently dropping data.
  * A file is stamped with the lowest version that can show it.
  */
-export const FORMAT_VERSION = 10
+export const FORMAT_VERSION = 11
 
 /** Lowest format version that can represent these items without losing anything. */
 export function requiredVersion({ items, background }: Pick<BoardData, 'items' | 'background'>): number {
+  if (items.some((i) => i.type === 'stroke' && (i.shape?.kind === 'obliquePyramid' || i.shape?.incircle || i.shape?.circumcircle))) return 11
   if (items.some((i) => (i.type === 'image' || i.type === 'text' || i.type === 'formula') && !!i.rot)) return 10
   if (SCHOOL_PATTERNS.includes(bgPattern(background))) return 9
   if (isChalk(background)) return 8
@@ -297,6 +299,8 @@ function readSpec(v: unknown): ShapeSpec | null {
   if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
   const spec: ShapeSpec = { kind: o.kind, ax: o.ax as number, ay: o.ay as number, bx: o.bx as number, by: o.by as number }
   if (typeof o.base === 'number' && Number.isInteger(o.base) && o.base >= MIN_BASE && o.base <= MAX_BASE) spec.base = o.base
+  if (o.incircle === true) spec.incircle = true
+  if (o.circumcircle === true) spec.circumcircle = true
   return spec
 }
 

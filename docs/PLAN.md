@@ -118,6 +118,9 @@ in progress and the pen cursor (so drawing never forces a full board redraw).
 - [x] Formatted text: select words (or right-click) → colour, size, bold, italic, underline; Ctrl+B / I / U
 - [x] Edit existing text: double-click / double-tap (pen too) or "Edit text" in the selection bar
 - [x] Pyramids and prisms with any number of sides for the base (3–24)
+- [x] Oblique pyramids with 3 to 24 base sides and dashed hidden edges
+- [x] Triangle incircles and circumcircles, selectable separately or together when inserting or editing;
+      circles recalculate when the triangle is stretched (format 11)
 - [x] Compass (K): set the radius in paper cells, draw arcs / circles around the needle
 - [x] Protractor arcs get their angle written next to them; how-to tips for both instruments
 - [x] Toolbar: hand (pan) next to the selection tools; four-way arrows for the Move tool

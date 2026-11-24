@@ -136,6 +136,8 @@ export interface Prefs {
   formulaHistory: Row[]
   /** Chosen base (number of sides) for pyramids and prisms. */
   shapeBases: Partial<Record<ShapeKind, number>>
+  /** Circles to include when drawing a triangle. */
+  triangleCircles: { incircle?: boolean; circumcircle?: boolean }
   /** The user's own coordinate-plane/line presets. */
   graphPresets: GraphPreset[]
   pens: InkSlot[]
@@ -172,6 +174,7 @@ export const prefsStore = createStore<Prefs>()(
   persist(
     (set) => ({
       shapeBases: {},
+      triangleCircles: {},
       selectRadius: 24,
       iPadFingerMode: null,
       pencilPressure: true,
@@ -256,6 +259,7 @@ export const prefsStore = createStore<Prefs>()(
         linkBoardToTheme: s.linkBoardToTheme,
         graphPresets: s.graphPresets,
         shapeBases: s.shapeBases,
+        triangleCircles: s.triangleCircles,
         selectRadius: s.selectRadius,
         iPadFingerMode: s.iPadFingerMode,
         pencilPressure: s.pencilPressure,

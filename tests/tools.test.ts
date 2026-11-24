@@ -171,6 +171,25 @@ test('pan moves the camera with the pointer', () => {
   assert.deepEqual(editor.camera, { x: -30, y: 20, zoom: 1 })
 })
 
+test('the shape tool previews and inserts triangle circles and oblique pyramids as one undo step', () => {
+  for (const kind of ['triangle', 'rightTriangle', 'obliquePyramid'] as const) {
+    const scene = new Scene()
+    const { ctx } = fakeContext(scene)
+    ctx.session.setState({ shape: kind })
+    Object.assign(ctx.prefs(), { triangleCircles: { incircle: true, circumcircle: true }, shapeBases: { obliquePyramid: 12 } })
+    const drag = beginShape(ctx, pt(0, 0))
+    drag.move([pt(180, 100)], keys)
+    const preview = drag.overlay!().live!.parts!
+    assert.equal(preview.length, kind === 'obliquePyramid' ? 24 : 3)
+    drag.end()
+    assert.deepEqual(scene.getItems().map((i) => (i as StrokeItem).points), preview.map((p) => p.points))
+    scene.undo()
+    assert.equal(scene.getItems().length, 0)
+    scene.redo()
+    assert.equal(scene.getItems().length, preview.length)
+  }
+})
+
 test('laser rendering batches fast pen samples and starts a separate path after lifting', () => {
   const trail = new LaserTrail()
   const { ctx } = fakeContext(new Scene())

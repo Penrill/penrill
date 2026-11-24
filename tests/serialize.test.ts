@@ -6,17 +6,47 @@ import { decodeBoard, deserializeBoard, encodeBoard, FORMAT_VERSION, serializeBo
 import { EMPTY_FORMULA, typeChar } from '@penrill/math/formula'
 import { rowsToText } from '../src/board/engine/formulaexpr.ts'
 import type { FormulaItem, GraphItem } from '@penrill/core/types'
+import { buildShapeItems, editableShape } from '@penrill/core/shapeItems'
+import type { ShapeSpec, StrokeItem } from '@penrill/core/types'
 
 const plane = {
   type: 'graph' as const, id: 'g1', z: 1, ox: 240, oy: 240, color: '#1e1e1e',
   kind: 'plane' as const, xMin: -10, xMax: 10, yMin: -10, yMax: 10, unit: 24, labelStep: 1, grid: false
 }
 
-test('the format version is 10; a board is stamped with the lowest version that can show it', () => {
-  assert.equal(FORMAT_VERSION, 10)
+test('the format version is 11; a board is stamped with the lowest version that can show it', () => {
+  assert.equal(FORMAT_VERSION, 11)
   // Nothing from version 7 on the board: apps that only know version 6 can still open it.
   const f = serializeBoard({ items: [{ ...plane, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
   assert.equal(f.version, 6)
+})
+
+test('triangle circles and oblique pyramids save as version 11 and retain editable geometry', () => {
+  const specs: ShapeSpec[] = [
+    { kind: 'triangle', ax: 10, ay: 20, bx: 160, by: 120, incircle: true, circumcircle: true },
+    { kind: 'rightTriangle', ax: 10, ay: 20, bx: 160, by: 120, circumcircle: true },
+    { kind: 'obliquePyramid', ax: 10, ay: 20, bx: 160, by: 120, base: 24 }
+  ]
+  for (const spec of specs) {
+    const items = buildShapeItems(spec, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `s${i}`, z: i }))
+    const file = JSON.parse(JSON.stringify(serializeBoard({ items, background: 'dots', camera: { x: 0, y: 0, zoom: 1 } }))) as BoardFile
+    assert.equal(file.version, 11)
+    const back = deserializeBoard(file).items as StrokeItem[]
+    assert.deepEqual(editableShape(back)?.spec, spec)
+    assert.deepEqual(back.map((p) => p.dash), items.map((p) => p.dash))
+    assert.deepEqual(back.map((p) => p.groupId), items.map((p) => p.groupId))
+  }
+})
+
+test('older triangle specs still load and invalid circle options are ignored', () => {
+  const spec: ShapeSpec = { kind: 'triangle', ax: 0, ay: 0, bx: 100, by: 100 }
+  const items = buildShapeItems(spec, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `s${i}`, z: i }))
+  const file = serializeBoard({ items, background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
+  assert.equal(file.version, 6)
+  for (let version = 4; version <= 10; version++) assert.deepEqual(editableShape(deserializeBoard({ ...file, version }).items)?.spec, spec)
+  const malformed = JSON.parse(JSON.stringify(file)) as BoardFile
+  Object.assign((malformed.items[0] as StrokeItem).shape!, { incircle: 'yes', circumcircle: 1 })
+  assert.deepEqual(editableShape(deserializeBoard(malformed).items)?.spec, spec)
 })
 
 test('a formula survives save and load and makes the file version 7', () => {

@@ -80,7 +80,7 @@ registry (`src/board/registry.ts`, `editor.features`):
 
 | Module | Brings |
 |---|---|
-| `ink` | stroke items (pen, highlighter, lines, shapes) |
+| `ink` | stroke items (pen, highlighter, lines, shapes); shape creation and triangle circle controls in `modules/strokes` |
 | `images` | image items |
 | `text` | text items |
 | `graphs` | graph items (number lines, planes, 3D axes) and their plots |

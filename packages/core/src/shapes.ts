@@ -1,4 +1,5 @@
 import type { Point, ShapeSpec } from './types'
+import { triangleCircles } from './triangleCircles'
 
 export const SHAPES_2D = [
   'line',
@@ -15,7 +16,7 @@ export const SHAPES_2D = [
   'hexagon',
   'star'
 ] as const
-export const SHAPES_3D = ['cube', 'prism', 'pyramid', 'cylinder', 'cone', 'sphere'] as const
+export const SHAPES_3D = ['cube', 'prism', 'pyramid', 'obliquePyramid', 'cylinder', 'cone', 'sphere'] as const
 export const SHAPES = [...SHAPES_2D, ...SHAPES_3D] as const
 export type ShapeKind = (typeof SHAPES)[number]
 
@@ -34,10 +35,12 @@ export const MAX_BASE = 24
 /** Solids whose base can be chosen (number of sides) and the default. */
 export const SHAPE_BASES: Partial<Record<ShapeKind, { options: number[]; def: number }>> = {
   pyramid: { options: [3, 4, 5, 6], def: 4 },
+  obliquePyramid: { options: [3, 4, 5, 6], def: 4 },
   prism: { options: [3, 4, 5, 6], def: 3 }
 }
 
 export const isShapeKind = (k: unknown): k is ShapeKind => typeof k === 'string' && (SHAPES as readonly string[]).includes(k)
+export const isTriangle = (k: ShapeKind): boolean => k === 'triangle' || k === 'rightTriangle'
 
 /**
  * The box a drag from a to b really produces: with `keep` (Shift) lines snap to 45° and boxes become
@@ -55,11 +58,24 @@ export function shapeBox(kind: ShapeKind, ax: number, ay: number, bx: number, by
 
 /** All parts of a stored shape. */
 export function specParts(spec: ShapeSpec, size: number): ShapePart[] {
-  return shapeParts(spec.kind, spec.ax, spec.ay, spec.bx, spec.by, false, size, spec.base)
+  const parts = shapeParts(spec.kind, spec.ax, spec.ay, spec.bx, spec.by, false, size, spec.base)
+  if (isTriangle(spec.kind) && (spec.incircle || spec.circumcircle)) {
+    const [a, b, c] = parts[0].points
+    const circles = triangleCircles(a, b, c)
+    if (circles) {
+      for (const key of ['incircle', 'circumcircle'] as const) {
+        if (!spec[key]) continue
+        const { x, y, radius } = circles[key]
+        parts.push({ points: ellipseArc(x, y, radius, radius, 0, Math.PI * 2, 128) })
+      }
+    }
+  }
+  return parts
 }
 
 export function sameSpec(a: ShapeSpec | undefined, b: ShapeSpec | undefined): boolean {
   return !!a && !!b && a.kind === b.kind && a.ax === b.ax && a.ay === b.ay && a.bx === b.bx && a.by === b.by && a.base === b.base
+    && !!a.incircle === !!b.incircle && !!a.circumcircle === !!b.circumcircle
 }
 
 /** Snap an angle to multiples of 45° when it's within `tolDeg` of one (Shift lines). */
@@ -222,6 +238,8 @@ export function shapeParts(
       return polygonSolid('prism', x0, y0, x1, y1, base ?? SHAPE_BASES.prism!.def)
     case 'pyramid':
       return polygonSolid('pyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.pyramid!.def)
+    case 'obliquePyramid':
+      return polygonSolid('obliquePyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.obliquePyramid!.def)
     case 'cylinder': {
       const ry = Math.min(h * 0.14, w * 0.25)
       const rx = w / 2
@@ -262,11 +280,11 @@ export function shapeParts(
 }
 
 /**
- * Upright prism or pyramid over a regular n-gon base, seen slightly from above. Base edges facing the
- * viewer are solid, the ones behind are dashed; a side edge is solid when it touches a visible face.
+ * Prism or pyramid over a regular n-gon base, seen slightly from above. Pyramids classify side faces
+ * by their projected winding so hidden edges follow the apex, including in an oblique pyramid.
  */
-function polygonSolid(kind: 'prism' | 'pyramid', x0: number, y0: number, x1: number, y1: number, n: number): ShapePart[] {
-  n = Math.max(3, Math.min(8, Math.round(n)))
+function polygonSolid(kind: 'prism' | 'pyramid' | 'obliquePyramid', x0: number, y0: number, x1: number, y1: number, n: number): ShapePart[] {
+  n = Number.isFinite(n) ? Math.max(MIN_BASE, Math.min(MAX_BASE, Math.round(n))) : SHAPE_BASES[kind]!.def
   const w = x1 - x0
   const h = y1 - y0
   const ry = Math.min(h * 0.16, w * 0.28)
@@ -282,22 +300,26 @@ function polygonSolid(kind: 'prism' | 'pyramid', x0: number, y0: number, x1: num
   const maxY = Math.max(...unit.map((u) => u[1]))
   const mapX = (u: number): number => x0 + ((u - minX) / (maxX - minX)) * w
   const mapY = (u: number, cy: number): number => cy - ry + ((u - minY) / (maxY - minY)) * 2 * ry
-  // Edge i joins vertex i and i+1; it faces the viewer when its outward normal points down the screen.
+  const bottomCy = y1 - ry
+  const bottom = unit.map(([ux, uy]) => P(mapX(ux), mapY(uy, bottomCy)))
+  const apex = P(kind === 'obliquePyramid' ? x0 + w * 0.9 : mapX(0), y0)
   const front = unit.map((_, i) => {
+    if (kind !== 'prism') {
+      const a = bottom[i], b = bottom[(i + 1) % n]
+      return (b[0] - a[0]) * (apex[1] - a[1]) - (b[1] - a[1]) * (apex[0] - a[0]) > 0
+    }
+    // A prism's vertical side faces the viewer when its outward normal points down the screen.
     const a = off + ((i + 0.5) / n) * Math.PI * 2
     return Math.sin(a) > 1e-6
   })
   const vertVisible = (i: number): boolean => front[i] || front[(i - 1 + n) % n]
-  const bottomCy = y1 - ry
-  const bottom = unit.map(([ux, uy]) => P(mapX(ux), mapY(uy, bottomCy)))
   const solid: ShapePart[] = []
   const hidden: ShapePart[] = []
   const edge = (a: Point, b: Point, visible: boolean): void => {
     ;(visible ? solid : hidden).push(visible ? { points: [a, b] } : { points: [a, b], dash: 'dashed' })
   }
   for (let i = 0; i < n; i++) edge(bottom[i], bottom[(i + 1) % n], front[i])
-  if (kind === 'pyramid') {
-    const apex = P(mapX(0), y0)
+  if (kind !== 'prism') {
     for (let i = 0; i < n; i++) edge(apex, bottom[i], vertVisible(i))
   } else {
     const top = unit.map(([ux, uy]) => P(mapX(ux), mapY(uy, y0 + ry)))

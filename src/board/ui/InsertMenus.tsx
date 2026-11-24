@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { BUILTIN_GRAPHS, DEFAULT_PLANE, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
 import { lineSvgPath } from '../engine/ink'
-import { MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, shapeParts, type ShapeKind } from '@penrill/core/shapes'
+import { isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, specParts, type ShapeKind } from '@penrill/core/shapes'
 import type { GraphItem, GraphParams } from '@penrill/core/types'
 import { useT, type MessageKey } from '../i18n'
 import { usePrefs, prefsStore } from '../store'
@@ -9,13 +9,18 @@ import { CompassIcon, PolygonIcon, ProtractorIcon, RulerIcon, SetSquare45Icon, S
 import { shortcutKey } from '../shortcuts'
 import { PanelTitle } from './chrome'
 import { useEditor, useSession } from '../editorContext'
+import { TriangleCircleControls, type TriangleCircleOptions } from '../modules/strokes/TriangleCircleControls'
 
 /** Tiny SVG preview of a shape, drawn with the real outline code. */
-export function ShapePreview({ kind, base }: { kind: ShapeKind; base?: number }) {
+export function ShapePreview({ kind, base, circles }: { kind: ShapeKind; base?: number; circles?: TriangleCircleOptions }) {
   const linear = kind === 'line' || kind === 'arrow' || kind === 'doubleArrow'
-  const parts = linear ? shapeParts(kind, 4, 20, 24, 8, false, 1.2) : shapeParts(kind, 4, 4, 24, 24, false, 1.2, base)
+  const parts = specParts({ ...circles, kind, ax: 4, ay: linear ? 20 : 4, bx: 24, by: linear ? 8 : 24, base }, 1.2)
+  // A circumcircle can extend beyond the triangle's box.
+  const points = parts.flatMap((p) => p.points)
+  const x0 = Math.min(0, ...points.map((p) => p[0] - 2)), y0 = Math.min(0, ...points.map((p) => p[1] - 2))
+  const x1 = Math.max(28, ...points.map((p) => p[0] + 2)), y1 = Math.max(28, ...points.map((p) => p[1] + 2))
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden>
+    <svg width="28" height="28" viewBox={`${x0} ${y0} ${x1 - x0} ${y1 - y0}`} aria-hidden>
       {parts.map((part, i) => (
         <path
           key={i}
@@ -81,6 +86,7 @@ export function ShapesPanel({ close }: { close: () => void }) {
   const tool = useSession((s) => s.tool)
   const shape = useSession((s) => s.shape)
   const bases = usePrefs((s) => s.shapeBases)
+  const circles = usePrefs((s) => s.triangleCircles)
   const baseOf = (k: ShapeKind): number | undefined => (SHAPE_BASES[k] ? (bases[k] ?? SHAPE_BASES[k]!.def) : undefined)
   return (
     <>
@@ -94,11 +100,11 @@ export function ShapesPanel({ close }: { close: () => void }) {
               title={t(`shape.${k}` as MessageKey)}
               onClick={() => {
                 editor.session.setState({ tool: 'shape', shape: k })
-                // Solids with a choice of base keep the menu open so the base can be picked.
-                if (!SHAPE_BASES[k]) close()
+                // Keep construction options available after choosing the shape.
+                if (!SHAPE_BASES[k] && !isTriangle(k)) close()
               }}
             >
-              <ShapePreview kind={k} base={baseOf(k)} />
+              <ShapePreview kind={k} base={baseOf(k)} circles={isTriangle(k) ? circles : undefined} />
             </button>
           ))}
         </div>
@@ -108,6 +114,12 @@ export function ShapesPanel({ close }: { close: () => void }) {
           kind={shape}
           value={baseOf(shape)!}
           onChange={(n) => prefsStore.setState((s) => ({ shapeBases: { ...s.shapeBases, [shape]: n } }))}
+        />
+      )}
+      {tool === 'shape' && isTriangle(shape) && (
+        <TriangleCircleControls
+          value={circles}
+          onChange={(patch) => prefsStore.setState((s) => ({ triangleCircles: { ...s.triangleCircles, ...patch } }))}
         />
       )}
     </>

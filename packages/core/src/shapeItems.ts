@@ -1,5 +1,5 @@
 import { bboxOfPoints, newId } from './geometry'
-import { sameSpec, specParts } from './shapes'
+import { isTriangle, sameSpec, SHAPE_BASES, specParts } from './shapes'
 import type { Item, LineCap, LineDash, ShapeSpec, StrokeItem } from './types'
 
 export interface ShapeStyle {
@@ -9,6 +9,21 @@ export interface ShapeStyle {
   dash?: LineDash
   startCap?: LineCap
   endCap?: LineCap
+}
+
+/** Keep compatible construction options when switching shape kinds. */
+export function patchShapeSpec(previous: ShapeSpec, patch: Partial<ShapeSpec>): ShapeSpec {
+  const spec = { ...previous, ...patch }
+  if (spec.kind !== previous.kind && patch.base === undefined) {
+    const base = SHAPE_BASES[previous.kind]
+    if (base && SHAPE_BASES[spec.kind]) spec.base = previous.base ?? base.def
+    else delete spec.base
+  }
+  if (!isTriangle(spec.kind)) {
+    delete spec.incircle
+    delete spec.circumcircle
+  }
+  return spec
 }
 
 /**

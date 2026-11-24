@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from '
 import { canHaveEnds } from '../editor'
 import { SELECTION_PAD } from '../engine/renderer'
 import { editableShape } from '@penrill/core/shapeItems'
-import { isLinear, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
+import { isLinear, isTriangle, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
 import { fullRuns, TEXT_SIZES } from '../engine/text'
 import type { FormulaItem, StrokeItem, TextItem } from '@penrill/core/types'
 import { useT, type MessageKey } from '../i18n'
@@ -13,6 +13,7 @@ import { LineStyleControls, SizeSlider } from './LineStyle'
 import { fitBox, screenArea } from './dock'
 import { Popover } from './Popover'
 import { useEditor, useSession } from '../editorContext'
+import { TriangleCircleControls } from '../modules/strokes/TriangleCircleControls'
 
 /** Small floating action bar above the current selection (like Whiteboard's context menu). */
 export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'below') => ReactNode }) {
@@ -129,7 +130,7 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
                     title={t(`shape.${k}` as MessageKey)}
                     onClick={() => editor.updateShape({ kind: k })}
                   >
-                    <ShapePreview kind={k} base={k === shape.spec.kind ? shape.spec.base : undefined} />
+                    <ShapePreview kind={k} base={k === shape.spec.kind ? shape.spec.base : undefined} circles={isTriangle(k) ? shape.spec : undefined} />
                   </button>
                 ))}
               </div>
@@ -139,6 +140,9 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
                   value={shape.spec.base ?? SHAPE_BASES[shape.spec.kind]!.def}
                   onChange={(n) => editor.updateShape({ base: n })}
                 />
+              )}
+              {isTriangle(shape.spec.kind) && (
+                <TriangleCircleControls value={shape.spec} onChange={(patch) => editor.updateShape(patch)} />
               )}
             </Popover>
           )}

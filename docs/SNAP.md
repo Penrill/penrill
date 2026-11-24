@@ -4,6 +4,34 @@ Ubuntu App Center only shows screenshots, the license, the full description and 
 for apps that come from the Snap Store. A downloaded `.deb` always gets a bare card, so Inkboard is
 also published as a snap.
 
+## Moving to the registered name `penril`
+
+The display title is **Penrill**. Confirm the registered identifier in the
+[Snap Store dashboard](https://snapcraft.io/account) before building. Each name has its own
+revisions, channels, listing and user data.
+
+1. On Linux with the build tools below, build a snap specifically for the new listing:
+
+   ```sh
+   npm ci
+   npm run build
+   npx electron-builder --linux snap --publish never -c.linux.executableName=penril -c.extraMetadata.desktopName=penril.desktop
+   ```
+
+2. Run `snap info ./dist/<new-file>.snap` and check that the name is `penril`.
+   Run `snapcraft login`, then `snapcraft upload --release=edge ./dist/<new-file>.snap`.
+   Install with `sudo snap install penril --edge` and check the app opens.
+3. Open [the new store listing](https://snapcraft.io/penril/listing). Set the title to **Penrill**
+   and the website to `https://penrill.com`. Upload
+   [the geometry board](images/hero.png), [formatted text](images/text-format.png)
+   and [the board library](images/home.png), in that order. Save.
+4. When ready, promote the tested revision with `snapcraft release penril <revision> stable`.
+   Update the website and README install links once the stable listing is available.
+   Existing `inkboard` installations follow their original channel. Users moving over can
+   export their boards from Inkboard and open them in Penrill.
+5. For future automated releases, apply the two build overrides above to the snap packaging
+   step and replace the GitHub Actions secret with credentials scoped to `penril` (see below).
+
 ## What is automated
 
 - `npm run dist:linux` builds `dist/Inkboard-<version>-linux-amd64.snap` next to the AppImage and
