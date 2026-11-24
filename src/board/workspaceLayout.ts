@@ -95,7 +95,7 @@ export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
       left: [...DEFAULT_INSERT_DOCK],
       right: []
     },
-    optionsMode: 'strip',
+    optionsMode: 'popover',
     optionsDock: 'top',
     zoomDock: 'bottom-right',
     insertLabels: true,

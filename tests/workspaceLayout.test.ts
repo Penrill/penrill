@@ -30,6 +30,8 @@ test('every built-in preset is detected by detectWorkspacePreset', () => {
 })
 
 test('tweaking any field or dock switches preset detection to custom', () => {
+  assert.equal(DEFAULT_WORKSPACE_LAYOUT.optionsMode, 'popover')
+  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, optionsMode: 'strip' }), 'custom')
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.top, optionsMode: 'strip' }), 'custom')
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, insertLabels: false }), 'custom')
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, collapseSelectTools: false }), 'custom')
