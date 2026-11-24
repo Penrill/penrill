@@ -10,6 +10,9 @@ export type Vec2 = [x: number, y: number]
 /** A 3D point in local right-handed shape coordinates (x right, y up, z toward viewer). */
 export type Vec3 = [x: number, y: number, z: number]
 
+/** Unit quaternion [x, y, z, w] representing arbitrary 3D orientation without gimbal lock. */
+export type Quat = [x: number, y: number, z: number, w: number]
+
 export interface BBox {
   minX: number
   minY: number
@@ -253,8 +256,12 @@ export interface ShapeGeometry {
   innerRatio?: number
   /** Real 3D dimensions [width, height, depth] in board units (3D solids). */
   dim3?: [w: number, h: number, d: number]
-  /** 3D camera orbit angles [yaw, pitch] in radians (3D solids). */
+  /** 3D camera orbit angles [yaw, pitch] in radians (3D solids, default upright turntable). */
   orbit?: [yaw: number, pitch: number]
+  /** Optional unit quaternion [x, y, z, w] for arbitrary 3-axis 3D orientation (supersedes `orbit`). */
+  rot3?: Quat
+  /** Optional local 3D vertex coordinate overrides keyed by vertex id for free 3D polyhedron editing. */
+  vertices3?: Record<string, Vec3>
   /** 3D horizontal shift [sx, sz] of apex or top face in normalized base-radius units. */
   slant3?: [sx: number, sz: number]
 }

@@ -17,12 +17,21 @@ import { arcStroke, baseStroke, degText, hitProtractor, rayStroke, scaleAngle, s
 import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import { evaluateShape } from '@penrill/core/shapeEval'
 import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
-import { isLinear, shapeEdges, snapAngle } from '@penrill/core/shapes'
+import { is3D, isLinear, shapeEdges, snapAngle } from '@penrill/core/shapes'
 import { canTurnSelection, hitTest } from '../engine/transform'
 import type { BBox, Item, Point, ShapeItem, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
+import { isSideViewPreset, type Gizmo3dModel } from '@penrill/shape-editor/gizmo3d'
 import { useEditor } from '../editorContext'
 import type { RecognizedShape, ShapeEditorHandle } from '../registry'
-import { beginShapeHandle, beginShapeItemHandle, tryRemovePolygonVertex, tryRemoveShapeItemVertex, type ShapeHandleGesture } from '../modules/shapeEditor/controller'
+import {
+  beginShapeHandle,
+  beginShapeItemHandle,
+  tryRemovePolygonVertex,
+  tryRemoveShapeItemVertex,
+  tryResetShapeItemOrbit,
+  tryToggleAxisView3d,
+  type ShapeHandleGesture
+} from '../modules/shapeEditor/controller'
 import type { Session } from '../session'
 import { isBoardFileShortcut, matchShortcut, type BoardFileShortcut, type ShortcutId } from '../shortcuts'
 import { prefsStore, type InkSlot, type PenAction, type Prefs, type Tool } from '../store'
@@ -119,6 +128,8 @@ type Gesture =
       pointerId: number
       startX: number
       startY: number
+      anchorX?: number
+      anchorY?: number
       startSx?: number
       startSy?: number
       moved?: boolean
@@ -177,6 +188,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const readUI = (): Prefs & Session => ({ ...prefsStore.getState(), ...session.getState() })
 
     let gesture: Gesture | null = null
+    /** Latest pointer position during an active drag so pressing/releasing Alt/Ctrl/Shift updates immediately. */
+    let lastDragWorld: { x: number; y: number; sx: number; sy: number } | null = null
     let hover: Hover | null = null
     let spaceDown = false
     const stylus = stylusStrategy(navigator)
@@ -188,6 +201,12 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     let lastTap: { id: string; t: number } | null = null
     /** Last press on a polygon vertex handle (double click / double tap = remove vertex). */
     let lastVertexTap: { id: string; t: number } | null = null
+    /** Last tap on the 3D Orbit handle (double click = reset 3D angle without leaving gizmo flipped). */
+    let lastOrbitTap: { t: number; prevOverride: boolean | null } | null = null
+    const isGizmo3dOn = (): boolean => {
+      const ov = session.getState().gizmo3dOverride
+      return ov !== null ? ov : prefsStore.getState().shapeDefaults.gizmo3d
+    }
     const touches = new Map<number, { x: number; y: number }>()
     const trail = new LaserTrail()
     /** Hold-to-snap timer of the stroke being drawn and where the pen last moved noticeably. */
@@ -277,14 +296,17 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           corners: !info?.line && !isLinearItem,
           sides: !!info?.showSides,
           ends: info?.line ? lineEnds(info.line) : hl ? lineEnds(hl) : null,
-          shapeEditor: info?.shapeHandles?.length || hotEdge || activeEdge
+          shapeEditor: info?.shapeHandles?.length || info?.gizmo3d || hotEdge || activeEdge
             ? {
                 handles: info?.shapeHandles ?? [],
                 hotHandle: gesture?.kind === 'shapeHandle' ? gesture.controller.handleId : (hotShapeHandle?.id ?? null),
                 activeHandle,
                 hotEdge,
                 activeEdge,
-                guides: gesture?.kind === 'shapeHandle' ? gesture.controller.guides() : null
+                guides: gesture?.kind === 'shapeHandle' ? gesture.controller.guides() : null,
+                gizmo3d: info?.gizmo3d ?? null,
+                gizmoArc: gesture?.kind === 'shapeHandle' ? (gesture.controller.gizmoArc?.() ?? null) : null,
+                gizmoActive: !!info?.gizmoActive
               }
             : null
         }, {
@@ -339,7 +361,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       return { sx, sy, x: w.x, y: w.y, pressure: 0.5, time: performance.now() }
     }
     const NO_KEYS: Modifiers = { shift: false, ctrl: false, alt: false }
-    const modifiers = (e: PointerEvent): Modifiers => ({ shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey })
+    /** Normalize modifier keys (on non-US Windows layouts AltGr sets both ctrlKey and altKey; Alt frees snap). */
+    const dragMods = (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): Modifiers => ({
+      shift: e.shiftKey,
+      ctrl: (e.ctrlKey || e.metaKey) && !e.altKey,
+      alt: e.altKey
+    })
+    const modifiers = (e: PointerEvent): Modifiers => dragMods(e)
 
     const toolEffect = (tool: Tool): Effective =>
       tool === 'eraser'
@@ -368,6 +396,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       shapeItem: ShapeItem | null
       shape: { spec: ShapeSpec; parts: StrokeItem[] } | null
       shapeHandles: ShapeEditorHandle[] | null
+      gizmo3d: Gizmo3dModel | null
+      gizmoActive: boolean
       showSides: boolean
       /** The selection can be turned (shows the ↻ handle). */
       turn: boolean
@@ -382,10 +412,19 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const es = locked || line || shapeItem ? null : editableShape(items)
       const shape = es && !isLinear(es.spec.kind) ? es : null
       const shapeEd = editor.features.shapeEditor
-      const shapeHandles = shapeItem && shapeEd ? shapeEd.itemHandles(shapeItem) : shape && shapeEd ? shapeEd.handles(shape.spec) : null
+      const gizmoActive = !!(shapeItem && is3D(shapeItem.geo.kind) && isGizmo3dOn())
+      const rawHandles = shapeItem && shapeEd ? shapeEd.itemHandles(shapeItem) : shape && shapeEd ? shapeEd.handles(shape.spec) : null
+      const shapeHandles =
+        rawHandles && gizmoActive
+          ? rawHandles.map((h) => (h.kind === 'orbit' ? { ...h, hint: 'shape.hint.trackball' } : h))
+          : rawHandles
+      const gizmo3d =
+        gizmoActive && shapeItem && shapeEd
+          ? shapeEd.buildGizmo3d(shapeItem, editor.camera.zoom, session.getState().gizmo3dSpace)
+          : null
       const showSides = !shapeItem && !!shape && !shape.spec.rot && !shapeEd?.usesVertexHandles(shape.spec.kind)
       const turn = canTurnSelection(items)
-      return { box, locked, line, shapeItem, shape, shapeHandles, showSides, turn }
+      return { box, locked, line, shapeItem, shape, shapeHandles, gizmo3d, gizmoActive, showSides, turn }
     }
 
     const reach = (): number => (hover?.pointerType === 'mouse' ? 0 : 6)
@@ -429,6 +468,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       if (info.shapeHandles?.length && editor.features.shapeEditor) {
         const hit = editor.features.shapeEditor.hitHandle(info.shapeHandles, sx, sy, editor.camera, reach())
         if (hit) return { kind: 'shapeHandle', handle: hit }
+      }
+      if (info.gizmo3d && editor.features.shapeEditor) {
+        const ringHit = editor.features.shapeEditor.hitGizmo3dRing(info.gizmo3d, sx, sy, editor.camera, reach())
+        if (ringHit) return { kind: 'shapeHandle', handle: ringHit }
       }
       if (info.line) {
         const which = nearEnd(info.line, sx, sy)
@@ -517,6 +560,54 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const snapPt = (x: number, y: number): { x: number; y: number } => {
       const [sx, sy] = gridSteps()
       return { x: Math.round(x / sx) * sx, y: Math.round(y / sy) * sy }
+    }
+    /** Anchor point used when Ctrl-snapping a moved selection to the paper grid. */
+    const moveAnchor = (): { anchorX: number; anchorY: number } | null => {
+      const items = editor.selectedItems()
+      if (items.length === 1 && items[0].type === 'shape') {
+        const s = items[0]
+        const ev = evaluateShape(s)
+        const useCenter =
+          s.geo.kind === 'ellipse' || s.geo.kind === 'cylinder' || s.geo.kind === 'cone' || s.geo.kind === 'sphere'
+        const pt = useCenter ? ev.center : (ev.vertices[0]?.pos ?? ev.center)
+        return { anchorX: pt[0], anchorY: pt[1] }
+      }
+      const box = editor.selectionBBox()
+      return box ? { anchorX: box.minX, anchorY: box.minY } : null
+    }
+    const applyMovePreview = (g: Extract<Gesture, { kind: 'move' }>, w: { x: number; y: number }, ctrl: boolean): void => {
+      let dx = w.x - g.startX
+      let dy = w.y - g.startY
+      if (ctrl && g.anchorX !== undefined && g.anchorY !== undefined) {
+        const snapped = snapPt(g.anchorX + dx, g.anchorY + dy)
+        dx = snapped.x - g.anchorX
+        dy = snapped.y - g.anchorY
+      }
+      editor.setPreview({ s: 1, ax: 0, ay: 0, dx, dy })
+    }
+    const applyScalePreview = (g: Extract<Gesture, { kind: 'scale' }>, w: { x: number; y: number }, ctrl: boolean): void => {
+      const vx = g.cx - g.ax
+      const vy = g.cy - g.ay
+      const len2 = vx * vx + vy * vy || 1
+      let tx = w.x
+      let ty = w.y
+      if (ctrl) {
+        const sp = snapPt(w.x, w.y)
+        tx = sp.x
+        ty = sp.y
+      }
+      let s = Math.max(0.05, ((tx - g.ax) * vx + (ty - g.ay) * vy) / len2)
+      if (ctrl) {
+        const [gx, gy] = gridSteps()
+        if (Math.abs(vx) >= Math.abs(vy) && Math.abs(vx) > 1e-4) {
+          const cornerX = Math.round((g.ax + vx * s) / gx) * gx
+          s = Math.max(0.05, (cornerX - g.ax) / vx)
+        } else if (Math.abs(vy) > 1e-4) {
+          const cornerY = Math.round((g.ay + vy * s) / gy) * gy
+          s = Math.max(0.05, (cornerY - g.ay) / vy)
+        }
+      }
+      editor.setPreview({ s, ax: g.ax, ay: g.ay, dx: 0, dy: 0 })
     }
 
     /** What a press at screen point (sx, sy) hits on the compass, if it's shown. */
@@ -674,7 +765,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const sHit = !gesture && hover && !pHit ? straightHitAt('setSquare', hover.sx, hover.sy) ?? straightHitAt('ruler', hover.sx, hover.sy) : null
       if (gesture?.kind === 'pan' || gesture?.kind === 'pinch') c = 'grabbing'
       else if (spaceDown || tool === 'pan') c = 'grab'
-      else if (gesture?.kind === 'shapeHandle') c = gesture.controller.handle.kind === 'orbit' ? 'grabbing' : 'crosshair'
+      else if (gesture?.kind === 'shapeHandle') {
+        const hk = gesture.controller.handle.kind
+        c = hk === 'orbit' || hk === 'gizmoRing' || hk === 'gizmoPole' ? 'grabbing' : 'crosshair'
+      }
       else if (tool === 'shape') {
         const h = !gesture && hover ? selectionHit(hover.sx, hover.sy) : null
         if (h?.kind === 'shapeHandle') c = h.handle.cursor
@@ -790,6 +884,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const finishGesture = (discardInk = false): void => {
       const g = gesture
       gesture = null
+      lastDragWorld = null
       penGesture = false
       clearTimeout(holdTimer)
       holdAt = null
@@ -880,6 +975,37 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             g.prevPop?.kind === nextPop.kind &&
             (nextPop.targetId ? g.prevPop?.targetId === nextPop.targetId : g.prevPop?.index === nextPop.index)
           session.setState({ shapePopover: same ? null : nextPop })
+        } else if (!dragged && g.controller.handle.kind === 'orbit') {
+          const now = performance.now()
+          const curInfo = selInfo()
+          const shapeEd = editor.features.shapeEditor
+          if (lastOrbitTap && now - lastOrbitTap.t < 380 && curInfo?.shapeItem && shapeEd) {
+            const restore = lastOrbitTap.prevOverride
+            lastOrbitTap = null
+            session.setState({ gizmo3dOverride: restore })
+            tryResetShapeItemOrbit(shapeEd, editor, curInfo.shapeItem)
+          } else {
+            lastOrbitTap = { t: now, prevOverride: session.getState().gizmo3dOverride }
+            session.setState({ gizmo3dOverride: !isGizmo3dOn() })
+          }
+        } else if (!dragged && g.controller.handle.kind === 'gizmoPole') {
+          const curInfo = selInfo()
+          const shapeEd = editor.features.shapeEditor
+          if (curInfo?.shapeItem && shapeEd) {
+            const id = g.controller.handle.id
+            const axis: 'x' | 'y' | 'z' = id === 'poleX' ? 'x' : id === 'poleY' ? 'y' : 'z'
+            const curView = curInfo.gizmo3d?.activeView ?? null
+            if (!isSideViewPreset(curView)) {
+              session.setState({
+                prev3dView: {
+                  itemId: curInfo.shapeItem.id,
+                  ...(curInfo.shapeItem.geo.rot3 ? { rot3: [...curInfo.shapeItem.geo.rot3] } : {}),
+                  ...(curInfo.shapeItem.geo.orbit ? { orbit: [...curInfo.shapeItem.geo.orbit] } : {})
+                }
+              })
+            }
+            tryToggleAxisView3d(shapeEd, editor, curInfo.shapeItem, axis)
+          }
         }
       }
       if (g.kind === 'ink') editor.shareInk?.(g.id, g.live, true, committedInk)
@@ -1168,7 +1294,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
               gesture = {
                 kind: 'shapeHandle',
                 pointerId: e.pointerId,
-                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y]),
+                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y], {
+                  gizmoSpace: session.getState().gizmo3dSpace,
+                  free3d: isGizmo3dOn()
+                }),
                 prevPop
               }
             }
@@ -1240,6 +1369,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             pointerId: e.pointerId,
             startX: w.x,
             startY: w.y,
+            ...(moveAnchor() ?? {}),
             ...(tapTarget ? { startSx: p.x, startSy: p.y, moved: false, tapTarget, prevPop } : {})
           }
         } else if (eff === 'move') {
@@ -1247,7 +1377,9 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const target = h ? null : hoverTarget(p.x, p.y)
           if (target) {
             editor.setSelection([target.item])
-            if (!isLocked(target.item)) gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y }
+            if (!isLocked(target.item)) {
+              gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y, ...(moveAnchor() ?? {}) }
+            }
           } else if (!h) {
             editor.clearSelection()
             gesture = { kind: 'pan', pointerId: e.pointerId, tool: beginPan(toolContext, sampleAt(p.x, p.y)) }
@@ -1257,7 +1389,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const hit = hitTest(scene.getItems(), w.x, w.y, 6 / editor.camera.zoom)
           if (hit && !isLocked(hit) && (e.pointerType !== 'pen' || hoverBox)) {
             editor.setSelection([hit])
-            gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y }
+            gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y, ...(moveAnchor() ?? {}) }
           } else {
             gesture = { kind: 'lasso', pointerId: e.pointerId, tool: beginLasso(toolContext, sampleAt(p.x, p.y)) }
           }
@@ -1299,7 +1431,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
               gesture = {
                 kind: 'shapeHandle',
                 pointerId: e.pointerId,
-                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y]),
+                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y], {
+                  gizmoSpace: session.getState().gizmo3dSpace,
+                  free3d: isGizmo3dOn()
+                }),
                 prevPop
               }
             }
@@ -1352,6 +1487,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             pointerId: e.pointerId,
             startX: w.x,
             startY: w.y,
+            ...(moveAnchor() ?? {}),
             startSx: p.x,
             startSy: p.y,
             moved: false,
@@ -1359,7 +1495,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             prevPop
           }
         } else {
-          gesture = { kind: 'shape', pointerId: e.pointerId, tool: beginShape(toolContext, sampleAt(p.x, p.y)) }
+          gesture = { kind: 'shape', pointerId: e.pointerId, tool: beginShape(toolContext, sampleAt(p.x, p.y), dragMods(e)) }
         }
       } else if (eff === 'brush') {
         const h = selectionHit(p.x, p.y)
@@ -1459,6 +1595,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const g = gesture
       if (g && 'pointerId' in g && g.pointerId === e.pointerId) {
         if ('tool' in g) {
+          if (g.kind === 'shape') {
+            const w = screenToWorld(editor.camera, p.x, p.y)
+            lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
+          }
           // Coalesced events give every sample the tablet produced (often 200+ Hz), not just one per frame.
           const coalesced = e.getCoalescedEvents?.() ?? []
           g.tool.move((coalesced.length ? coalesced : [e]).map(sample), modifiers(e))
@@ -1526,7 +1666,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           }
           g.moved = true
           const w = screenToWorld(editor.camera, p.x, p.y)
-          editor.setPreview({ s: 1, ax: 0, ay: 0, dx: w.x - g.startX, dy: w.y - g.startY })
+          lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
+          applyMovePreview(g, w, dragMods(e).ctrl)
         } else if (g.kind === 'endpoint') {
           const w = screenToWorld(editor.camera, p.x, p.y)
           const ends = lineEnds(g.original)!
@@ -1581,16 +1722,14 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           g.current = next
         } else if (g.kind === 'shapeHandle') {
           const w = screenToWorld(editor.camera, p.x, p.y)
-          g.controller.move([w.x, w.y], { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey }, gridSteps())
+          lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
+          g.controller.move([w.x, w.y], dragMods(e), gridSteps())
           const lbl = g.controller.label()
           angleLabel = lbl ? { sx: p.x, sy: p.y, text: lbl } : null
         } else if (g.kind === 'scale') {
           const w = screenToWorld(editor.camera, p.x, p.y)
-          const vx = g.cx - g.ax
-          const vy = g.cy - g.ay
-          const len2 = vx * vx + vy * vy || 1
-          const s = Math.max(0.05, ((w.x - g.ax) * vx + (w.y - g.ay) * vy) / len2)
-          editor.setPreview({ s, ax: g.ax, ay: g.ay, dx: 0, dy: 0 })
+          lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
+          applyScalePreview(g, w, dragMods(e).ctrl)
         } else if (g.kind === 'turn') {
           const w = screenToWorld(editor.camera, p.x, p.y)
           let r = Math.atan2(w.y - g.cy, w.x - g.cx) - g.a0
@@ -1766,7 +1905,37 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const boardClipboardActive = (e: ClipboardEvent): boolean =>
       session.getState().active && !e.defaultPrevented && !isTyping(e.target) && !inDialog()
 
+    const reapplyDragModifiers = (e: KeyboardEvent): void => {
+      const g = gesture
+      if (!g || !lastDragWorld) return
+      const mods = dragMods(e)
+      if (g.kind === 'shapeHandle') {
+        g.controller.move([lastDragWorld.x, lastDragWorld.y], mods, gridSteps())
+        const lbl = g.controller.label()
+        angleLabel = lbl ? { sx: lastDragWorld.sx, sy: lastDragWorld.sy, text: lbl } : null
+        invalidate(false)
+      } else if (g.kind === 'move' && g.moved !== false) {
+        applyMovePreview(g, lastDragWorld, mods.ctrl)
+      } else if (g.kind === 'scale') {
+        applyScalePreview(g, lastDragWorld, mods.ctrl)
+      } else if (g.kind === 'shape') {
+        g.tool.move([sampleAt(lastDragWorld.sx, lastDragWorld.sy)], mods)
+        invalidate(false)
+      }
+    }
+
     const onKeyDown = (e: KeyboardEvent): void => {
+      const isModKey = e.key === 'Alt' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta'
+      if (isModKey) {
+        if (e.key === 'Alt' && (gesture || (session.getState().active && session.getState().selectedIds.length > 0 && !isTyping(e.target) && !inDialog()))) {
+          // Prevent browser menu-bar focus / window blur on Windows & Linux when holding Alt for free vertex dragging.
+          e.preventDefault()
+        }
+        if (gesture) {
+          reapplyDragModifiers(e)
+          return
+        }
+      }
       if (e.defaultPrevented || isTyping(e.target) || inDialog() ||
           (e.target instanceof Element && e.target.closest('[role="menu"], select'))) return
       const ui = readUI()
@@ -1801,7 +1970,12 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         group: () => editor.groupSelection(),
         ungroup: () => editor.ungroupSelection(),
         delete: () => editor.deleteSelection(),
-        escape: () => (session.getState().shapePopover ? session.setState({ shapePopover: null }) : editor.clearSelection()),
+        escape: () => {
+          const st = session.getState()
+          if (st.shapePopover) session.setState({ shapePopover: null })
+          else if (st.shapePanel) session.setState({ shapePanel: false })
+          else editor.clearSelection()
+        },
         pen1: () => ui.selectPen(0),
         pen2: () => ui.selectPen(1),
         pen3: () => ui.selectPen(2),
@@ -1845,6 +2019,12 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     }
 
     const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === 'Alt' && (gesture || (session.getState().active && session.getState().selectedIds.length > 0 && !isTyping(e.target) && !inDialog()))) {
+        e.preventDefault()
+      }
+      if (gesture && (e.key === 'Alt' || e.key === 'Shift' || e.key === 'Control' || e.key === 'Meta')) {
+        reapplyDragModifiers(e)
+      }
       if (e.code === 'Space') {
         spaceDown = false
         updateCssCursor()

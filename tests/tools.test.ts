@@ -123,7 +123,7 @@ function fakeContext(sc: Scene) {
     clearSelection() { this.selected = [] },
     setCamera(c: { x: number; y: number; zoom: number }) { this.camera = c }
   }
-  const prefs = { pens: [{ color: '#1e1e1e', size: 3 }], shapeBases: {} }
+  const prefs = { background: 'grid', pens: [{ color: '#1e1e1e', size: 3 }], shapeBases: {} }
   const ctx = { scene: sc, editor, session: createSessionStore(), prefs: () => prefs, invalidate: () => {} } as unknown as ToolContext
   return { ctx, editor }
 }
@@ -147,24 +147,65 @@ test('lasso selects what it goes around; a tap selects the item under it or clea
   assert.deepEqual(editor.selected, [])
 })
 
-test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, a click drops the default size', () => {
+test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, a click drops the default size, and switches to select', () => {
   const sc = new Scene()
   const { ctx } = fakeContext(sc)
-  ctx.session.setState({ shape: 'rectangle' })
+  ctx.session.setState({ tool: 'shape', shape: 'rectangle' })
   const drag = beginShape(ctx, pt(0, 0))
   drag.move([pt(100, 40)], { ...keys, shift: true })
   assert.ok(drag.overlay?.().live?.parts?.length, 'a preview is shown while dragging')
   drag.end()
+  assert.equal(ctx.session.getState().tool, 'select')
   const item = sc.getItems()[0] as ShapeItem
   assert.equal(item.type, 'shape')
   assert.equal(item.geo.kind, 'rectangle')
   assert.equal(Math.abs(item.geo.bx - item.geo.ax), Math.abs(item.geo.by - item.geo.ay))
+  ctx.session.setState({ tool: 'shape', shape: 'rectangle' })
   const click = beginShape(ctx, pt(500, 500))
   click.end()
+  assert.equal(ctx.session.getState().tool, 'select')
   const dropped = sc.getItems().at(-1) as ShapeItem
   assert.equal(dropped.type, 'shape')
   assert.equal((dropped.geo.ax + dropped.geo.bx) / 2, 500)
   assert.equal(sc.canUndo, true)
+})
+
+test('holding Ctrl snaps created shapes (drag, Shift+Ctrl drag, and click-drop) to the 24-unit paper grid', () => {
+  const sc = new Scene()
+  const { ctx } = fakeContext(sc)
+  ctx.session.setState({ tool: 'shape', shape: 'rectangle' })
+  const drag = beginShape(ctx, pt(11, 25), { ...keys, ctrl: true })
+  drag.move([pt(119, 97)], { ...keys, ctrl: true })
+  drag.end()
+  const r = sc.getItems()[0] as ShapeItem
+  assert.equal(r.geo.ax % 24, 0)
+  assert.equal(r.geo.ay % 24, 0)
+  assert.equal(r.geo.bx % 24, 0)
+  assert.equal(r.geo.by % 24, 0)
+  assert.equal(r.geo.ax, 0)
+  assert.equal(r.geo.ay, 24)
+  assert.equal(r.geo.bx, 120)
+  assert.equal(r.geo.by, 96)
+
+  ctx.session.setState({ tool: 'shape', shape: 'rectangle' })
+  const sq = beginShape(ctx, pt(13, 13), { ...keys, ctrl: true, shift: true })
+  sq.move([pt(100, 50)], { ...keys, ctrl: true, shift: true })
+  sq.end()
+  const rSq = sc.getItems()[1] as ShapeItem
+  assert.equal(rSq.geo.ax % 24, 0)
+  assert.equal(rSq.geo.ay % 24, 0)
+  assert.equal(rSq.geo.bx % 24, 0)
+  assert.equal(rSq.geo.by % 24, 0)
+  assert.equal(Math.abs(rSq.geo.bx - rSq.geo.ax), Math.abs(rSq.geo.by - rSq.geo.ay))
+
+  ctx.session.setState({ tool: 'shape', shape: 'cube' })
+  const tap = beginShape(ctx, pt(49, 71), { ...keys, ctrl: true })
+  tap.end()
+  const dropped = sc.getItems()[2] as ShapeItem
+  assert.equal(Math.abs(((dropped.geo.ax + dropped.geo.bx) / 2) % 24), 0)
+  assert.equal(Math.abs(((dropped.geo.ay + dropped.geo.by) / 2) % 24), 0)
+  assert.equal(Math.abs(dropped.geo.ax % 24), 0)
+  assert.equal(Math.abs(dropped.geo.ay % 24), 0)
 })
 
 test('pan moves the camera with the pointer', () => {

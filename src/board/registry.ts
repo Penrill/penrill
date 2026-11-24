@@ -1,6 +1,7 @@
 import type { Row } from '@penrill/math/formula'
 import type { ShapeKind } from '@penrill/core/shapes'
 import type { Camera, Item, Point, ShapeGeometry, ShapeItem, ShapeSpec, StrokeItem, Vec2 } from '@penrill/core/types'
+import type { Gizmo3dModel, GizmoActiveArc, GizmoSpace, ViewPreset3d } from '@penrill/shape-editor/gizmo3d'
 import { paint } from '@penrill/render-canvas/paint'
 import { toSvg, type Prim } from '@penrill/render/display'
 import type { NumericResult } from './engine/formulaexpr'
@@ -48,7 +49,7 @@ export interface FormulaEvaluator {
 /** One interactive handle exposed on a selected shape by the shape-editor module. */
 export interface ShapeEditorHandle {
   id: string
-  kind: 'vertex' | 'control' | 'addVertex' | 'orbit'
+  kind: 'vertex' | 'control' | 'addVertex' | 'orbit' | 'gizmoRing' | 'gizmoPole'
   x: number
   y: number
   hint: string
@@ -56,6 +57,8 @@ export interface ShapeEditorHandle {
   index?: number
   vertexId?: string
   draggable?: boolean
+  /** Camera-space depth for 3D handles (larger = closer to viewer). */
+  depth?: number
 }
 
 /** Subtle geometric snap guide drawn while dragging a shape handle. */
@@ -84,6 +87,7 @@ export interface ShapeEditorItemDragResult {
   label: string | null
   guides: ShapeEditorGuide[]
   snapped: boolean
+  gizmoArc?: GizmoActiveArc | null
 }
 
 export interface ShapeEditorEdgeTarget {
@@ -108,6 +112,9 @@ export interface ShapeEditorOverlayState {
   hotEdge?: { a: Vec2; b: Vec2 } | null
   activeEdge?: { a: Vec2; b: Vec2 } | null
   guides?: readonly ShapeEditorGuide[] | null
+  gizmo3d?: Gizmo3dModel | null
+  gizmoArc?: GizmoActiveArc | null
+  gizmoActive?: boolean
 }
 
 /** Direct on-canvas shape editing feature (registered by the `shape-editor` module). */
@@ -116,8 +123,15 @@ export interface ShapeEditorFeature {
   itemHandles(item: ShapeItem): ShapeEditorHandle[]
   isCustomizedItem(item: ShapeItem): boolean
   isConstrained2d(item: ShapeItem): boolean
+  canUnlockFreeVertices(item: ShapeItem): boolean
   unlockFreeVertices(item: ShapeItem): ShapeItem
   resetItemGeometry(item: ShapeItem): ShapeItem
+  resetItemOrbit(item: ShapeItem): ShapeItem
+  applyViewPreset3d(item: ShapeItem, preset: ViewPreset3d): ShapeItem
+  toggleAxisViewPreset3d(item: ShapeItem, axis: 'x' | 'y' | 'z'): { item: ShapeItem; preset: ViewPreset3d }
+  setEulerDeg3d(item: ShapeItem, eulerDeg: readonly [number, number, number]): ShapeItem
+  buildGizmo3d(item: ShapeItem, zoom: number, space: GizmoSpace): Gizmo3dModel | null
+  hitGizmo3dRing(gizmo: Gizmo3dModel, sx: number, sy: number, cam: Camera, reach: number): ShapeEditorHandle | null
   switchItemKind(item: ShapeItem, nextKind: ShapeKind): ShapeItem
   setItemSides(item: ShapeItem, sides: number): ShapeItem
   hitItemEdge(item: ShapeItem, wx: number, wy: number, zoom: number): ShapeEditorEdgeTarget | null
@@ -126,7 +140,14 @@ export interface ShapeEditorFeature {
     handleId: string,
     pt: Vec2,
     opts: ShapeEditorDragOptions,
-    dragStart?: { startWorld: Vec2; startGeo: ShapeGeometry }
+    dragStart?: {
+      startWorld: Vec2
+      startGeo: ShapeGeometry
+      prevWorld?: Vec2
+      prevGeo?: ShapeGeometry
+      gizmoSpace?: GizmoSpace
+      free3d?: boolean
+    }
   ): ShapeEditorItemDragResult
   insertItemVertex(item: ShapeItem, edgeIndex: number, pt: Vec2): { item: ShapeItem; vertexId: string } | null
   removeItemVertex(item: ShapeItem, vertexId: string): ShapeItem | null

@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import type { ShapeKind } from '@penrill/core/shapes'
-import type { Camera, GraphParams } from '@penrill/core/types'
+import type { Camera, GraphParams, Quat } from '@penrill/core/types'
 import type { Compass } from './engine/compass'
 import type { Protractor } from './engine/protractor'
 import type { Straightedge } from './engine/straightedge'
@@ -50,6 +50,14 @@ export interface Session {
   protractorPanel: boolean
   /** Contextual vertex or edge mini-popover for the selected shape. */
   shapePopover: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
+  /** Non-modal shape inspector docked beside the selected shape (stays open while interacting with the canvas). */
+  shapePanel: boolean
+  /** Remembered 3D orientation before switching to an orthographic side editing view. */
+  prev3dView: { itemId: string; orbit?: [number, number]; rot3?: Quat } | null
+  /** Per-board override for showing the 3D X/Y/Z rotation gizmo (`null` = follow `shapeDefaults.gizmo3d`). */
+  gizmo3dOverride: boolean | null
+  /** Transform axis frame for the 3D rotation gizmo ('local' rotates with solid; 'world' stays aligned to room). */
+  gizmo3dSpace: 'local' | 'world'
   /** Open Settings dialog to a section ('general' or 'shapes'), or null when closed. */
   settingsSection: 'general' | 'shapes' | null
   setTool: (tool: Tool) => void
@@ -82,6 +90,10 @@ export function createSessionStore(): SessionStore {
     compass: null,
     protractorPanel: false,
     shapePopover: null,
+    shapePanel: false,
+    prev3dView: null,
+    gizmo3dOverride: null,
+    gizmo3dSpace: 'local',
     settingsSection: null,
     setTool: (tool) => set({ tool }),
     selectPen: (index) => set({ tool: 'pen', activePen: index })

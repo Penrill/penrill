@@ -3,14 +3,27 @@ import { is3D } from './shapes'
 import { evaluate2dShape } from './shapeEval2d'
 import { evaluate3dShape } from './shapeEval3d'
 
+export interface EvalAngle3d {
+  /** Exact true 3D geometric angle in degrees. */
+  deg: number
+  /** Projected 2D polyline of the 3D angle mark (foreshortened 90 deg L-mark or planar 3D arc). */
+  markPts: Vec2[]
+  /** Projected 2D label position inside the 3D angle wedge. */
+  labelPos: Vec2
+}
+
 export interface EvalVertex {
   id: string
   pos: Vec2
   pos3?: Vec3
+  /** Camera-space depth toward viewer (higher = closer to camera, 3D solids only). */
+  depth?: number
   defaultLabel: string
   angleDeg?: number
-  /** Ordered [startUnitRay, endUnitRay] sweeping clockwise (y-down) through the interior angle. */
+  /** Ordered [startUnitRay, endUnitRay] sweeping clockwise (y-down) through the interior angle (2D shapes). */
   angleRays?: [Vec2, Vec2]
+  /** Pre-projected true 3D geometric angle mark and label anchor (3D solids). */
+  angle3d?: EvalAngle3d
   role: 'corner' | 'apex' | 'center' | 'cardinal' | 'inner'
   visible: boolean
 }

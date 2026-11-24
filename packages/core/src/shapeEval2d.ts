@@ -250,15 +250,25 @@ function evaluate2dConstruction(
       }
     }
     case 'diagonal': {
-      const a = byV.get(c.from)
-      const b = byV.get(c.to)
-      if (!a || !b) return null
+      const point2 = (id: string): Vec2 | null => {
+        const v = byV.get(id)
+        if (v) return v.pos
+        if (id === 'center') return center
+        if (id.startsWith('mid:')) {
+          const e = byE.get(id.slice(4))
+          return e ? mid2(e.a, e.b) : null
+        }
+        return null
+      }
+      const pa = point2(c.from)
+      const pb = point2(c.to)
+      if (!pa || !pb) return null
       return {
         id: c.id,
         kind: c.kind,
-        segments: [{ pts: [a.pos, b.pos], dash: 'dashed' }],
-        length: dist2(a.pos, b.pos),
-        lengthAnchor: [a.pos, b.pos]
+        segments: [{ pts: [pa, pb], dash: 'dashed' }],
+        length: dist2(pa, pb),
+        lengthAnchor: [pa, pb]
       }
     }
     case 'midpoint': {

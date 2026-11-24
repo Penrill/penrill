@@ -2,18 +2,15 @@ import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from '
 import { canHaveEnds } from '../editor'
 import { SELECTION_PAD } from '../engine/renderer'
 import { editableShape } from '@penrill/core/shapeItems'
-import { isLinear, isTriangle, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
 import { fullRuns, TEXT_SIZES } from '../engine/text'
 import type { FormulaItem, ShapeItem, StrokeItem, TextItem } from '@penrill/core/types'
-import { useT, type MessageKey } from '../i18n'
+import { useT } from '../i18n'
 import { PEN_COLORS, PEN_SIZES } from '../store'
 import { DuplicateIcon, FitIcon, FormulaIcon, FunctionIcon, GearIcon, GroupIcon, LockIcon, ShapesIcon, StyleIcon, TextIcon, TrashIcon, UngroupIcon, UnlockIcon } from './icons'
-import { BaseRow, ShapePreview } from './InsertMenus'
 import { LineStyleControls, SizeSlider } from './LineStyle'
 import { fitBox, screenArea } from './dock'
 import { Popover } from './Popover'
 import { useEditor, useSession } from '../editorContext'
-import { ShapeItemEditorControls, ShapeMeasurementControls, ShapePopoverFooter, TriangleConstructionControls } from '../modules/shapeEditor/ShapeEditorControls'
 
 /** Small floating action bar above the current selection (like Whiteboard's context menu). */
 export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'below') => ReactNode }) {
@@ -22,12 +19,11 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   const selectedIds = useSession((s) => s.selectedIds)
   const active = useSession((s) => s.active)
   const fnPanel = useSession((s) => s.fnPanel)
+  const shapePanel = useSession((s) => s.shapePanel)
   // Re-render when the camera or items move so the bar follows the selection.
   useSession((s) => s.camera)
   useSession((s) => s.sceneVersion)
   const [styling, setStyling] = useState(false)
-  const [shaping, setShaping] = useState(false)
-  const closeShape = useCallback(() => setShaping(false), [])
   const closeStyle = useCallback(() => setStyling(false), [])
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 320, h: 40 })
@@ -47,14 +43,6 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   const shapeItem = !anyLocked && items.length === 1 && items[0].type === 'shape' ? items[0] : null
   const legacyShape = anyLocked || shapeItem ? null : editableShape(items)
   const activeKind = shapeItem?.geo.kind ?? legacyShape?.spec.kind ?? null
-  // Shapes can be switched within their family: lines, flat shapes, solids.
-  const family: readonly ShapeKind[] = !activeKind
-    ? []
-    : isLinear(activeKind)
-      ? SHAPES_2D.filter((k) => isLinear(k))
-      : (SHAPES_3D as readonly ShapeKind[]).includes(activeKind)
-        ? SHAPES_3D
-        : SHAPES_2D.filter((k) => !isLinear(k))
   const firstGroup = items[0]?.groupId
   const oneGroup = !!firstGroup && items.every((i) => i.groupId === firstGroup)
   const canGroup = items.length >= 2 && !oneGroup
@@ -118,62 +106,13 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
         </>
       )}
       {(shapeItem || legacyShape) && activeKind && (
-        <div className="menu-anchor">
-          <button data-popover-anchor className="labeled-btn" title={t('sel.shapeTitle')} onClick={() => setShaping((v) => !v)}>
-            <ShapesIcon />
-          </button>
-          {shaping && (
-            <Popover onClose={closeShape} className="sel-popover shape-popover" fit={place.side}>
-              <div className="shape-grid">
-                {family.map((k) => (
-                  <button
-                    key={k}
-                    className={`shape-btn ${activeKind === k ? 'active' : ''}`}
-                    title={t(`shape.${k}` as MessageKey)}
-                    onClick={() => editor.updateShape({ kind: k })}
-                  >
-                    <ShapePreview
-                      kind={k}
-                      base={k === activeKind ? (shapeItem?.geo.sides ?? legacyShape?.spec.base) : undefined}
-                      circles={
-                        isTriangle(k)
-                          ? shapeItem
-                            ? {
-                                incircle: shapeItem.constructions?.some((c) => c.kind === 'incircle'),
-                                circumcircle: shapeItem.constructions?.some((c) => c.kind === 'circumcircle')
-                              }
-                            : legacyShape?.spec
-                          : undefined
-                      }
-                    />
-                  </button>
-                ))}
-              </div>
-              {SHAPE_BASES[activeKind] && (
-                <BaseRow
-                  kind={activeKind}
-                  value={(shapeItem?.geo.sides ?? legacyShape?.spec.base) ?? SHAPE_BASES[activeKind]!.def}
-                  onChange={(n) => editor.updateShape({ base: n })}
-                />
-              )}
-              {shapeItem ? (
-                <ShapeItemEditorControls
-                  item={shapeItem}
-                  onChange={(next) => editor.replaceShapeItem(next)}
-                  onOpenSettings={closeShape}
-                />
-              ) : legacyShape ? (
-                <>
-                  {isTriangle(legacyShape.spec.kind) && (
-                    <TriangleConstructionControls value={legacyShape.spec} onChange={(patch) => editor.updateShape(patch)} />
-                  )}
-                  <ShapeMeasurementControls spec={legacyShape.spec} onChange={(next) => editor.replaceShape(next)} />
-                  <ShapePopoverFooter spec={legacyShape.spec} onReset={(next) => editor.replaceShape(next)} onOpenSettings={closeShape} />
-                </>
-              ) : null}
-            </Popover>
-          )}
-        </div>
+        <button
+          className={`labeled-btn ${shapePanel ? 'active' : ''}`}
+          title={t('sel.shapeTitle')}
+          onClick={() => editor.session.setState((s) => ({ shapePanel: !s.shapePanel }))}
+        >
+          <ShapesIcon />
+        </button>
       )}
       {firstText && items.length === 1 && (
         <button className="labeled-btn" title={t('text.edit')} onClick={() => editor.editText(firstText)}>

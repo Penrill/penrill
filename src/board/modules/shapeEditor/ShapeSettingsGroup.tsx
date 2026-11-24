@@ -46,6 +46,14 @@ export function ShapeSettingsGroup() {
         </Headless.Field>
         <Headless.Field className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 py-3">
           <Headless.Label className="text-sm/6 font-medium text-zinc-950 select-none dark:text-white">
+            {t('shapes.defaultGizmo3d')}
+          </Headless.Label>
+          <div className="col-start-2 row-span-2 row-start-1 flex justify-end">
+            <Switch color="blue" checked={defaults.gizmo3d} onChange={(gizmo3d) => patch({ gizmo3d })} />
+          </div>
+        </Headless.Field>
+        <Headless.Field className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 py-3">
+          <Headless.Label className="text-sm/6 font-medium text-zinc-950 select-none dark:text-white">
             {t('shapes.unit')}
           </Headless.Label>
           <div className="col-start-2 row-span-2 row-start-1 flex justify-end">

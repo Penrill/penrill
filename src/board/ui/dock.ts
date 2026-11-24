@@ -1,27 +1,39 @@
 import type { BBox, Camera } from '@penrill/core/types'
 
 const MARGIN = 16
-/** Keep clear of the bars at the top of the window and of the drawing rail on the left. */
+/** Keep clear of the bars at the top, bottom and left of the window. */
 const topMin = (): number => Math.max(72, (document.querySelector('[data-chrome="top"]')?.getBoundingClientRect().bottom ?? 0) + MARGIN)
 const leftMin = (): number => Math.max(MARGIN, (document.querySelector('[data-chrome="rail"] > *')?.getBoundingClientRect().right ?? 0) + MARGIN)
+const bottomMax = (): number => {
+  const top = document.querySelector('[data-chrome="bottom"]')?.getBoundingClientRect().top
+  return top && top > 0 ? Math.min(window.innerHeight - MARGIN, top - MARGIN) : window.innerHeight - MARGIN
+}
 
 /**
  * Where a floating card goes beside a board object (world bbox): to its right if it fits, else to its
- * left, else in the bottom-right corner of the window. Top follows the object, kept on screen.
+ * left, else in the right side of the safe canvas area. Top follows the object, kept clear of top & bottom bars.
  */
-export function dockBeside(b: BBox, cam: Camera, panelW: number, height: number): { left: number; top: number } {
+export function dockBeside(
+  b: BBox,
+  cam: Camera,
+  panelW: number,
+  height: number
+): { left: number; top: number; minTop: number; maxBottom: number; maxHeight: number } {
   const sx0 = (b.minX - cam.x) * cam.zoom
   const sx1 = (b.maxX - cam.x) * cam.zoom
   const sy0 = (b.minY - cam.y) * cam.zoom
   const W = window.innerWidth
-  const H = window.innerHeight
   let left: number
   const minLeft = leftMin()
+  const minTop = topMin()
+  const maxBottom = bottomMax()
+  const maxHeight = Math.max(220, maxBottom - minTop)
+  const clampedH = Math.min(height, maxHeight)
   if (sx1 + MARGIN + panelW <= W - MARGIN) left = Math.max(minLeft, sx1 + MARGIN)
   else if (sx0 - MARGIN - panelW >= minLeft) left = Math.min(W - MARGIN - panelW, sx0 - MARGIN - panelW)
-  else left = W - MARGIN - panelW
-  const top = Math.max(topMin(), Math.min(sy0, H - MARGIN - height))
-  return { left, top }
+  else left = Math.max(minLeft, W - MARGIN - panelW)
+  const top = Math.max(minTop, Math.min(sy0, maxBottom - clampedH))
+  return { left, top, minTop, maxBottom, maxHeight }
 }
 
 export interface ScreenRect {
@@ -39,8 +51,13 @@ export interface Fit {
   side: 'above' | 'below'
 }
 
-/** The part of the window floating cards may use (below the top bars, right of the rail). */
-export const screenArea = (): { w: number; h: number; top: number; left: number } => ({ w: window.innerWidth, h: window.innerHeight, top: topMin(), left: leftMin() })
+/** The part of the window floating cards may use (below the top bars, above the bottom bar, right of the rail). */
+export const screenArea = (): { w: number; h: number; top: number; left: number } => ({
+  w: window.innerWidth,
+  h: bottomMax() + 8,
+  top: topMin(),
+  left: leftMin()
+})
 
 /**
  * Where a floating box (w × h) goes next to an anchor rectangle so that all of it stays on screen:

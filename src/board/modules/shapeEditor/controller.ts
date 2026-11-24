@@ -4,6 +4,7 @@ import { regenerateShape } from '@penrill/core/shapeItems'
 import { shapePolygonVertices } from '@penrill/core/shapes'
 import type { Scene } from '@penrill/core/scene'
 import type { Camera, Item, ShapeGeometry, ShapeItem, ShapeSpec, StrokeItem, Vec2 } from '@penrill/core/types'
+import type { GizmoActiveArc, GizmoSpace } from '@penrill/shape-editor/gizmo3d'
 import { shapeEdgeTargets } from '@penrill/shape-editor/targets'
 import type { ShapeEditorCornerTarget, ShapeEditorEdgeTarget, ShapeEditorFeature, ShapeEditorGuide, ShapeEditorHandle } from '../../registry'
 
@@ -12,7 +13,7 @@ export const ORBIT_HANDLE_R = 9
 export const ADD_HANDLE_R = 5
 export const HANDLE_TAP_SLOP = 4
 
-/** Screen-space hit test for direct shape handles (vertices, controls and 3D orbit win over add-vertex dots). */
+/** Screen-space hit test for direct shape handles (vertices, controls and 3D orbit win over add-vertex dots; closer 3D depth wins on overlapping vertices). */
 export function hitShapeHandle(
   handles: readonly ShapeEditorHandle[],
   sx: number,
@@ -22,6 +23,7 @@ export function hitShapeHandle(
 ): ShapeEditorHandle | null {
   let best: ShapeEditorHandle | null = null
   let bestScore = Infinity
+  let bestDepth = -Infinity
   for (const h of handles) {
     const hx = (h.x - cam.x) * cam.zoom
     const hy = (h.y - cam.y) * cam.zoom
@@ -30,8 +32,12 @@ export function hitShapeHandle(
     const d = Math.hypot(sx - hx, sy - hy)
     if (d > radius) continue
     const score = d + (h.kind === 'addVertex' ? 4 : h.kind === 'orbit' ? -2 : 0)
-    if (score < bestScore) {
+    const depth = h.depth ?? 0
+    // In orthographic side views front & back 3D vertices project to the same pixel: prefer the closer vertex.
+    const nearTie = best !== null && Math.abs(score - bestScore) <= 3 && h.kind === best.kind
+    if ((!nearTie && score < bestScore) || (nearTie && depth > bestDepth + 1e-4)) {
       bestScore = score
+      bestDepth = depth
       best = h
     }
   }
@@ -132,27 +138,39 @@ export interface ShapeHandleGesture {
   end(): boolean
   guides(): readonly ShapeEditorGuide[]
   label(): string | null
+  gizmoArc?(): GizmoActiveArc | null
+}
+
+export interface ShapeItemHandleOptions {
+  gizmoSpace?: GizmoSpace
+  free3d?: boolean
 }
 
 /**
  * Headless gesture controller for dragging any handle of a first-class ShapeItem (2D constrained
- * or free vertex, 3D orbit knob, 3D dimension/apex handle, or polygon '+' insert).
- * Distinguishes a tap (<= 4 screen px) from a drag so tapping any 2D or 3D vertex opens its popover.
+ * or free vertex, 3D orbit/trackball knob, 3D X/Y/Z/roll gizmo ring, 3D dimension/apex handle,
+ * or polygon '+' insert).
+ * Distinguishes a tap (<= 4 screen px) from a drag so tapping any 2D/3D vertex opens its popover
+ * and tapping the 3D orbit knob toggles the Blender-style X/Y/Z gizmo.
  */
 export function beginShapeItemHandle(
   feature: ShapeEditorFeature,
   host: ShapeHandleHost,
   startItem: ShapeItem,
   handle: ShapeEditorHandle,
-  startPt: Vec2
+  startPt: Vec2,
+  options?: ShapeItemHandleOptions
 ): ShapeHandleGesture {
   const { scene } = host
   let baseItem: ShapeItem = startItem
   let startGeo: ShapeGeometry = startItem.geo
+  let prevWorld: Vec2 = startPt
+  let prevGeo: ShapeGeometry = startItem.geo
   let handleId = handle.id
   let current: ShapeItem = startItem
   let lastGuides: ShapeEditorGuide[] = []
   let lastLabel: string | null = null
+  let lastGizmoArc: GizmoActiveArc | null = null
   let moved = false
 
   if (handle.kind === 'addVertex' && handle.index !== undefined) {
@@ -160,6 +178,7 @@ export function beginShapeItemHandle(
     if (inserted) {
       baseItem = inserted.item
       startGeo = inserted.item.geo
+      prevGeo = inserted.item.geo
       handleId = inserted.vertexId
       moved = true
       scene.replace([current], [inserted.item], false)
@@ -195,10 +214,20 @@ export function beginShapeItemHandle(
           snapTol: 10 / host.camera.zoom,
           gridStep
         },
-        { startWorld: startPt, startGeo }
+        {
+          startWorld: startPt,
+          startGeo,
+          prevWorld,
+          prevGeo,
+          gizmoSpace: options?.gizmoSpace,
+          free3d: options?.free3d
+        }
       )
       lastGuides = res.guides
       lastLabel = res.label
+      lastGizmoArc = res.gizmoArc ?? null
+      prevWorld = worldPt
+      prevGeo = res.item.geo
       scene.replace([current], [res.item], false)
       current = res.item
       host.setSelection([current])
@@ -212,8 +241,36 @@ export function beginShapeItemHandle(
       return false
     },
     guides: () => lastGuides,
-    label: () => lastLabel
+    label: () => lastLabel,
+    gizmoArc: () => lastGizmoArc
   }
+}
+
+/** Reset only the 3D orientation of a ShapeItem back to default axonometry in one undo step. */
+export function tryResetShapeItemOrbit(
+  feature: ShapeEditorFeature,
+  host: ShapeHandleHost,
+  item: ShapeItem
+): boolean {
+  const next = feature.resetItemOrbit(item)
+  if (next === item) return false
+  host.scene.replace([item], [next])
+  host.setSelection([next])
+  return true
+}
+
+/** Snap or flip a 3D ShapeItem to the +/- orthographic side view for a clicked X/Y/Z gizmo pole in one undo step. */
+export function tryToggleAxisView3d(
+  feature: ShapeEditorFeature,
+  host: ShapeHandleHost,
+  item: ShapeItem,
+  axis: 'x' | 'y' | 'z'
+): boolean {
+  const { item: next } = feature.toggleAxisViewPreset3d(item, axis)
+  if (next === item) return false
+  host.scene.replace([item], [next])
+  host.setSelection([next])
+  return true
 }
 
 /** Remove a polygon vertex from a first-class ShapeItem in one undo step. */

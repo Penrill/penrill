@@ -1,3 +1,10 @@
+import { PlusIcon, TrashIcon } from '@heroicons/react/20/solid'
+import { BadgeButton } from '@penrill/ui/badge'
+import { Button } from '@penrill/ui/button'
+import { Checkbox, CheckboxField } from '@penrill/ui/checkbox'
+import { Divider } from '@penrill/ui/divider'
+import { Label } from '@penrill/ui/fieldset'
+import { Input } from '@penrill/ui/input'
 import { editableShape } from '@penrill/core/shapeItems'
 import { isTriangle, MAX_BASE, MIN_BASE, shapeEdges, shapePolygonVertices } from '@penrill/core/shapes'
 import { cornerAngleDeg } from '@penrill/core/triangleConstructions'
@@ -15,11 +22,15 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { useEditor, useSession } from '../../editorContext'
 import { useT, type MessageKey } from '../../i18n'
 import { usePrefs } from '../../store'
+import { PanelTitle } from '../../ui/chrome'
 import { fitBox, screenArea } from '../../ui/dock'
 
+const CARD_CLASS =
+  'fixed z-50 min-w-52 max-w-64 rounded-2xl bg-white p-3 text-zinc-950 shadow-xl ring-1 ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:ring-white/10'
+
 /**
- * Compact contextual popover anchored beside a clicked vertex or edge of any selected 2D or 3D
- * shape. Driven by `availableVertexActions` and `availableEdgeActions` so every shape shares one
+ * Compact contextual Catalyst card anchored beside a clicked vertex or edge of any selected 2D or
+ * 3D shape. Driven by `availableVertexActions` and `availableEdgeActions` so every shape shares one
  * uniform interface without shape-specific branches.
  */
 export function ShapeElementPopover() {
@@ -32,7 +43,7 @@ export function ShapeElementPopover() {
   useSession((s) => s.sceneVersion)
   usePrefs((s) => s.shapeDefaults)
   const ref = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState({ w: 204, h: 148 })
+  const [size, setSize] = useState({ w: 224, h: 168 })
   useLayoutEffect(() => {
     const el = ref.current
     if (el && (el.offsetWidth !== size.w || el.offsetHeight !== size.h)) setSize({ w: el.offsetWidth, h: el.offsetHeight })
@@ -45,7 +56,7 @@ export function ShapeElementPopover() {
   const cam = editor.camera
   const close = (): void => editor.session.setState({ shapePopover: null })
 
-  // --- First-class ShapeItem popover (2D & 3D unified!) ---
+  // --- First-class ShapeItem popover (2D & 3D unified) ---
   const shapeItem = items.length === 1 && items[0].type === 'shape' ? items[0] : null
   if (shapeItem) {
     if (pop.kind === 'vertex') {
@@ -58,28 +69,24 @@ export function ShapeElementPopover() {
       return (
         <div
           ref={ref}
-          className="panel shape-element-popover"
+          className={CARD_CLASS}
           style={{ left: place.left, top: place.top }}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <div className="shape-el-title">{t('shape.el.vertex')}</div>
-          <div className="shape-el-list">
-            <div className="shape-el-label-row">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={model.currentLabel !== null}
-                  onChange={() => editor.replaceShapeItem(toggleLabel(shapeItem, targetId))}
-                />
-                <span>{t('shape.el.label')}</span>
-              </label>
+          <PanelTitle>{t('shape.el.vertex')}</PanelTitle>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <CheckboxField className="!gap-x-2">
+                <Checkbox color="blue" checked={model.currentLabel !== null} onChange={() => editor.replaceShapeItem(toggleLabel(shapeItem, targetId))} />
+                <Label className="!text-xs/5">{t('shape.el.label')}</Label>
+              </CheckboxField>
               {model.currentLabel !== null && (
-                <input
+                <Input
                   type="text"
-                  className="shape-el-label-input"
                   value={model.currentLabel}
                   maxLength={4}
                   aria-label={t('shape.el.label')}
+                  className="!w-14 [&_input]:px-1.5 [&_input]:py-0.5 [&_input]:text-center [&_input]:font-serif [&_input]:text-xs [&_input]:italic"
                   onChange={(e) => editor.replaceShapeItem(setLabel(shapeItem, targetId, e.target.value))}
                   onKeyDown={(e) => {
                     e.stopPropagation()
@@ -89,40 +96,58 @@ export function ShapeElementPopover() {
               )}
             </div>
             {model.hasAngle && model.vertex.angleDeg !== undefined && (
-              <label>
-                <input
-                  type="checkbox"
-                  checked={model.angleOn}
-                  onChange={() => editor.replaceShapeItem(toggleAngle(shapeItem, targetId))}
-                />
-                <span>{t('shape.el.angle', { deg: Math.round(model.vertex.angleDeg) })}</span>
-              </label>
+              <CheckboxField className="!gap-x-2">
+                <Checkbox color="blue" checked={model.angleOn} onChange={() => editor.replaceShapeItem(toggleAngle(shapeItem, targetId))} />
+                <Label className="!text-xs/5">{t('shape.el.angle', { deg: Math.round(model.vertex.angleDeg) })}</Label>
+              </CheckboxField>
             )}
             {model.constructions.map((act) => (
-              <label key={act.id}>
-                <input
-                  type="checkbox"
+              <CheckboxField key={act.id} className="!gap-x-2">
+                <Checkbox
+                  color="blue"
                   checked={act.active}
                   onChange={() => editor.replaceShapeItem(toggleConstruction(shapeItem, act.construction))}
                 />
-                <span>{t(act.labelKey as MessageKey, act.vars)}</span>
-              </label>
+                <Label className="!text-xs/5">{t(act.labelKey as MessageKey, act.vars)}</Label>
+              </CheckboxField>
             ))}
           </div>
+          {model.connectTargets.length > 0 && (
+            <>
+              <Divider soft className="my-2.5" />
+              <PanelTitle>{t('shape.el.connectTo')}</PanelTitle>
+              <div className="flex flex-wrap gap-1.5">
+                {model.connectTargets.map((ct) => (
+                  <BadgeButton
+                    key={ct.id}
+                    color={ct.active ? 'blue' : 'zinc'}
+                    title={t('shape.diagonalPair', {
+                      pair: `${model.currentLabel ?? model.vertex.defaultLabel}${ct.label}`
+                    })}
+                    onClick={() => editor.replaceShapeItem(toggleConstruction(shapeItem, ct.construction))}
+                  >
+                    <span className="px-0.5 font-serif italic">{ct.label}</span>
+                  </BadgeButton>
+                ))}
+              </div>
+            </>
+          )}
           {model.canRemove && (
-            <div className="shape-el-actions">
-              <button
-                type="button"
-                className="shape-el-action danger"
+            <>
+              <Divider soft className="my-2.5" />
+              <Button
+                plain
+                className="w-full !justify-start !px-2 !py-1 !text-xs text-red-600 dark:text-red-400"
                 onClick={() => {
                   const next = feature.removeItemVertex(shapeItem, targetId)
                   if (next) editor.replaceShapeItem(next)
                   close()
                 }}
               >
+                <TrashIcon data-slot="icon" />
                 {t('shape.el.removeVertex')}
-              </button>
-            </div>
+              </Button>
+            </>
           )}
         </div>
       )
@@ -138,45 +163,43 @@ export function ShapeElementPopover() {
     return (
       <div
         ref={ref}
-        className="panel shape-element-popover"
+        className={CARD_CLASS}
         style={{ left: place.left, top: place.top }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <div className="shape-el-title">{t('shape.el.edge')}</div>
-        <div className="shape-el-list">
-          <label>
-            <input
-              type="checkbox"
-              checked={model.lengthOn}
-              onChange={() => editor.replaceShapeItem(toggleLength(shapeItem, edgeId))}
-            />
-            <span>{t('shape.el.length', { len: lenText })}</span>
-          </label>
+        <PanelTitle>{t('shape.el.edge')}</PanelTitle>
+        <div className="space-y-2">
+          <CheckboxField className="!gap-x-2">
+            <Checkbox color="blue" checked={model.lengthOn} onChange={() => editor.replaceShapeItem(toggleLength(shapeItem, edgeId))} />
+            <Label className="!text-xs/5">{t('shape.el.length', { len: lenText })}</Label>
+          </CheckboxField>
           {model.constructions.map((act) => (
-            <label key={act.id}>
-              <input
-                type="checkbox"
+            <CheckboxField key={act.id} className="!gap-x-2">
+              <Checkbox
+                color="blue"
                 checked={act.active}
                 onChange={() => editor.replaceShapeItem(toggleConstruction(shapeItem, act.construction))}
               />
-              <span>{t(act.labelKey as MessageKey, act.vars)}</span>
-            </label>
+              <Label className="!text-xs/5">{t(act.labelKey as MessageKey, act.vars)}</Label>
+            </CheckboxField>
           ))}
         </div>
         {model.canAddVertex && (
-          <div className="shape-el-actions">
-            <button
-              type="button"
-              className="shape-el-action"
+          <>
+            <Divider soft className="my-2.5" />
+            <Button
+              plain
+              className="w-full !justify-start !px-2 !py-1 !text-xs"
               onClick={() => {
                 const inserted = feature.insertItemVertex(shapeItem, pop.index, model.mid)
                 if (inserted) editor.replaceShapeItem(inserted.item)
                 close()
               }}
             >
-              {t('shape.el.addVertex')}
-            </button>
-          </div>
+              <PlusIcon data-slot="icon" />
+              {t('shape.el.addVertex').replace(/^\+\s*/, '')}
+            </Button>
+          </>
         )}
       </div>
     )
@@ -217,44 +240,46 @@ export function ShapeElementPopover() {
     const hasAng = !!spec.angleAt?.includes(pop.index)
     const canDelete = spec.kind === 'polygon' && n > MIN_BASE
     return (
-      <div ref={ref} className="panel shape-element-popover" style={{ left: place.left, top: place.top }} onPointerDown={(e) => e.stopPropagation()}>
-        <div className="shape-el-title">{t('shape.el.vertex')}</div>
-        <div className="shape-el-list">
+      <div ref={ref} className={CARD_CLASS} style={{ left: place.left, top: place.top }} onPointerDown={(e) => e.stopPropagation()}>
+        <PanelTitle>{t('shape.el.vertex')}</PanelTitle>
+        <div className="space-y-2">
           {tri && (
             <>
-              <label>
-                <input type="checkbox" checked={hasAlt} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'altitude'))} />
-                <span>{t('shape.el.altitude')}</span>
-              </label>
-              <label>
-                <input type="checkbox" checked={hasMed} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'median'))} />
-                <span>{t('shape.el.median')}</span>
-              </label>
-              <label>
-                <input type="checkbox" checked={hasBis} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'bisector'))} />
-                <span>{t('shape.el.bisector')}</span>
-              </label>
+              <CheckboxField className="!gap-x-2">
+                <Checkbox color="blue" checked={hasAlt} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'altitude'))} />
+                <Label className="!text-xs/5">{t('shape.el.altitude')}</Label>
+              </CheckboxField>
+              <CheckboxField className="!gap-x-2">
+                <Checkbox color="blue" checked={hasMed} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'median'))} />
+                <Label className="!text-xs/5">{t('shape.el.median')}</Label>
+              </CheckboxField>
+              <CheckboxField className="!gap-x-2">
+                <Checkbox color="blue" checked={hasBis} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'bisector'))} />
+                <Label className="!text-xs/5">{t('shape.el.bisector')}</Label>
+              </CheckboxField>
             </>
           )}
-          <label>
-            <input type="checkbox" checked={hasAng} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'angle'))} />
-            <span>{t('shape.el.angle', { deg })}</span>
-          </label>
+          <CheckboxField className="!gap-x-2">
+            <Checkbox color="blue" checked={hasAng} onChange={() => editor.replaceShape(feature.toggleVertexFeature(spec, pop.index, 'angle'))} />
+            <Label className="!text-xs/5">{t('shape.el.angle', { deg })}</Label>
+          </CheckboxField>
         </div>
         {canDelete && (
-          <div className="shape-el-actions">
-            <button
-              type="button"
-              className="shape-el-action danger"
+          <>
+            <Divider soft className="my-2.5" />
+            <Button
+              plain
+              className="w-full !justify-start !px-2 !py-1 !text-xs text-red-600 dark:text-red-400"
               onClick={() => {
                 const nextSpec = feature.removeVertex(spec, pop.index)
                 if (nextSpec) editor.replaceShape(nextSpec)
                 close()
               }}
             >
+              <TrashIcon data-slot="icon" />
               {t('shape.el.removeVertex')}
-            </button>
-          </div>
+            </Button>
+          </>
         )}
       </div>
     )
@@ -270,40 +295,42 @@ export function ShapeElementPopover() {
   const hasMed = tri && !!spec.medianAt?.includes(opp)
   const canAdd = spec.kind === 'polygon' && edges.length < MAX_BASE
   return (
-    <div ref={ref} className="panel shape-element-popover" style={{ left: place.left, top: place.top }} onPointerDown={(e) => e.stopPropagation()}>
-      <div className="shape-el-title">{t('shape.el.edge')}</div>
-      <div className="shape-el-list">
-        <label>
-          <input type="checkbox" checked={hasLen} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'length'))} />
-          <span>{t('shape.el.length', { len: lenText })}</span>
-        </label>
+    <div ref={ref} className={CARD_CLASS} style={{ left: place.left, top: place.top }} onPointerDown={(e) => e.stopPropagation()}>
+      <PanelTitle>{t('shape.el.edge')}</PanelTitle>
+      <div className="space-y-2">
+        <CheckboxField className="!gap-x-2">
+          <Checkbox color="blue" checked={hasLen} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'length'))} />
+          <Label className="!text-xs/5">{t('shape.el.length', { len: lenText })}</Label>
+        </CheckboxField>
         {tri && (
           <>
-            <label>
-              <input type="checkbox" checked={hasAlt} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'altitude'))} />
-              <span>{t('shape.el.altitudeToSide')}</span>
-            </label>
-            <label>
-              <input type="checkbox" checked={hasMed} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'median'))} />
-              <span>{t('shape.el.medianToSide')}</span>
-            </label>
+            <CheckboxField className="!gap-x-2">
+              <Checkbox color="blue" checked={hasAlt} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'altitude'))} />
+              <Label className="!text-xs/5">{t('shape.el.altitudeToSide')}</Label>
+            </CheckboxField>
+            <CheckboxField className="!gap-x-2">
+              <Checkbox color="blue" checked={hasMed} onChange={() => editor.replaceShape(feature.toggleEdgeFeature(spec, pop.index, 'median'))} />
+              <Label className="!text-xs/5">{t('shape.el.medianToSide')}</Label>
+            </CheckboxField>
           </>
         )}
       </div>
       {canAdd && (
-        <div className="shape-el-actions">
-          <button
-            type="button"
-            className="shape-el-action"
+        <>
+          <Divider soft className="my-2.5" />
+          <Button
+            plain
+            className="w-full !justify-start !px-2 !py-1 !text-xs"
             onClick={() => {
               const inserted = feature.insertVertex(spec, pop.index, anchorWorld!)
               if (inserted) editor.replaceShape(inserted.spec)
               close()
             }}
           >
-            {t('shape.el.addVertex')}
-          </button>
-        </div>
+            <PlusIcon data-slot="icon" />
+            {t('shape.el.addVertex').replace(/^\+\s*/, '')}
+          </Button>
+        </>
       )}
     </div>
   )

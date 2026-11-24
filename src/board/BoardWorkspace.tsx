@@ -11,6 +11,7 @@ import { GraphDialog } from './ui/GraphDialog'
 import { Board, type BoardFileActions } from './ui/Board'
 import { SelectionToolbar } from './ui/SelectionToolbar'
 import { ShapeElementPopover } from './modules/shapeEditor/ShapeElementPopover'
+import { ShapePanel } from './modules/shapeEditor/ShapePanel'
 import { ShortcutsDialog } from './ui/ShortcutsDialog'
 import { TextEditor } from './ui/TextEditor'
 import { InsertBar } from './ui/InsertBar'
@@ -110,6 +111,7 @@ export function BoardWorkspace({
       </div>
       <GraphDialog />
       <FunctionPanel />
+      <ShapePanel />
       <InstrumentPanel />
       <MathKeypad />
       <NoticeArea />

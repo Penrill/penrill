@@ -79,6 +79,8 @@ export class Editor {
       prefsStore.subscribe((p, prev) => {
         if (p.background !== prev.background || p.shapeDefaults.unit !== prev.shapeDefaults.unit || p.lang !== prev.lang) {
           this.invalidate(true)
+        } else if (p.shapeDefaults.gizmo3d !== prev.shapeDefaults.gizmo3d) {
+          this.invalidate(false)
         }
       }),
       this.session.subscribe((s, prev) => this.onSessionChange(s, prev))
@@ -94,7 +96,7 @@ export class Editor {
     // The selection is drawn lifted on the board itself, so a new selection redraws the board.
     if (s.selectedIds !== prev.selectedIds) {
       this.invalidate(true)
-    } else if (s.tool !== prev.tool) {
+    } else if (s.tool !== prev.tool || s.gizmo3dOverride !== prev.gizmo3dOverride || s.gizmo3dSpace !== prev.gizmo3dSpace) {
       this.invalidate(false)
     }
     // The function panel belongs to one selected plane: close it when that plane stops being the selection.
@@ -103,6 +105,18 @@ export class Editor {
     }
     if (s.shapePopover && (s.selectedIds !== prev.selectedIds || s.tool !== prev.tool || !s.active)) {
       this.session.setState({ shapePopover: null })
+    }
+    if (s.shapePanel) {
+      const items = s.selectedIds.length ? this.scene.getById(s.selectedIds) : []
+      const hasEditableShape =
+        s.active &&
+        items.length > 0 &&
+        !items.some((i) => i.locked) &&
+        ((items.length === 1 && items[0].type === 'shape') || !!editableShape(items))
+      if (!hasEditableShape) this.session.setState({ shapePanel: false })
+    }
+    if (s.prev3dView && (s.selectedIds.length !== 1 || s.selectedIds[0] !== s.prev3dView.itemId)) {
+      this.session.setState({ prev3dView: null })
     }
     if (s.tool !== prev.tool) {
       // Picking a drawing tool means "done with the selection": drop it (lasso ↔ move keep it).

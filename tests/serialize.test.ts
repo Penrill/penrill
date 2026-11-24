@@ -320,3 +320,59 @@ test('turned images, texts and formulas need version 10 and keep their turn', ()
   assert.equal(plain.version, 6)
   assert.equal('rot' in plain.items[0], false)
 })
+
+test('3D ShapeItem quaternion rot3 round-trips cleanly, normalizes drift and drops malformed values', () => {
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const q = [0.5, 0.5, 0.5, 0.5] as [number, number, number, number]
+  const cube = createShapeItem(
+    { geo: { kind: 'cube', ax: 0, ay: 0, bx: 120, by: 120, dim3: [90, 90, 90], rot3: q } },
+    { color: '#1e1e1e', size: 2, tool: 'pen' },
+    { id: 'c-rot3', z: 1 }
+  )
+  const file = JSON.parse(JSON.stringify(serializeBoard({ items: [cube], background: 'dots', camera: cam }))) as BoardFile
+  assert.equal(file.version, 12)
+  const back = deserializeBoard(file).items[0] as ShapeItem
+  assert.ok(back.geo.rot3)
+  for (let i = 0; i < 4; i++) assert.ok(Math.abs(back.geo.rot3![i] - q[i]) < 1e-4)
+
+  // Unnormalized quaternion gets normalized; zero/bad quaternion is dropped safely.
+  const driftFile = JSON.parse(JSON.stringify(file)) as BoardFile
+  ;(driftFile.items[0] as unknown as { geo: { rot3: unknown } }).geo.rot3 = [0, 0, 2, 0]
+  const normBack = deserializeBoard(driftFile).items[0] as ShapeItem
+  assert.deepEqual(normBack.geo.rot3, [0, 0, 1, 0])
+
+  const badFile = JSON.parse(JSON.stringify(file)) as BoardFile
+  ;(badFile.items[0] as unknown as { geo: { rot3: unknown } }).geo.rot3 = [0, 0, 0, 0]
+  const badBack = deserializeBoard(badFile).items[0] as ShapeItem
+  assert.equal(badBack.geo.rot3, undefined)
+})
+
+test('3D ShapeItem free vertices3 map round-trips cleanly and drops malformed entries', () => {
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const verts3: Record<string, [number, number, number]> = {
+    b0: [-45.125, -45, 45],
+    b1: [45, -45, 45],
+    b2: [45, -45, -45],
+    b3: [-45, -45, -45],
+    t0: [-55, 62.5, 45],
+    t1: [45, 45, 45],
+    t2: [45, 45, -45],
+    t3: [-45, 45, -45]
+  }
+  const cube = createShapeItem(
+    { geo: { kind: 'cube', ax: 0, ay: 0, bx: 120, by: 120, dim3: [90, 90, 90], vertices3: verts3 } },
+    { color: '#1e1e1e', size: 2, tool: 'pen' },
+    { id: 'c-v3', z: 1 }
+  )
+  const file = JSON.parse(JSON.stringify(serializeBoard({ items: [cube], background: 'dots', camera: cam }))) as BoardFile
+  assert.equal(file.version, 12)
+  const back = deserializeBoard(file).items[0] as ShapeItem
+  assert.ok(back.geo.vertices3)
+  assert.deepEqual(back.geo.vertices3!.t0, [-55, 62.5, 45])
+  assert.equal(back.geo.vertices3!.b0[0], -45.12)
+
+  const badFile = JSON.parse(JSON.stringify(file)) as BoardFile
+  ;(badFile.items[0] as unknown as { geo: { vertices3: unknown } }).geo.vertices3 = { b0: [1, 2, 'bad'] }
+  const badBack = deserializeBoard(badFile).items[0] as ShapeItem
+  assert.equal(badBack.geo.vertices3, undefined)
+})

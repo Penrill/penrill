@@ -17,12 +17,22 @@ export interface ConstructionAction {
   construction: ShapeConstruction
 }
 
+export interface ConnectTarget {
+  id: string
+  targetId: string
+  label: string
+  active: boolean
+  construction: ShapeConstruction
+}
+
 export interface VertexActionsModel {
   vertex: EvalVertex
   currentLabel: string | null
   hasAngle: boolean
   angleOn: boolean
   constructions: ConstructionAction[]
+  /** All connectable non-adjacent vertices, centers and active edge midpoints (compact chip grid). */
+  connectTargets: ConnectTarget[]
   canRemove: boolean
 }
 
@@ -52,18 +62,36 @@ const CONSTRAINED_2D_POLYGONS: ReadonlySet<ShapeKind> = new Set([
   'star'
 ])
 
+const CONSTRAINED_3D_POLYHEDRA: ReadonlySet<ShapeKind> = new Set([
+  'cube',
+  'prism',
+  'pyramid',
+  'obliquePyramid'
+])
+
 /** True when a 2D polygonal shape is currently constrained and can be unlocked into free vertices. */
 export function isConstrained2dPolygon(geo: ShapeGeometry): boolean {
   return CONSTRAINED_2D_POLYGONS.has(geo.kind) || (geo.kind === 'polygon' && !geo.vertices)
 }
 
+/** True when a 3D polyhedron is currently constrained and can be unlocked into free 3D vertices. */
+export function isConstrained3dPolyhedron(geo: ShapeGeometry): boolean {
+  return CONSTRAINED_3D_POLYHEDRA.has(geo.kind) && !geo.vertices3
+}
+
+/** True when any 2D polygon or 3D polyhedron can be unlocked into free vertex editing. */
+export function canUnlockFreeVertices(geo: ShapeGeometry): boolean {
+  return isConstrained2dPolygon(geo) || isConstrained3dPolyhedron(geo)
+}
+
 /** True when a ShapeItem has custom geometry overrides beyond its canonical bounding-box form. */
 export function isCustomizedShapeItem(item: ShapeItem): boolean {
   const g = item.geo
-  if (g.vertices || g.skew !== undefined || g.topLeft !== undefined || g.topRight !== undefined || g.innerRatio !== undefined) {
+  if (g.vertices || g.vertices3 || g.skew !== undefined || g.topLeft !== undefined || g.topRight !== undefined || g.innerRatio !== undefined) {
     return true
   }
   if (is3D(g.kind)) {
+    if (g.rot3) return true
     const defOrbit = DEFAULT_ORBIT
     if (g.orbit && (Math.abs(g.orbit[0] - defOrbit[0]) > 1e-3 || Math.abs(g.orbit[1] - defOrbit[1]) > 1e-3)) return true
     const defSlant: [number, number] = g.kind === 'obliquePyramid' ? [0.85, 0] : [0, 0]
@@ -96,12 +124,14 @@ function pruneAnnotations(item: ShapeItem): ShapeItem {
   const vIds = new Set(ev.vertices.map((v) => v.id))
   const eIds = new Set(ev.edges.map((e) => e.id))
   const cIds = new Set(ev.curves.map((c) => c.id))
+  const validPointId = (id: string): boolean =>
+    vIds.has(id) || id === 'center' || (id.startsWith('mid:') && eIds.has(id.slice(4)))
   const cons = (item.constructions ?? []).filter((c) => {
     switch (c.kind) {
       case 'altitude': return vIds.has(c.from) && (!c.toEdge || eIds.has(c.toEdge))
       case 'median': return vIds.has(c.from) && eIds.has(c.toEdge)
       case 'bisector': return vIds.has(c.from) && !ev.is3D
-      case 'diagonal': return vIds.has(c.from) && vIds.has(c.to)
+      case 'diagonal': return validPointId(c.from) && validPointId(c.to)
       case 'midpoint': return eIds.has(c.edge)
       case 'midline': return eIds.has(c.edgeA) && eIds.has(c.edgeB)
       case 'apothem': return vIds.has('apex') && eIds.has(c.edge)
@@ -142,11 +172,19 @@ function pruneAnnotations(item: ShapeItem): ShapeItem {
 }
 
 /**
- * Unlock any constrained 2D polygonal shape (rhombus, rectangle, parallelogram, trapezoid, pentagon,
- * hexagon, star, regular polygon) into a free polygon with explicit vertices while keeping all
- * labels, angles, lengths and compatible constructions.
+ * Unlock any constrained 2D polygonal shape into a free 2D polygon OR any constrained 3D polyhedron
+ * into free 3D vertices (`geo.vertices3`) while keeping all labels, angles, lengths and constructions.
  */
 export function unlockFreeVertices(item: ShapeItem): ShapeItem {
+  if (isConstrained3dPolyhedron(item.geo)) {
+    const ev = evaluateShape(item)
+    const vertices3: Record<string, [number, number, number]> = {}
+    for (const v of ev.vertices) {
+      if (v.pos3) vertices3[v.id] = [v.pos3[0], v.pos3[1], v.pos3[2]]
+    }
+    if (!Object.keys(vertices3).length) return item
+    return withShapeUpdate(item, { geo: { ...item.geo, vertices3 } })
+  }
   if (!isConstrained2dPolygon(item.geo)) return item
   const ev = evaluateShape(item)
   if (ev.vertices.length < MIN_BASE) return item
@@ -180,6 +218,14 @@ export function resetShapeItemGeometry(item: ShapeItem): ShapeItem {
   return pruneAnnotations(withShapeUpdate(item, { geo: nextGeo }))
 }
 
+/** Reset only the 3D orientation back to classic textbook axonometry (keeping dimensions and constructions). */
+export function resetShapeItemOrbit(item: ShapeItem): ShapeItem {
+  if (!is3D(item.geo.kind)) return item
+  const nextGeo: ShapeGeometry = { ...item.geo, orbit: [DEFAULT_ORBIT[0], DEFAULT_ORBIT[1]] }
+  delete nextGeo.rot3
+  return withShapeUpdate(item, { geo: nextGeo })
+}
+
 /** Switch a ShapeItem to a new ShapeKind while preserving bounds, compatible sides and annotations. */
 export function switchShapeItemKind(item: ShapeItem, nextKind: ShapeKind): ShapeItem {
   const g = item.geo
@@ -197,7 +243,8 @@ export function switchShapeItemKind(item: ShapeItem, nextKind: ShapeKind): Shape
   }
   if (is3D(nextKind)) {
     nextGeo.dim3 = is3D(g.kind) && g.dim3 ? [...g.dim3] : defaultDim3(nextKind, g.bx - g.ax, g.by - g.ay)
-    nextGeo.orbit = is3D(g.kind) && g.orbit ? [...g.orbit] : [DEFAULT_ORBIT[0], DEFAULT_ORBIT[1]]
+    if (is3D(g.kind) && g.rot3) nextGeo.rot3 = [...g.rot3]
+    else nextGeo.orbit = is3D(g.kind) && g.orbit ? [...g.orbit] : [DEFAULT_ORBIT[0], DEFAULT_ORBIT[1]]
     if (nextKind === 'obliquePyramid') nextGeo.slant3 = [0.85, 0]
   }
   return pruneAnnotations(withShapeUpdate(item, { geo: nextGeo }))
@@ -209,6 +256,7 @@ export function setShapeItemSides(item: ShapeItem, sides: number): ShapeItem {
   const clamped = Math.max(MIN_BASE, Math.min(MAX_BASE, Math.round(sides)))
   const nextGeo: ShapeGeometry = { ...item.geo, sides: clamped }
   if (nextGeo.kind === 'polygon') delete nextGeo.vertices
+  delete nextGeo.vertices3
   return pruneAnnotations(withShapeUpdate(item, { geo: nextGeo }))
 }
 
@@ -326,55 +374,92 @@ function defaultAltitudeEdgeForVertex(geo: ShapeGeometry, vIdx: number, n: numbe
   return (vIdx + Math.floor(n / 2)) % n
 }
 
-/** Opposite vertex for a diagonal starting at vertex `vId` (works for 2D quads/n-gons AND 3D solids!). */
-function diagonalTargetsForVertex(item: ShapeItem, v: EvalVertex, vertices: readonly EvalVertex[], edges: readonly EvalEdge[]): EvalVertex[] {
+/**
+ * Universal connectable target points from vertex `v` across ANY 2D or 3D shape:
+ * every non-adjacent vertex (no artificial 3-target cap, including all cube/prism face & space
+ * diagonals, all n-gon/star diagonals, and ellipse/cylinder/cone/sphere chords & radii),
+ * plus active center `O` and active edge midpoints (`mid:<edgeId>`) for stereometric sections.
+ */
+function connectTargetsForVertex(
+  item: ShapeItem,
+  v: EvalVertex,
+  vertices: readonly EvalVertex[],
+  edges: readonly EvalEdge[]
+): ConnectTarget[] {
   const adjacent = new Set<string>([v.id])
   for (const e of edges) {
     if (e.from === v.id) adjacent.add(e.to)
     if (e.to === v.id) adjacent.add(e.from)
   }
+
+  const ordered: { targetId: string; label: string }[] = []
+  const seen = new Set<string>()
+  const pushVertex = (u: EvalVertex | undefined): void => {
+    if (!u || adjacent.has(u.id) || seen.has(u.id)) return
+    seen.add(u.id)
+    ordered.push({ targetId: u.id, label: item.labels?.[u.id] ?? u.defaultLabel })
+  }
+
   if (!is3D(item.geo.kind)) {
     const n = vertices.length
-    if (n < 4) return []
     const idx = vertices.findIndex((x) => x.id === v.id)
-    if (idx < 0) return []
-    // For quads, there is 1 exact opposite vertex; for 5+ gons offer opposite vertex first, then up to 2 others.
-    const opp = vertices[(idx + Math.floor(n / 2)) % n]
-    const others = vertices.filter((u) => !adjacent.has(u.id) && u.id !== opp.id)
-    return [opp, ...others].slice(0, 3)
-  }
-  // 3D cube or prism: prioritize space diagonal (opposite corner on the other base), then base diagonal!
-  if (item.geo.kind === 'cube' || item.geo.kind === 'prism') {
-    const isBottom = v.id.startsWith('b')
-    const isTop = v.id.startsWith('t')
-    if (!isBottom && !isTop) return []
-    const idx = Number(v.id.slice(1))
-    const half = vertices.length / 2
-    const targets: EvalVertex[] = []
-    if (half >= 4) {
-      const oppIdx = (idx + Math.floor(half / 2)) % half
-      const spaceId = `${isBottom ? 't' : 'b'}${oppIdx}`
-      const baseId = `${isBottom ? 'b' : 't'}${oppIdx}`
-      const spaceV = vertices.find((u) => u.id === spaceId)
-      const baseV = vertices.find((u) => u.id === baseId)
-      if (spaceV) targets.push(spaceV)
-      if (baseV) targets.push(baseV)
-    } else if (half === 3) {
-      const faceId = `${isBottom ? 't' : 'b'}${(idx + 1) % 3}`
-      const faceV = vertices.find((u) => u.id === faceId)
-      if (faceV) targets.push(faceV)
+    if (n >= 4 && idx >= 0 && item.geo.kind !== 'ellipse') {
+      // Opposite vertex first, then every remaining non-adjacent vertex in order.
+      pushVertex(vertices[(idx + Math.floor(n / 2)) % n])
     }
-    return targets
+    for (const u of vertices) pushVertex(u)
+  } else {
+    // Prioritize space/base diagonals first on cube & prism, then every other non-adjacent vertex (including face diagonals!).
+    if (item.geo.kind === 'cube' || item.geo.kind === 'prism') {
+      const isBottom = v.id.startsWith('b')
+      const isTop = v.id.startsWith('t')
+      if (isBottom || isTop) {
+        const idx = Number(v.id.slice(1))
+        const half = vertices.length / 2
+        if (half >= 4) {
+          const oppIdx = (idx + Math.floor(half / 2)) % half
+          pushVertex(vertices.find((u) => u.id === `${isBottom ? 't' : 'b'}${oppIdx}`))
+          pushVertex(vertices.find((u) => u.id === `${isBottom ? 'b' : 't'}${oppIdx}`))
+        }
+      }
+    } else if ((item.geo.kind === 'pyramid' || item.geo.kind === 'obliquePyramid') && v.id.startsWith('b')) {
+      const baseVerts = vertices.filter((u) => u.id.startsWith('b'))
+      if (baseVerts.length >= 4) {
+        const idx = Number(v.id.slice(1))
+        pushVertex(baseVerts[(idx + Math.floor(baseVerts.length / 2)) % baseVerts.length])
+      }
+    }
+    for (const u of vertices) pushVertex(u)
   }
-  // 3D pyramid base corner -> base diagonal!
-  if ((item.geo.kind === 'pyramid' || item.geo.kind === 'obliquePyramid') && v.id.startsWith('b')) {
-    const baseVerts = vertices.filter((u) => u.id.startsWith('b'))
-    if (baseVerts.length < 4) return []
-    const idx = Number(v.id.slice(1))
-    const opp = baseVerts[(idx + Math.floor(baseVerts.length / 2)) % baseVerts.length]
-    return opp ? [opp] : []
+
+  // Also include active center O (when not already in `vertices`) and active edge midpoints for cross-sections!
+  if (hasConstruction(item, 'center') && !seen.has('center') && v.id !== 'center') {
+    seen.add('center')
+    ordered.push({ targetId: 'center', label: item.labels?.center ?? 'O' })
   }
-  return []
+  const byV = new Map(vertices.map((u) => [u.id, u]))
+  for (const c of item.constructions ?? []) {
+    if (c.kind !== 'midpoint') continue
+    const e = edges.find((x) => x.id === c.edge)
+    if (!e || e.from === v.id || e.to === v.id) continue
+    const midTarget = `mid:${e.id}`
+    if (seen.has(midTarget)) continue
+    seen.add(midTarget)
+    const aL = item.labels?.[e.from] ?? byV.get(e.from)?.defaultLabel ?? ''
+    const bL = item.labels?.[e.to] ?? byV.get(e.to)?.defaultLabel ?? ''
+    ordered.push({ targetId: midTarget, label: aL && bL ? `M(${aL}${bL})` : 'M' })
+  }
+
+  return ordered.map(({ targetId, label }) => {
+    const id = canonicalDiagId(v.id, targetId)
+    return {
+      id,
+      targetId,
+      label,
+      active: hasConstruction(item, id),
+      construction: { id, kind: 'diagonal', from: v.id, to: targetId }
+    }
+  })
 }
 
 function canonicalDiagId(a: string, b: string): string {
@@ -417,17 +502,6 @@ export function availableVertexActions(item: ShapeItem, vertexId: string): Verte
         active: hasConstruction(item, bisId),
         construction: { id: bisId, kind: 'bisector', from: vertexId }
       })
-      for (const target of diagonalTargetsForVertex(item, vertex, ev.vertices, ev.edges)) {
-        const dId = canonicalDiagId(vertexId, target.id)
-        const pair = `${item.labels?.[vertexId] ?? vertex.defaultLabel}${item.labels?.[target.id] ?? target.defaultLabel}`
-        constructions.push({
-          id: dId,
-          labelKey: 'shape.diagonalPair',
-          vars: { pair },
-          active: hasConstruction(item, dId),
-          construction: { id: dId, kind: 'diagonal', from: vertexId, to: target.id }
-        })
-      }
     } else if (item.geo.kind === 'ellipse' && vertexId === 'center') {
       constructions.push(
         { id: 'center', labelKey: 'shape.center', active: hasConstruction(item, 'center'), construction: { id: 'center', kind: 'center' } },
@@ -469,18 +543,9 @@ export function availableVertexActions(item: ShapeItem, vertexId: string): Verte
         })
       }
     }
-    for (const target of diagonalTargetsForVertex(item, vertex, ev.vertices, ev.edges)) {
-      const dId = canonicalDiagId(vertexId, target.id)
-      const pair = `${item.labels?.[vertexId] ?? vertex.defaultLabel}${item.labels?.[target.id] ?? target.defaultLabel}`
-      constructions.push({
-        id: dId,
-        labelKey: 'shape.diagonalPair',
-        vars: { pair },
-        active: hasConstruction(item, dId),
-        construction: { id: dId, kind: 'diagonal', from: vertexId, to: target.id }
-      })
-    }
   }
+
+  const connectTargets = connectTargetsForVertex(item, vertex, ev.vertices, ev.edges)
 
   return {
     vertex,
@@ -488,6 +553,7 @@ export function availableVertexActions(item: ShapeItem, vertexId: string): Verte
     hasAngle: vertex.angleDeg !== undefined && vertex.role !== 'inner',
     angleOn: Boolean(item.angles?.includes(vertexId)),
     constructions,
+    connectTargets,
     canRemove: item.geo.kind === 'polygon' && ev.vertices.length > MIN_BASE
   }
 }

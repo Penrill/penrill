@@ -4,6 +4,17 @@ import { test } from 'node:test'
 import { Scene } from '@penrill/core/scene'
 import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import { evaluateShape } from '@penrill/core/shapeEval'
+import {
+  effectiveQuat,
+  eulerDegToQuat,
+  orbitToQuat,
+  quatFromAxisAngle,
+  quatMul,
+  quatToEulerDeg,
+  quatToMat3,
+  rotate3d,
+  rotate3dMat
+} from '@penrill/core/shapeEval3d'
 import { buildShapeItems, editableShape } from '@penrill/core/shapeItems'
 import { specParts } from '@penrill/core/shapes'
 import { triangleCircles } from '@penrill/core/triangleCircles'
@@ -15,9 +26,11 @@ import {
   availableEdgeActions,
   availableVertexActions,
   availableWholeShapeActions,
+  canUnlockFreeVertices,
   isConstrained2dPolygon,
   isCustomizedShapeItem,
   resetShapeItemGeometry,
+  resetShapeItemOrbit,
   setLabel,
   toggleAllAngles,
   toggleAllLabels,
@@ -42,6 +55,18 @@ import {
   shapeItemHandles,
   usesVertexHandles
 } from '@penrill/shape-editor/handles'
+import {
+  applyViewPreset3d,
+  buildGizmo3d,
+  detectViewPreset3d,
+  dragGizmo3dRing,
+  dragTrackball3d,
+  hitGizmo3dRing,
+  isSideViewPreset,
+  setEulerDeg3d,
+  toggleAxisViewPreset3d
+} from '@penrill/shape-editor/gizmo3d'
+import { DEFAULT_SHAPE_DEFAULTS } from '../src/board/store.ts'
 import { shapeDisplay } from '@penrill/shape-editor/shapeDisplay'
 import {
   applyDefaultMeasurements,
@@ -498,13 +523,13 @@ test('first-class ShapeItem works with defaults, polygon vertex insert/remove, h
     assert.equal(hitTest([rect], 60, 0, 4)?.id, 'r1')
     assert.equal(hitShapeItemEdge(rect, 60, 0, 1)?.id, 'e0')
 
-    // Headless controller: tapping a cube corner does not mutate scene; dragging orbit records one undo step!
+    // Headless controller: tapping a cube corner (<= 4px) does not mutate scene; dragging reshapes in one undo step!
     editor.scene.add([cube])
     editor.setSelection([cube])
     const b0 = feature.itemHandles(cube).find((h) => h.id === 'b0')!
     const verBefore = editor.scene.version
     const tap = beginShapeItemHandle(feature, editor, cube, b0, [b0.x, b0.y])
-    tap.move([b0.x + 10, b0.y + 10], { shift: false, ctrl: false, alt: false }, [24, 24])
+    tap.move([b0.x + 2, b0.y + 2], { shift: false, ctrl: false, alt: false }, [24, 24])
     assert.equal(tap.end(), false)
     assert.equal(editor.scene.version, verBefore)
 
@@ -515,6 +540,423 @@ test('first-class ShapeItem works with defaults, polygon vertex insert/remove, h
     assert.notDeepEqual((editor.selectedItems()[0] as ShapeItem).geo.orbit, cube.geo.orbit)
     editor.undo()
     assert.deepEqual((editor.selectedItems()[0] as ShapeItem).geo.orbit, cube.geo.orbit)
+  } finally {
+    editor.dispose()
+  }
+})
+
+test('optional Blender-style 3-axis 3D rotation gizmo: quaternion equivalence, X/Y/Z/Roll rings, Trackball, presets and edge-on solids', () => {
+  // 1. Exact equivalence between orbitToQuat + rotate3dMat and legacy R_x(pitch)*R_y(yaw).
+  const vectors: [number, number, number][] = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [12.5, -7.25, 4.1],
+    [-3.3, 8.8, -9.9]
+  ]
+  for (const [yaw, pitch] of [[-0.52, 0.36], [1.1, -0.7], [-2.4, 1.2], [0, 0]] as const) {
+    const m = quatToMat3(orbitToQuat(yaw, pitch))
+    for (const v of vectors) {
+      const a = rotate3d(v, yaw, pitch)
+      const b = rotate3dMat(v, m)
+      near(a[0], b[0], 1e-11)
+      near(a[1], b[1], 1e-11)
+      near(a[2], b[2], 1e-11)
+    }
+  }
+
+  // 2. Composing 3-axis rotations (X -> Y -> Z) stays unit-normalized with zero gimbal lock and flips cube back faces cleanly.
+  const mk = (kind: ShapeSpec['kind']): ShapeItem =>
+    createShapeItem(specToShapeData({ kind, ax: 0, ay: 0, bx: 140, by: 140 }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: `g-${kind}`, z: 1 })
+  const cube = mk('cube')
+  const q180x = quatFromAxisAngle([1, 0, 0], Math.PI)
+  const flipped: ShapeItem = { ...cube, geo: { ...cube.geo, rot3: q180x } }
+  const evFlipped = evaluateShape(flipped)
+  // Upside-down cube still has exact 3D edge lengths and valid visibility.
+  assert.equal(evFlipped.edges.length, 12)
+  near(evFlipped.edges[0].length, cube.geo.dim3![0], 1e-6)
+  assert.equal(isCustomizedShapeItem(flipped), true)
+
+  // 3. buildGizmo3d produces 4 rings (X, Y, Z, View Roll) and hitGizmo3dRing hits a front ring point while missing center interior.
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const gizmoLocal = buildGizmo3d(cube, 1, 'local')!
+  assert.equal(gizmoLocal.rings.length, 4)
+  assert.deepEqual(gizmoLocal.rings.map((r) => r.id), ['rotX', 'rotY', 'rotZ', 'rotView'])
+  assert.equal(hitGizmo3dRing(gizmoLocal, gizmoLocal.center[0], gizmoLocal.center[1], cam, 0), null, 'interior stays free for clicks/drag')
+  const xRing = gizmoLocal.rings.find((r) => r.id === 'rotX')!
+  const samplePt = xRing.frontPts[0][Math.floor(xRing.frontPts[0].length / 2)]
+  const ringHit = hitGizmo3dRing(gizmoLocal, samplePt[0], samplePt[1], cam, 0)
+  assert.ok(ringHit)
+  assert.equal(ringHit.ring.id, 'rotX')
+
+  // 4. Dragging rotView (outer ring) by 90 deg with Shift produces exact 90 deg roll & sweep sector polygon.
+  const startRollPt: [number, number] = [gizmoLocal.center[0] + gizmoLocal.outerRadius, gizmoLocal.center[1]]
+  const endRollPt: [number, number] = [gizmoLocal.center[0], gizmoLocal.center[1] + gizmoLocal.outerRadius]
+  const rolled = dragGizmo3dRing(
+    cube,
+    'rotView',
+    endRollPt,
+    { ...baseOpts, shift: true },
+    { startWorld: startRollPt, startGeo: cube.geo, gizmoSpace: 'local' }
+  )
+  assert.ok(rolled.item.geo.rot3)
+  near(Math.hypot(...rolled.item.geo.rot3!), 1, 1e-9)
+  assert.equal(rolled.gizmoArc?.id, 'rotView')
+  assert.equal(rolled.gizmoArc?.deltaDeg, -90)
+  assert.equal(rolled.label, 'Roll: -90°')
+
+  // 5. Local vs World space produce distinct rotations on an already-tilted solid.
+  const tilted: ShapeItem = {
+    ...cube,
+    geo: { ...cube.geo, rot3: quatMul(orbitToQuat(-0.52, 0.36), quatFromAxisAngle([1, 0, 0], Math.PI / 3)) }
+  }
+  const p0: [number, number] = [70 + 80, 70]
+  const p1: [number, number] = [70 + 40, 70 + 70]
+  const localDrag = dragGizmo3dRing(tilted, 'rotY', p1, { ...baseOpts, alt: true }, { startWorld: p0, startGeo: tilted.geo, gizmoSpace: 'local' })
+  const worldDrag = dragGizmo3dRing(tilted, 'rotY', p1, { ...baseOpts, alt: true }, { startWorld: p0, startGeo: tilted.geo, gizmoSpace: 'world' })
+  assert.notDeepEqual(localDrag.item.geo.rot3, worldDrag.item.geo.rot3)
+
+  // 6. Dragging dimX on a quaternion-rotated cube preserves rot3 instead of snapping back to default orbit.
+  const dimX = shapeItemHandles(tilted).find((h) => h.id === 'dimX')!
+  const resizedTilted = dragShapeItemHandle(
+    tilted,
+    'dimX',
+    [dimX.x + 30, dimX.y],
+    { ...baseOpts, alt: true },
+    { startWorld: [dimX.x, dimX.y], startGeo: tilted.geo }
+  )
+  assert.deepEqual(resizedTilted.item.geo.rot3, tilted.geo.rot3)
+
+  // 7. Free 3D Trackball drag via orbit handle with free3d=true updates rot3 cleanly without pitch clamp.
+  const orb = shapeItemHandles(cube).find((h) => h.id === 'orbit')!
+  const tb = dragTrackball3d(
+    cube,
+    [orb.x + 90, orb.y + 180],
+    { ...baseOpts, alt: true },
+    { startWorld: [orb.x, orb.y], startGeo: cube.geo, prevWorld: [orb.x, orb.y], prevGeo: cube.geo, free3d: true }
+  )
+  assert.ok(tb.item.geo.rot3)
+  near(Math.hypot(...tb.item.geo.rot3!), 1, 1e-9)
+
+  // 8. View presets (axon, iso, front, back, top, bottom, right, left) & resetShapeItemOrbit preserve dim3 while snapping orientation.
+  const topCube = applyViewPreset3d(resizedTilted.item, 'top')
+  assert.ok(topCube.geo.rot3)
+  assert.deepEqual(topCube.geo.dim3, resizedTilted.item.geo.dim3)
+  const resetAng = resetShapeItemOrbit(topCube)
+  assert.equal(resetAng.geo.rot3, undefined)
+  assert.deepEqual(resetAng.geo.dim3, resizedTilted.item.geo.dim3)
+
+  // 9. Head-on cylinder (Top view) and edge-on rolled cone evaluate cleanly with finite geometry and zero NaNs across all 8 presets.
+  for (const kind of ['cylinder', 'cone', 'sphere'] as const) {
+    const solid = mk(kind)
+    for (const preset of ['axon', 'iso', 'front', 'back', 'top', 'bottom', 'right', 'left'] as const) {
+      const ev = evaluateShape(applyViewPreset3d(solid, preset))
+      assert.ok(Number.isFinite(ev.bounds.minX) && Number.isFinite(ev.bounds.maxY))
+      for (const path of ev.hitPaths) {
+        for (const [x, y] of path) {
+          assert.ok(Number.isFinite(x) && Number.isFinite(y), `${kind} ${preset} produced non-finite coordinate`)
+        }
+      }
+    }
+  }
+})
+
+test('3D gizmo defaults ON, Euler X/Y/Z° round-trips, 3D geometric vertex angles render, and all 3D vertices drag smoothly', () => {
+  // 1. 3D rotation gizmo is enabled by default.
+  assert.equal(DEFAULT_SHAPE_DEFAULTS.gizmo3d, true)
+
+  // 2. Euler X/Y/Z° <-> Quaternion round-trip across textbook axonometry, presets and arbitrary 3-axis orientations.
+  for (const [x, y, z] of [[21, -30, 0], [0, 0, 0], [90, 0, 0], [0, -90, 0], [35, 60, -45], [-40, 125, 20]] as const) {
+    const q = eulerDegToQuat(x, y, z)
+    const back = quatToEulerDeg(q)
+    const m1 = quatToMat3(q)
+    const m2 = quatToMat3(eulerDegToQuat(back[0], back[1], back[2]))
+    for (let i = 0; i < 9; i++) near(m1[i], m2[i], 1e-2)
+  }
+
+  const mk = (kind: ShapeSpec['kind'], base?: number): ShapeItem =>
+    createShapeItem(specToShapeData({ kind, ax: 0, ay: 0, bx: 160, by: 160, ...(base ? { base } : {}) }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: `3dv-${kind}`, z: 1 })
+
+  // 3. setEulerDeg3d + buildGizmo3d.eulerDeg match cleanly.
+  const cube = mk('cube')
+  const customAng = setEulerDeg3d(cube, [45, -60, 15])
+  assert.deepEqual(quatToEulerDeg(effectiveQuat(customAng.geo)), [45, -60, 15])
+  assert.deepEqual(buildGizmo3d(customAng, 1, 'local')!.eulerDeg, [45, -60, 15])
+
+  // 4. Geometric 3D vertex angles on cube (90 deg), prism (60 deg / 108 deg), pyramid (base + apex), cone (apex opening).
+  const evCube = evaluateShape(cube)
+  assert.equal(evCube.vertices.every((v) => v.angleDeg === 90 && v.angle3d?.markPts.length === 3), true)
+  const cubeWithAngles = toggleAllAngles(cube, true)
+  assert.equal(cubeWithAngles.angles?.length, 8)
+  const cubeSvg = toSvg(shapeDisplay(cubeWithAngles, { unit: 'cm', unitLabel: 'cm', comma: false }), (c) => (c === '@paper' ? '#fff' : c))
+  assert.match(cubeSvg, />90°<\/text>/)
+  assert.equal(availableVertexActions(cube, 'b0')?.hasAngle, true)
+
+  const triPrism = mk('prism', 3)
+  near(evaluateShape(triPrism).vertices[0].angleDeg!, 60, 1e-3)
+  const pentPrism = mk('prism', 5)
+  near(evaluateShape(pentPrism).vertices[0].angleDeg!, 108, 1e-3)
+
+  const pyr = mk('pyramid', 4)
+  const evPyr = evaluateShape(pyr)
+  near(evPyr.vertices[0].angleDeg!, 90, 1e-3)
+  const pyrApex = evPyr.vertices.find((v) => v.id === 'apex')!
+  assert.ok(pyrApex.angleDeg! > 10 && pyrApex.angleDeg! < 120)
+  assert.ok(pyrApex.angle3d!.markPts.length >= 2)
+
+  const cone = mk('cone')
+  const coneApex = evaluateShape(cone).vertices.find((v) => v.id === 'apex')!
+  assert.ok(coneApex.angleDeg! > 10 && coneApex.angleDeg! < 140)
+  assert.equal(availableVertexActions(cone, 'apex')?.hasAngle, true)
+
+  // 5. All 3D vertex handles are draggable on every 3D solid, and dragging keeps opposite corner/base pinned!
+  for (const kind of ['cube', 'prism', 'pyramid', 'obliquePyramid', 'cylinder', 'cone', 'sphere'] as const) {
+    const s = mk(kind)
+    const vertHandles = shapeItemHandles(s).filter((h) => h.kind === 'vertex')
+    assert.ok(vertHandles.length >= 3, `${kind} exposes draggable vertex handles`)
+    assert.ok(vertHandles.every((h) => h.draggable === true), `${kind} vertices are all draggable`)
+  }
+
+  // Cube corner constrained drag (without Alt) stretches dimensions while keeping diagonally opposite corner t2 pinned!
+  const b0Before = evaluateShape(cube).vertices.find((v) => v.id === 'b0')!.pos
+  const t2Before = evaluateShape(cube).vertices.find((v) => v.id === 't2')!.pos
+  const cubeDrag = dragShapeItemHandle(
+    cube,
+    'b0',
+    [b0Before[0] - 40, b0Before[1] + 30],
+    { ...baseOpts, alt: false },
+    { startWorld: b0Before, startGeo: cube.geo }
+  )
+  const t2After = evaluateShape(cubeDrag.item).vertices.find((v) => v.id === 't2')!.pos
+  near(t2After[0], t2Before[0], 1e-4)
+  near(t2After[1], t2Before[1], 1e-4)
+  assert.equal(cubeDrag.item.geo.vertices3, undefined)
+  assert.ok(cubeDrag.item.geo.dim3![0] > cube.geo.dim3![0] + 10)
+
+  // Cube corner drag with Shift enforces uniform cube a=b=c.
+  const cubeShift = dragShapeItemHandle(
+    cube,
+    't1',
+    [b0Before[0] + 80, b0Before[1] - 40],
+    { ...baseOpts, shift: true },
+    { startWorld: b0Before, startGeo: cube.geo }
+  )
+  near(cubeShift.item.geo.dim3![0], cubeShift.item.geo.dim3![1], 1e-4)
+  near(cubeShift.item.geo.dim3![1], cubeShift.item.geo.dim3![2], 1e-4)
+  assert.equal(cubeShift.label, 'a=b=c')
+
+  // Pyramid apex constrained drag stretches height while keeping base center pinned!
+  const pyrCenterBefore = evaluateShape(pyr).vertices.find((v) => v.id === 'b0')!.pos
+  const pyrApexBefore = evaluateShape(pyr).vertices.find((v) => v.id === 'apex')!.pos
+  const pyrDrag = dragShapeItemHandle(
+    pyr,
+    'apex',
+    [pyrApexBefore[0], pyrApexBefore[1] - 40],
+    { ...baseOpts, alt: false },
+    { startWorld: pyrApexBefore, startGeo: pyr.geo }
+  )
+  const pyrBaseAfter = evaluateShape(pyrDrag.item).vertices.find((v) => v.id === 'b0')!.pos
+  near(pyrBaseAfter[0], pyrCenterBefore[0], 1e-3)
+  near(pyrBaseAfter[1], pyrCenterBefore[1], 1e-3)
+  assert.ok(pyrDrag.item.geo.dim3![1] > pyr.geo.dim3![1] + 20)
+
+  // Pyramid base corner constrained drag widens base radius.
+  const pyrBaseDrag = dragShapeItemHandle(
+    pyr,
+    'b0',
+    [pyrCenterBefore[0] + 35, pyrCenterBefore[1] + 25],
+    { ...baseOpts, alt: false },
+    { startWorld: pyrCenterBefore, startGeo: pyr.geo }
+  )
+  assert.notEqual(pyrBaseDrag.item.geo.dim3![0], pyr.geo.dim3![0])
+
+  // Cone rim b0 drag resizes radius; sphere center translates and rim0 resizes.
+  const coneB0 = evaluateShape(cone).vertices.find((v) => v.id === 'b0')!.pos
+  const coneRad = dragShapeItemHandle(cone, 'b0', [coneB0[0] + 45, coneB0[1]], { ...baseOpts, alt: true }, { startWorld: coneB0, startGeo: cone.geo })
+  assert.notEqual(coneRad.item.geo.dim3![0], cone.geo.dim3![0])
+
+  const sphere = mk('sphere')
+  const spCenter = evaluateShape(sphere).center
+  const spMoved = dragShapeItemHandle(sphere, 'center', [spCenter[0] + 25, spCenter[1] - 15], { ...baseOpts, alt: true }, { startWorld: spCenter, startGeo: sphere.geo })
+  near(evaluateShape(spMoved.item).center[0], spCenter[0] + 25, 1e-4)
+  near(evaluateShape(spMoved.item).center[1], spCenter[1] - 15, 1e-4)
+  const spRim = evaluateShape(sphere).vertices.find((v) => v.id === 'rim0')!.pos
+  const spResized = dragShapeItemHandle(sphere, 'rim0', [spCenter[0] + 120, spCenter[1]], { ...baseOpts, alt: true }, { startWorld: spRim, startGeo: sphere.geo })
+  near(spResized.item.geo.dim3![0], 240, 1e-4)
+})
+
+test('true free 3D vertex dragging (Alt + Free vertices), isometric + 6 side views, clickable poles, depth hit priority, universal connections, Ctrl snap & docked panel lifecycle', () => {
+  const mk = (kind: ShapeSpec['kind'], base?: number): ShapeItem =>
+    createShapeItem(
+      specToShapeData({ kind, ax: 0, ay: 0, bx: 144, by: 144, ...(base ? { base } : {}) }),
+      { color: '#1e1e1e', size: 2, tool: 'pen' },
+      { id: `u-${kind}`, z: 1 }
+    )
+
+  // 1. True Isometric (35.264 / -45 deg) + 6 orthographic side views + clickable pole toggling.
+  const cube = mk('cube')
+  assert.equal(detectViewPreset3d(cube.geo), 'axon')
+  assert.equal(isSideViewPreset('axon'), false)
+  assert.equal(isSideViewPreset('iso'), false)
+  assert.equal(isSideViewPreset('top'), true)
+
+  const isoCube = applyViewPreset3d(cube, 'iso')
+  assert.equal(detectViewPreset3d(isoCube.geo), 'iso')
+  // Mathematical isometric projects X, Y, Z unit vectors with identical foreshortening sqrt(2/3).
+  const isoM = quatToMat3(effectiveQuat(isoCube.geo))
+  const lenX = Math.hypot(rotate3dMat([1, 0, 0], isoM)[0], rotate3dMat([1, 0, 0], isoM)[1])
+  const lenY = Math.hypot(rotate3dMat([0, 1, 0], isoM)[0], rotate3dMat([0, 1, 0], isoM)[1])
+  const lenZ = Math.hypot(rotate3dMat([0, 0, 1], isoM)[0], rotate3dMat([0, 0, 1], isoM)[1])
+  near(lenX, Math.sqrt(2 / 3), 1e-4)
+  near(lenY, Math.sqrt(2 / 3), 1e-4)
+  near(lenZ, Math.sqrt(2 / 3), 1e-4)
+
+  for (const preset of ['axon', 'iso', 'front', 'back', 'top', 'bottom', 'right', 'left'] as const) {
+    assert.equal(detectViewPreset3d(applyViewPreset3d(cube, preset).geo), preset)
+  }
+
+  // Axis pole toggling flips +/- sides on repeated clicks.
+  const r1 = toggleAxisViewPreset3d(cube, 'x')
+  assert.equal(r1.preset, 'right')
+  const r2 = toggleAxisViewPreset3d(r1.item, 'x')
+  assert.equal(r2.preset, 'left')
+  const y1 = toggleAxisViewPreset3d(cube, 'y')
+  assert.equal(y1.preset, 'top')
+  const y2 = toggleAxisViewPreset3d(y1.item, 'y')
+  assert.equal(y2.preset, 'bottom')
+  const z1 = toggleAxisViewPreset3d(cube, 'z')
+  assert.equal(z1.preset, 'front')
+  const z2 = toggleAxisViewPreset3d(z1.item, 'z')
+  assert.equal(z2.preset, 'back')
+
+  // Clicking a gizmo X/Y/Z pole hits kind='pole', and dragging poleX rotates the X ring.
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const gizmo = buildGizmo3d(cube, 1, 'local')!
+  const xPole = gizmo.rings.find((r) => r.id === 'rotX')!.pole!
+  const poleHit = hitGizmo3dRing(gizmo, xPole.pos[0], xPole.pos[1], cam, 0)
+  assert.ok(poleHit)
+  assert.equal(poleHit.kind, 'pole')
+  assert.equal(poleHit.id, 'poleX')
+  const poleDrag = dragShapeItemHandle(
+    cube,
+    'poleX',
+    [xPole.pos[0], xPole.pos[1] + 50],
+    { ...baseOpts, shift: true },
+    { startWorld: xPole.pos, startGeo: cube.geo, gizmoSpace: 'local' }
+  )
+  assert.ok(poleDrag.item.geo.rot3)
+  assert.equal(poleDrag.gizmoArc?.id, 'rotX')
+
+  // 2. Front-face depth priority in orthographic side views: in Top view, t0 (depth > 0) beats overlapping b0 (depth < 0).
+  const topCube = applyViewPreset3d(cube, 'top')
+  const topHandles = shapeItemHandles(topCube)
+  const hB0 = topHandles.find((h) => h.id === 'b0')!
+  const hT0 = topHandles.find((h) => h.id === 't0')!
+  near(hB0.x, hT0.x, 1e-4)
+  near(hB0.y, hT0.y, 1e-4)
+  assert.ok((hT0.depth ?? 0) > (hB0.depth ?? 0))
+  const pickedTop = hitShapeHandle(topHandles, hT0.x, hT0.y, cam, 0)
+  assert.equal(pickedTop?.id, 't0')
+
+  // 3. True free 3D vertex dragging via Alt + unlockFreeVertices on 3D polyhedra.
+  assert.equal(canUnlockFreeVertices(cube.geo), true)
+  assert.equal(canUnlockFreeVertices(mk('sphere').geo), false)
+  const evTopBefore = evaluateShape(topCube)
+  const t0Start = evTopBefore.vertices.find((v) => v.id === 't0')!
+  const b0Start = evTopBefore.vertices.find((v) => v.id === 'b0')!
+  const freeCubeDrag = dragShapeItemHandle(
+    topCube,
+    't0',
+    [t0Start.pos[0] + 30, t0Start.pos[1] - 20],
+    { ...baseOpts, alt: true },
+    { startWorld: t0Start.pos, startGeo: topCube.geo }
+  )
+  assert.ok(freeCubeDrag.item.geo.vertices3, 'Alt+drag unlocks free 3D vertices')
+  assert.equal(canUnlockFreeVertices(freeCubeDrag.item.geo), false)
+  // In Top view, dragging in screen X/Y changes world X/Z with zero accidental Y depth drift and leaves all 7 other vertices pinned!
+  const evFreeAfter = evaluateShape(freeCubeDrag.item)
+  const t0After = evFreeAfter.vertices.find((v) => v.id === 't0')!
+  near(t0After.pos[0], t0Start.pos[0] + 30, 1e-4)
+  near(t0After.pos[1], t0Start.pos[1] - 20, 1e-4)
+  near(t0After.pos3![1], t0Start.pos3![1], 1e-4)
+  const b0After = evFreeAfter.vertices.find((v) => v.id === 'b0')!
+  near(b0After.pos3![0], b0Start.pos3![0], 1e-4)
+  near(b0After.pos3![1], b0Start.pos3![1], 1e-4)
+  near(b0After.pos3![2], b0Start.pos3![2], 1e-4)
+  assert.ok(Number.isFinite(t0After.angleDeg!))
+
+  // Unlocking explicitly via "Free vertices" allows dragging without Alt, and Reset clears vertices3.
+  const unlockedPyr = unlockFreeVertices(mk('pyramid', 4))
+  assert.ok(unlockedPyr.geo.vertices3)
+  const pyrWithAlt = toggleConstruction(unlockedPyr, { id: 'alt:apex', kind: 'altitude', from: 'apex' })
+  const pyrB0 = evaluateShape(pyrWithAlt).vertices.find((v) => v.id === 'b0')!
+  const tiltedPyr = dragShapeItemHandle(
+    pyrWithAlt,
+    'b0',
+    [pyrB0.pos[0] + 15, pyrB0.pos[1] - 25],
+    { ...baseOpts, alt: false },
+    { startWorld: pyrB0.pos, startGeo: pyrWithAlt.geo }
+  ).item
+  const altCon = evaluateShape(tiltedPyr).constructions.find((c) => c.id === 'alt:apex')!
+  assert.ok(altCon.segments.length >= 1)
+  assert.ok(Number.isFinite(altCon.segments[0].pts[1][0]) && Number.isFinite(altCon.segments[0].pts[1][1]))
+  const resetCube = resetShapeItemGeometry(freeCubeDrag.item)
+  assert.equal(resetCube.geo.vertices3, undefined)
+
+  // 4. Universal point-to-point line connections (all non-adjacent vertices + face diagonals + active center O & midpoints).
+  const hex = mk('hexagon')
+  const hexWithMidAndO = toggleConstruction(
+    toggleConstruction(hex, { id: 'center', kind: 'center' }),
+    { id: 'mid:e2', kind: 'midpoint', edge: 'e2' }
+  )
+  const hexConn = availableVertexActions(hexWithMidAndO, 'v0')!.connectTargets
+  const hexTargetIds = hexConn.map((c) => c.targetId)
+  assert.ok(hexTargetIds.includes('v2') && hexTargetIds.includes('v3') && hexTargetIds.includes('v4'), 'connects to ALL non-adjacent hexagon vertices')
+  assert.ok(hexTargetIds.includes('center'), 'connects to active center O')
+  assert.ok(hexTargetIds.includes('mid:e2'), 'connects to active edge midpoint')
+  const midConn = hexConn.find((c) => c.targetId === 'mid:e2')!
+  const hexLinked = toggleConstruction(hexWithMidAndO, midConn.construction)
+  assert.equal(evaluateShape(hexLinked).constructions.some((c) => c.id === midConn.id && c.segments.length === 1), true)
+
+  const cubeConn = availableVertexActions(cube, 'b0')!.connectTargets.map((c) => c.targetId)
+  // b0 is adjacent to b1, b3, t0 -> connects to ALL 4 remaining vertices: b2 (base diag), t1 & t3 (face diags), t2 (space diag)!
+  assert.deepEqual(cubeConn.sort(), ['b2', 't1', 't2', 't3'])
+  const faceDiagCube = toggleConstruction(cube, { id: 'diag:b0-t1', kind: 'diagonal', from: 'b0', to: 't1' })
+  assert.equal(evaluateShape(faceDiagCube).constructions.some((c) => c.id === 'diag:b0-t1' && c.segments.length === 1), true)
+
+  const ell = mk('ellipse')
+  const ellConn = availableVertexActions(ell, 'v0')!.connectTargets.map((c) => c.targetId)
+  assert.ok(ellConn.includes('v1') && ellConn.includes('v2') && ellConn.includes('v3') && ellConn.includes('center'))
+
+  // 5. Ctrl grid snap on 2D and 3D handles.
+  const rect = mk('rectangle')
+  const rectSnap = dragShapeItemHandle(rect, 'v1', [151, 29], { ...baseOpts, ctrl: true }, { startWorld: [144, 0], startGeo: rect.geo })
+  assert.equal(rectSnap.snapped, true)
+  near(rectSnap.item.geo.bx, 144, 1e-4)
+  near(rectSnap.item.geo.ay, 24, 1e-4)
+
+  const freeGridCube = dragShapeItemHandle(
+    topCube,
+    't0',
+    [t0Start.pos[0] + 29, t0Start.pos[1] - 19],
+    { ...baseOpts, alt: true, ctrl: true },
+    { startWorld: t0Start.pos, startGeo: topCube.geo }
+  )
+  const t0Grid = evaluateShape(freeGridCube.item).vertices.find((v) => v.id === 't0')!.pos
+  near(t0Grid[0] % 24, 0, 1e-3)
+  near(t0Grid[1] % 24, 0, 1e-3)
+
+  // 6. Docked ShapePanel lifecycle in Editor: stays open across shape edits, closes on deselect or lock.
+  const editor = new Editor([strokesModule, shapesModule, shapeEditorModule])
+  try {
+    editor.scene.add([cube])
+    editor.setSelection([cube])
+    editor.session.setState({ shapePanel: true })
+    assert.equal(editor.session.getState().shapePanel, true)
+    editor.replaceShapeItem(isoCube)
+    assert.equal(editor.session.getState().shapePanel, true, 'stays open while editing the selected shape')
+    editor.clearSelection()
+    assert.equal(editor.session.getState().shapePanel, false, 'closes automatically when deselected')
   } finally {
     editor.dispose()
   }

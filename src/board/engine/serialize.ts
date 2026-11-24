@@ -3,6 +3,7 @@ import { isEquation } from './formulaexpr'
 import { formulaBBox } from './formulatype'
 import { graphBBox, sanitizeGraph } from './graph'
 import { shapeBBox } from '@penrill/core/shapeEval'
+import { quatNormalize } from '@penrill/core/shapeEval3d'
 import { isShapeKind, MAX_BASE, MIN_BASE } from '@penrill/core/shapes'
 import { turnedBBox } from '@penrill/core/geometry'
 import { bgPattern, isBackgroundKind, isChalk, SCHOOL_PATTERNS } from './surface'
@@ -23,7 +24,8 @@ import type {
   ShapeItem,
   ShapeSpec,
   TextItem,
-  Vec2
+  Vec2,
+  Vec3
 } from '@penrill/core/types'
 
 /**
@@ -207,6 +209,7 @@ export const noWhite = (c: string): string => (/^#(fff|ffffff)$/i.test(c) ? '#1e
 
 const r2 = (v: number): number => Math.round(v * 100) / 100
 const r3 = (v: number): number => Math.round(v * 1000) / 1000
+const r4 = (v: number): number => Math.round(v * 10000) / 10000
 
 export function serializeBoard(data: BoardData): BoardFile {
   const assetKeys = new Map<string, string>()
@@ -416,8 +419,16 @@ function serializeGeo(geo: ShapeGeometry): ShapeGeometry {
     bx: r2(geo.bx),
     by: r2(geo.by),
     ...(geo.vertices ? { vertices: geo.vertices.map(([x, y]): Vec2 => [r2(x), r2(y)]) } : {}),
+    ...(geo.vertices3 && Object.keys(geo.vertices3).length
+      ? {
+          vertices3: Object.fromEntries(
+            Object.entries(geo.vertices3).map(([k, [x, y, z]]): [string, Vec3] => [k, [r2(x), r2(y), r2(z)]])
+          )
+        }
+      : {}),
     ...(geo.dim3 ? { dim3: [r2(geo.dim3[0]), r2(geo.dim3[1]), r2(geo.dim3[2])] } : {}),
     ...(geo.orbit ? { orbit: [r3(geo.orbit[0]), r3(geo.orbit[1])] } : {}),
+    ...(geo.rot3 ? { rot3: [r4(geo.rot3[0]), r4(geo.rot3[1]), r4(geo.rot3[2]), r4(geo.rot3[3])] } : {}),
     ...(geo.slant3 ? { slant3: [r3(geo.slant3[0]), r3(geo.slant3[1])] } : {})
   }
 }
@@ -438,6 +449,22 @@ function readShapeGeo(v: unknown): ShapeGeometry | null {
     }
     if (ok) geo.vertices = verts
   }
+  if (o.vertices3 && typeof o.vertices3 === 'object' && !Array.isArray(o.vertices3)) {
+    const entries = Object.entries(o.vertices3 as Record<string, unknown>)
+    if (entries.length > 0 && entries.length <= 64) {
+      const verts3: Record<string, Vec3> = {}
+      let ok = true
+      for (const [k, pt] of entries) {
+        if (k.length > 0 && k.length <= 32 && Array.isArray(pt) && pt.length === 3 && pt.every(isFiniteNum)) {
+          verts3[k] = [pt[0], pt[1], pt[2]]
+        } else {
+          ok = false
+          break
+        }
+      }
+      if (ok && Object.keys(verts3).length) geo.vertices3 = verts3
+    }
+  }
   if (typeof o.sides === 'number' && Number.isInteger(o.sides) && o.sides >= MIN_BASE && o.sides <= MAX_BASE) geo.sides = o.sides
   if (isFiniteNum(o.skew) && o.skew >= -0.75 && o.skew <= 0.75) geo.skew = o.skew
   if (isFiniteNum(o.topLeft) && o.topLeft >= 0 && o.topLeft <= 0.95) geo.topLeft = o.topLeft
@@ -448,6 +475,10 @@ function readShapeGeo(v: unknown): ShapeGeometry | null {
   }
   if (Array.isArray(o.orbit) && o.orbit.length === 2 && isFiniteNum(o.orbit[0]) && isFiniteNum(o.orbit[1])) {
     geo.orbit = [o.orbit[0], o.orbit[1]]
+  }
+  if (Array.isArray(o.rot3) && o.rot3.length === 4 && o.rot3.every(isFiniteNum)) {
+    const len = Math.hypot(o.rot3[0], o.rot3[1], o.rot3[2], o.rot3[3])
+    if (len > 1e-6) geo.rot3 = quatNormalize([o.rot3[0], o.rot3[1], o.rot3[2], o.rot3[3]])
   }
   if (Array.isArray(o.slant3) && o.slant3.length === 2 && isFiniteNum(o.slant3[0]) && isFiniteNum(o.slant3[1])) {
     geo.slant3 = [o.slant3[0], o.slant3[1]]

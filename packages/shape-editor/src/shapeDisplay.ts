@@ -231,7 +231,21 @@ export function shapeDisplay(item: ShapeItem, fmt: ShapeAnnotationFormat): Prim 
       edgeByVert.set(e.to, Math.min(edgeByVert.get(e.to) ?? Infinity, len))
     }
     for (const v of ev.vertices) {
-      if (!angleSet.has(v.id) || v.angleDeg === undefined || !v.angleRays) continue
+      if (!angleSet.has(v.id)) continue
+      if (v.angle3d) {
+        if (v.angle3d.markPts.length >= 2) {
+          children.push({ kind: 'polyline', pts: v.angle3d.markPts as Point2[], width: auxW, color, join: 'round' })
+        }
+        const rounded = Math.round(v.angle3d.deg * 10) / 10
+        const degStr = Math.abs(v.angle3d.deg - 90) <= 0.6
+          ? '90°'
+          : Number.isInteger(rounded)
+            ? `${rounded}°`
+            : `${fmt.comma ? rounded.toFixed(1).replace('.', ',') : rounded.toFixed(1)}°`
+        children.push(...haloText(v.angle3d.labelPos[0], v.angle3d.labelPos[1], degStr, fontSize, color))
+        continue
+      }
+      if (v.angleDeg === undefined || !v.angleRays) continue
       const [startRay, endRay] = v.angleRays
       const startA = Math.atan2(startRay[1], startRay[0])
       let sweep = Math.atan2(endRay[1], endRay[0]) - startA

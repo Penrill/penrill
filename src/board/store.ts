@@ -31,9 +31,17 @@ export interface ShapeDefaults {
   showAngles: boolean
   showLengths: boolean
   unit: ShapeLengthUnit
+  /** Show the Blender-style X/Y/Z 3D rotation gizmo automatically when a 3D shape is selected. */
+  gizmo3d: boolean
 }
 
-export const DEFAULT_SHAPE_DEFAULTS: ShapeDefaults = { showLabels: false, showAngles: false, showLengths: false, unit: 'cm' }
+export const DEFAULT_SHAPE_DEFAULTS: ShapeDefaults = {
+  showLabels: false,
+  showAngles: false,
+  showLengths: false,
+  unit: 'cm',
+  gizmo3d: true
+}
 
 function cleanShapeDefaults(v: unknown): ShapeDefaults {
   const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
@@ -41,7 +49,8 @@ function cleanShapeDefaults(v: unknown): ShapeDefaults {
     showLabels: o.showLabels === true,
     showAngles: o.showAngles === true,
     showLengths: o.showLengths === true,
-    unit: o.unit === 'cells' ? 'cells' : 'cm'
+    unit: o.unit === 'cells' ? 'cells' : 'cm',
+    gizmo3d: o.gizmo3d !== false
   }
 }
 
@@ -238,7 +247,14 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 1,
+      version: 2,
+      migrate: (persisted, version) => {
+        const state = (persisted ?? {}) as Prefs
+        if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
+          return { ...state, shapeDefaults: { ...state.shapeDefaults, gizmo3d: true } }
+        }
+        return state
+      },
       merge: (saved, current) => {
         const p = (saved ?? {}) as Partial<Prefs>
         return {
