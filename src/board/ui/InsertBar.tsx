@@ -38,7 +38,7 @@ function InsertFlyout({
  * instruments, images and templates), each with its name. Steps aside while the math keypad,
  * which sits in the same place, is open.
  */
-export function InsertBar({ templates }: { templates?: ReactNode }) {
+export function InsertBar({ templates, trackpad }: { templates?: ReactNode; trackpad?: ReactNode }) {
   const editor = useEditor()
   const t = useT()
   const { tool, formulaEdit } = useSession(useShallow((s) => ({ tool: s.tool, formulaEdit: s.formulaEdit })))
@@ -69,6 +69,7 @@ export function InsertBar({ templates }: { templates?: ReactNode }) {
       </InsertFlyout>
     ),
     show('image') && <InsertButton key="image" icon={<ImageIcon />} label={t('insert.image')} title={t('tool.image')} onClick={() => fileRef.current?.click()} />,
+    trackpad,
     templates && show('templates') && <div key="templates" className="contents">{templates}</div>
   ].filter(Boolean)
 

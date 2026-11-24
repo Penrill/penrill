@@ -194,7 +194,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       }
       if (overlayDirty) {
         const shown = gesture && 'tool' in gesture ? gesture.tool.overlay?.() : undefined
-        const live = gesture?.kind === 'ink' ? gesture.live : (shown?.live ?? null)
+        const live = gesture?.kind === 'ink' ? gesture.live : (shown?.live ?? editor.trackpadInk)
         if (gesture?.kind === 'ink') editor.shareInk?.(gesture.id, gesture.live, false, false)
         const info = selInfo()
         const hl = !gesture && hoverLine && hoverLine.id !== info?.line?.id ? hoverLine : null

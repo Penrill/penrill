@@ -27,6 +27,7 @@ interface BoardWorkspaceProps {
   /** Top left: the app's board menu (all boards, file actions, the board's name). */
   menu?: ReactNode
   /** The app's templates button, shown in the insert bar. */
+  trackpad?: ReactNode
   extraTools?: ReactNode
   /** Top right, before the board's background and settings: the app's way to share the board. */
   share?: ReactNode
@@ -46,7 +47,7 @@ interface BoardWorkspaceProps {
 }
 
 export function BoardWorkspace({
-  editor, fileActions, menu, extraTools, share, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
+  editor, fileActions, menu, extraTools, trackpad, share, selectionActions, storageSettings, about, fixedLanguage, hideExperimental = false, covered = false, children
 }: BoardWorkspaceProps) {
   useAppTheme()
   useEffect(() => {
@@ -100,7 +101,7 @@ export function BoardWorkspace({
         className="pointer-events-none absolute inset-x-3 bottom-3 z-10 grid grid-cols-[1fr_auto] items-end gap-3 lg:grid-cols-[1fr_auto_1fr]"
       >
         <div className="flex min-w-0 justify-center lg:col-start-2">
-          <InsertBar templates={extraTools} />
+          <InsertBar templates={extraTools} trackpad={covered ? undefined : trackpad} />
         </div>
         <div className="flex justify-end lg:col-start-3">
           <ZoomControls />

@@ -1,3 +1,4 @@
+import { TrackpadButton } from './ui/TrackpadButton'
 import { syncCoordinator } from './sync/coordinator'
 import { useEffect } from 'react'
 import { canCopy, useLinks } from './sync/links'
@@ -51,6 +52,7 @@ export function App() {
       hideExperimental={settings.hideExperimental}
       fileActions={fileActions}
       menu={<MainMenu />}
+      trackpad={platform.trackpad && <TrackpadButton key={boardId} />}
       extraTools={<TemplatesMenu />}
       share={<ShareButton />}
       selectionActions={() => <SaveSelectionTemplate />}

@@ -93,3 +93,9 @@ Text tool: *Text* in the bar at the bottom (no keyboard shortcut, because T is t
 | Drag the compass needle or a leg | Move the compass |
 | Drag the ↔ handle beside the pencil | Open / close the legs (radius, shown in paper cells) |
 | Drag the pencil (coloured dot) | Draw an arc around the needle with the current pen; a full turn is a circle |
+
+## Trackpad drawing on macOS
+
+In Trackpad mode, W / ↑, A / ←, S / ↓ and D / → move the view up, left, down and right respectively. The board slides in the opposite direction beneath the fixed drawing frame.
+Hold a key to keep moving. Moving the board finishes the current stroke. Lift and touch again to draw.
+Press Return to leave Trackpad mode.

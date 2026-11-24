@@ -152,3 +152,13 @@ export function matchShortcut(e: KeyLike, scope: 'app' | 'board'): Shortcut | nu
 export function shortcutKey(id: ShortcutId): string | undefined {
   return SHORTCUTS.find((s) => s.id === id && !s.alias)?.display
 }
+
+/** Screen directions for the board beneath the fixed macOS trackpad frame. */
+export function trackpadPanDirection(code: string): readonly [number, number] | undefined {
+  switch (code) {
+    case 'KeyW': case 'ArrowUp': return [0, 1]
+    case 'KeyA': case 'ArrowLeft': return [1, 0]
+    case 'KeyS': case 'ArrowDown': return [0, -1]
+    case 'KeyD': case 'ArrowRight': return [-1, 0]
+  }
+}

@@ -1,3 +1,4 @@
+import type { TrackpadListener } from '../shared/platform'
 import { contextBridge, ipcRenderer } from 'electron'
 
 const invoke =
@@ -8,6 +9,15 @@ const invoke =
 // Mirrors `PlatformApi` in src/shared/platform.ts.
 contextBridge.exposeInMainWorld('penrill', {
   platform: process.platform,
+  trackpad: process.platform === 'darwin' ? {
+    start: invoke('trackpad:start'),
+    stop: () => ipcRenderer.send('trackpad:stop'),
+    onTouch: (handler: TrackpadListener) => {
+      const listener = (_event: Electron.IpcRendererEvent, ...args: Parameters<TrackpadListener>) => handler(...args)
+      ipcRenderer.on('trackpad:touch', listener)
+      return () => ipcRenderer.removeListener('trackpad:touch', listener)
+    }
+  } : undefined,
   http: invoke('server:http'),
   connect: (() => {
     const init = ipcRenderer.sendSync('connect:init') as { deviceName: string; accounts: Record<string, unknown> }

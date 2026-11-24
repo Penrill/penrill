@@ -103,7 +103,16 @@ export interface ConnectApi {
   saveAccount(origin: string, value: StoredAccount | null): Promise<void>
 }
 
+export type TrackpadPhase = 'begin' | 'move' | 'end' | 'cancel' | 'finish' | 'pan'
+export type TrackpadListener = (phase: TrackpadPhase, x: number, y: number, aspect: number) => void
+export interface TrackpadApi {
+  start(): Promise<void>
+  stop(): void
+  onTouch(listener: TrackpadListener): () => void
+}
+
 export interface PlatformApi {
+  trackpad?: TrackpadApi
   /** Desktop only; the browser connects to publicly trusted servers and keeps accounts in local storage. */
   connect?: ConnectApi
   http(origin: string, request: import('./http').HttpRequest): Promise<import('./http').HttpResponse>

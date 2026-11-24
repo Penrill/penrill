@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { matchShortcut, SHORTCUTS, type KeyLike } from '../src/board/shortcuts.ts'
+import { matchShortcut, trackpadPanDirection, SHORTCUTS, type KeyLike } from '../src/board/shortcuts.ts'
 
 const key = (code: string, mods: Partial<KeyLike> = {}): KeyLike => ({
   code,
@@ -100,4 +100,15 @@ test('every shortcut is documented and translated', () => {
     const occurrences = i18n.split(`'${s.label}'`).length - 1 + (i18n.split(`"${s.label}"`).length - 1)
     assert.ok(occurrences >= 2, `${s.label} must be translated in English and Ukrainian`)
   }
+})
+
+test('trackpad directions use the same physical positions on every layout', () => {
+  for (const [letter, arrow, dx, dy] of [
+    ['KeyW', 'ArrowUp', 0, 1], ['KeyA', 'ArrowLeft', 1, 0],
+    ['KeyS', 'ArrowDown', 0, -1], ['KeyD', 'ArrowRight', -1, 0]
+  ] as const) {
+    assert.deepEqual(trackpadPanDirection(letter), [dx, dy])
+    assert.deepEqual(trackpadPanDirection(arrow), [dx, dy])
+  }
+  assert.equal(trackpadPanDirection('KeyQ'), undefined)
 })

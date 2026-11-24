@@ -1,3 +1,4 @@
+import { registerTrackpad } from './trackpad'
 import { sendHttp } from '../shared/http'
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from 'electron'
 import { existsSync } from 'node:fs'
@@ -286,6 +287,7 @@ app.whenReady().then(async () => {
   if (argLink) pendingLinks.push(argLink)
 
   registerIpc()
+  registerTrackpad()
   initUpdater(
     () => mainWindow,
     () => {

@@ -46,6 +46,7 @@ export class Editor {
   readonly session = createSessionStore()
   /** The feature modules this board was made with: item types, shape recognition, formula answers. */
   readonly features: FeatureRegistry
+  trackpadInk: LiveStroke | null = null
   peerInk = new Map<string, LiveStroke>()
   shareInk?: (id: string, stroke: LiveStroke, finished: boolean, committed: boolean) => void
   camera: Camera = { ...DEFAULT_CAMERA }
