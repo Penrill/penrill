@@ -32,6 +32,7 @@ import {
   resetShapeItemGeometry,
   resetShapeItemOrbit,
   setLabel,
+  switchShapeItemKind,
   toggleAllAngles,
   toggleAllLabels,
   toggleAllLengths,
@@ -960,4 +961,26 @@ test('true free 3D vertex dragging (Alt + Free vertices), isometric + 6 side vie
   } finally {
     editor.dispose()
   }
+
+  // 7. 2D <-> 3D shape conversion preserves natural side counts and positive dimensions even on reversed boxes.
+  const tri2d = createShapeItem(
+    specToShapeData({ kind: 'triangle', ax: 160, ay: 140, bx: 20, by: 20 }),
+    { color: '#1e1e1e', size: 2, tool: 'pen' },
+    { id: 'tri-2d', z: 1 }
+  )
+  const triPrism = switchShapeItemKind(tri2d, 'prism')
+  assert.equal(triPrism.geo.kind, 'prism')
+  assert.equal(triPrism.geo.sides, 3)
+  assert.ok(triPrism.geo.dim3!.every((d) => d > 0))
+  assert.equal(evaluateShape(triPrism).is3D, true)
+
+  const hexPyr = switchShapeItemKind(mk('hexagon'), 'pyramid')
+  assert.equal(hexPyr.geo.kind, 'pyramid')
+  assert.equal(hexPyr.geo.sides, 6)
+
+  const backToPoly = switchShapeItemKind(hexPyr, 'polygon')
+  assert.equal(backToPoly.geo.kind, 'polygon')
+  assert.equal(backToPoly.geo.sides, 6)
+  assert.equal(evaluateShape(backToPoly).is3D, false)
+  assert.equal(backToPoly.geo.dim3, undefined)
 })

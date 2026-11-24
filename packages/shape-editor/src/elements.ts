@@ -226,23 +226,38 @@ export function resetShapeItemOrbit(item: ShapeItem): ShapeItem {
   return withShapeUpdate(item, { geo: nextGeo })
 }
 
-/** Switch a ShapeItem to a new ShapeKind while preserving bounds, compatible sides and annotations. */
+/** Natural polygon side count of a shape kind, used when converting between 2D and 3D (e.g. triangle -> triangular prism). */
+function naturalSidesOf(g: ShapeGeometry): number | undefined {
+  if (g.kind === 'triangle' || g.kind === 'rightTriangle') return 3
+  if (g.kind === 'rectangle' || g.kind === 'rhombus' || g.kind === 'parallelogram' || g.kind === 'trapezoid' || g.kind === 'cube') return 4
+  if (g.kind === 'pentagon') return 5
+  if (g.kind === 'hexagon') return 6
+  if (g.kind === 'polygon' && g.vertices?.length) return Math.max(MIN_BASE, Math.min(MAX_BASE, g.vertices.length))
+  if (SHAPE_BASES[g.kind]) return g.sides ?? SHAPE_BASES[g.kind]!.def
+  return undefined
+}
+
+/** Switch a ShapeItem to a new ShapeKind (including 2D <-> 3D) while preserving bounds, natural sides and compatible annotations. */
 export function switchShapeItemKind(item: ShapeItem, nextKind: ShapeKind): ShapeItem {
   const g = item.geo
   if (g.kind === nextKind) return item
+  const box = g.vertices?.length ? boxOfVertices(g.vertices) : { ax: g.ax, ay: g.ay, bx: g.bx, by: g.by }
   const nextGeo: ShapeGeometry = {
     kind: nextKind,
-    ax: g.ax,
-    ay: g.ay,
-    bx: g.bx,
-    by: g.by,
+    ax: box.ax,
+    ay: box.ay,
+    bx: box.bx,
+    by: box.by,
     ...(g.rot && !is3D(nextKind) && !isLinear(nextKind) ? { rot: g.rot } : {})
   }
   if (SHAPE_BASES[nextKind]) {
-    nextGeo.sides = SHAPE_BASES[g.kind] ? (g.sides ?? SHAPE_BASES[g.kind]!.def) : SHAPE_BASES[nextKind]!.def
+    const inferred = naturalSidesOf(g)
+    nextGeo.sides = inferred !== undefined ? Math.max(MIN_BASE, Math.min(MAX_BASE, inferred)) : SHAPE_BASES[nextKind]!.def
   }
   if (is3D(nextKind)) {
-    nextGeo.dim3 = is3D(g.kind) && g.dim3 ? [...g.dim3] : defaultDim3(nextKind, g.bx - g.ax, g.by - g.ay)
+    const w = Math.abs(box.bx - box.ax)
+    const h = Math.abs(box.by - box.ay)
+    nextGeo.dim3 = is3D(g.kind) && g.dim3 ? [...g.dim3] : defaultDim3(nextKind, w, h)
     if (is3D(g.kind) && g.rot3) nextGeo.rot3 = [...g.rot3]
     else nextGeo.orbit = is3D(g.kind) && g.orbit ? [...g.orbit] : [DEFAULT_ORBIT[0], DEFAULT_ORBIT[1]]
     if (nextKind === 'obliquePyramid') nextGeo.slant3 = [0.85, 0]

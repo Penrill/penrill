@@ -7,6 +7,7 @@ import { isLinear, isTriangle, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditor, useSession } from '../../editorContext'
 import { useT, type MessageKey } from '../../i18n'
+import { PanelTitle } from '../../ui/chrome'
 import { dockBeside } from '../../ui/dock'
 import { BaseRow, ShapePreview } from '../../ui/InsertMenus'
 import {
@@ -80,11 +81,9 @@ export function ShapePanel() {
 
   if (!visible || !activeKind) return null
 
-  const family: readonly ShapeKind[] = isLinear(activeKind)
-    ? SHAPES_2D.filter((k) => isLinear(k))
-    : (SHAPES_3D as readonly ShapeKind[]).includes(activeKind)
-      ? SHAPES_3D
-      : SHAPES_2D.filter((k) => !isLinear(k))
+  const linearOnly = isLinear(activeKind)
+  const shapes2d = linearOnly ? SHAPES_2D.filter((k) => isLinear(k)) : SHAPES_2D.filter((k) => !isLinear(k))
+  const show3d = !linearOnly
 
   const close = (): void => editor.session.setState({ shapePanel: false })
   const openSettings = (): void => editor.session.setState({ settingsSection: 'shapes' })
@@ -172,32 +171,57 @@ export function ShapePanel() {
       <Divider soft />
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3.5 py-3">
-        <div className="shape-grid">
-          {family.map((k) => (
-            <button
-              key={k}
-              type="button"
-              className={`shape-btn ${activeKind === k ? 'active' : ''}`}
-              title={t(`shape.${k}` as MessageKey)}
-              onClick={() => editor.updateShape({ kind: k })}
-            >
-              <ShapePreview
-                kind={k}
-                base={k === activeKind ? (shapeItem?.geo.sides ?? legacyShape?.spec.base) : undefined}
-                circles={
-                  isTriangle(k)
-                    ? shapeItem
-                      ? {
-                          incircle: shapeItem.constructions?.some((c) => c.kind === 'incircle'),
-                          circumcircle: shapeItem.constructions?.some((c) => c.kind === 'circumcircle')
-                        }
-                      : legacyShape?.spec
-                    : undefined
-                }
-              />
-            </button>
-          ))}
+        <div>
+          {show3d && <PanelTitle className="!mb-1.5">2D</PanelTitle>}
+          <div className="grid grid-cols-6 gap-1">
+            {shapes2d.map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={`shape-btn !h-9 !w-full ${activeKind === k ? 'active' : ''}`}
+                title={t(`shape.${k}` as MessageKey)}
+                onClick={() => editor.updateShape({ kind: k })}
+              >
+                <ShapePreview
+                  kind={k}
+                  base={k === activeKind ? (shapeItem?.geo.sides ?? legacyShape?.spec.base) : undefined}
+                  circles={
+                    isTriangle(k)
+                      ? shapeItem
+                        ? {
+                            incircle: shapeItem.constructions?.some((c) => c.kind === 'incircle'),
+                            circumcircle: shapeItem.constructions?.some((c) => c.kind === 'circumcircle')
+                          }
+                        : legacyShape?.spec
+                      : undefined
+                  }
+                />
+              </button>
+            ))}
+          </div>
         </div>
+
+        {show3d && (
+          <div>
+            <PanelTitle className="!mb-1.5">3D</PanelTitle>
+            <div className="grid grid-cols-7 gap-1">
+              {SHAPES_3D.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`shape-btn !h-9 !w-full ${activeKind === k ? 'active' : ''}`}
+                  title={t(`shape.${k}` as MessageKey)}
+                  onClick={() => editor.updateShape({ kind: k })}
+                >
+                  <ShapePreview
+                    kind={k}
+                    base={k === activeKind ? (shapeItem?.geo.sides ?? legacyShape?.spec.base) : undefined}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {SHAPE_BASES[activeKind] && (
           <BaseRow

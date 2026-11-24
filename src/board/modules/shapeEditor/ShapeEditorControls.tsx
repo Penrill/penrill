@@ -7,9 +7,18 @@ import { Label } from '@penrill/ui/fieldset'
 import { Input } from '@penrill/ui/input'
 import { Switch } from '@penrill/ui/switch'
 import { evaluateShape } from '@penrill/core/shapeEval'
-import { effectiveQuat, quatToEulerDeg } from '@penrill/core/shapeEval3d'
+import {
+  effectiveDim3,
+  effectiveQuat,
+  effectiveRotMat3,
+  quatFromAxisAngle,
+  quatMul,
+  quatNormalize,
+  quatToEulerDeg,
+  rotate3dMat
+} from '@penrill/core/shapeEval3d'
 import { shapeEdges, shapePolygonVertices } from '@penrill/core/shapes'
-import type { ShapeItem, ShapeSpec } from '@penrill/core/types'
+import type { ShapeItem, ShapeSpec, Vec3 } from '@penrill/core/types'
 import {
   availableWholeShapeActions,
   toggleAllAngles,
@@ -19,11 +28,288 @@ import {
   withShapeUpdate
 } from '@penrill/shape-editor/elements'
 import { detectViewPreset3d, isSideViewPreset, type ViewPreset3d } from '@penrill/shape-editor/gizmo3d'
-import { useEffect, useState } from 'react'
+import clsx from 'clsx'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useEditor, useSession } from '../../editorContext'
 import { useT, type MessageKey } from '../../i18n'
 import { usePrefs } from '../../store'
 import { PanelTitle, Segmented } from '../../ui/chrome'
+
+type SidePreset = 'front' | 'back' | 'top' | 'bottom' | 'right' | 'left'
+
+/** Miniature axonometric cube icon with one specific face highlighted so side views read at a glance. */
+function CubeFaceIcon({ face, active }: { face: SidePreset; active?: boolean }) {
+  // 8 distinct projected cube corners (no front/back corner overlap) in a 16x16 box.
+  const pts = {
+    t0: '3.1,5.4', t1: '9.7,6.7', t2: '13.2,4.3', t3: '6.6,3.0',
+    b0: '3.1,11.8', b1: '9.7,13.1', b2: '13.2,10.7', b3: '6.6,9.4'
+  }
+  const facePoly: Record<SidePreset, string> = {
+    top: `${pts.t0} ${pts.t1} ${pts.t2} ${pts.t3}`,
+    bottom: `${pts.b0} ${pts.b1} ${pts.b2} ${pts.b3}`,
+    front: `${pts.t0} ${pts.t1} ${pts.b1} ${pts.b0}`,
+    back: `${pts.t3} ${pts.t2} ${pts.b2} ${pts.b3}`,
+    right: `${pts.t1} ${pts.t2} ${pts.b2} ${pts.b1}`,
+    left: `${pts.t3} ${pts.t0} ${pts.b0} ${pts.b3}`
+  }
+  const isBackSide = face === 'bottom' || face === 'back' || face === 'left'
+  return (
+    <svg
+      data-slot="icon"
+      viewBox="0 0 16 16"
+      fill="none"
+      className="!size-4 shrink-0"
+      aria-hidden="true"
+    >
+      {/* Subtle hidden back edges when highlighting an interior/rear face */}
+      {isBackSide && (
+        <path
+          d="M6.6 3.0V9.4M6.6 9.4L3.1 11.8M6.6 9.4L13.2 10.7"
+          stroke="currentColor"
+          strokeOpacity={0.35}
+          strokeWidth={1}
+          strokeDasharray="1.5 1.5"
+          strokeLinecap="round"
+        />
+      )}
+      {/* Highlighted target face */}
+      <polygon
+        points={facePoly[face]}
+        fill="currentColor"
+        fillOpacity={active ? 0.42 : 0.28}
+        stroke="currentColor"
+        strokeWidth={1.45}
+        strokeLinejoin="round"
+      />
+      {/* Clean outer cube wireframe */}
+      <path
+        d="M3.1 5.4L6.6 3.0L13.2 4.3L13.2 10.7L9.7 13.1L3.1 11.8Z"
+        stroke="currentColor"
+        strokeOpacity={0.6}
+        strokeWidth={1.1}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.1 5.4L9.7 6.7L13.2 4.3M9.7 6.7V13.1"
+        stroke="currentColor"
+        strokeOpacity={isBackSide ? 0.35 : 0.65}
+        strokeWidth={1.1}
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+const CUBE_VERTS: readonly Vec3[] = [
+  [-1, -1, 1], [1, -1, 1], [1, -1, -1], [-1, -1, -1], // bottom 0..3
+  [-1, 1, 1], [1, 1, 1], [1, 1, -1], [-1, 1, -1] // top 4..7
+]
+
+const VIEW_CUBE_FACES: readonly { id: SidePreset; verts: readonly [number, number, number, number]; normal: Vec3 }[] = [
+  { id: 'front', verts: [0, 1, 5, 4], normal: [0, 0, 1] },
+  { id: 'back', verts: [2, 3, 7, 6], normal: [0, 0, -1] },
+  { id: 'top', verts: [4, 5, 6, 7], normal: [0, 1, 0] },
+  { id: 'bottom', verts: [3, 2, 1, 0], normal: [0, -1, 0] },
+  { id: 'right', verts: [1, 2, 6, 5], normal: [1, 0, 0] },
+  { id: 'left', verts: [3, 0, 4, 7], normal: [-1, 0, 0] }
+]
+
+/**
+ * Live interactive 3D orientation cube synced to the selected solid's rotation.
+ * Click any visible face to align straight to that side; drag anywhere on the cube to rotate in 3D.
+ */
+function ViewCube3d({
+  item,
+  activeView,
+  onPickSide
+}: {
+  item: ShapeItem
+  activeView: ViewPreset3d | null
+  onPickSide: (side: SidePreset) => void
+}) {
+  const editor = useEditor()
+  const t = useT()
+  const [hovered, setHovered] = useState<SidePreset | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    prevX: number
+    prevY: number
+    moved: boolean
+    face: SidePreset | null
+    startItem: ShapeItem
+    currentItem: ShapeItem
+  } | null>(null)
+
+  const mat = effectiveRotMat3(item.geo)
+  const scale = 25
+  const cx = 48
+  const cy = 48
+  const proj = CUBE_VERTS.map((v) => {
+    const r = rotate3dMat(v, mat)
+    return { x: cx + r[0] * scale, y: cy - r[1] * scale, z: r[2] }
+  })
+
+  const visibleFaces = VIEW_CUBE_FACES.map((f) => {
+    const nr = rotate3dMat(f.normal, mat)
+    const pts = f.verts.map((i) => proj[i])
+    const avgX = (pts[0].x + pts[1].x + pts[2].x + pts[3].x) / 4
+    const avgY = (pts[0].y + pts[1].y + pts[2].y + pts[3].y) / 4
+    const avgZ = (pts[0].z + pts[1].z + pts[2].z + pts[3].z) / 4
+    return {
+      ...f,
+      nz: nr[2],
+      avgX,
+      avgY,
+      avgZ,
+      points: pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+    }
+  })
+    .filter((f) => f.nz > 0.02)
+    .sort((a, b) => a.avgZ - b.avgZ)
+
+  const onDown = (e: ReactPointerEvent<SVGSVGElement>): void => {
+    if (!e.isPrimary || e.button !== 0) return
+    const faceEl = (e.target as Element | null)?.closest<SVGElement>('[data-cube-face]')
+    const face = (faceEl?.dataset.cubeFace as SidePreset | undefined) ?? null
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      prevX: e.clientX,
+      prevY: e.clientY,
+      moved: false,
+      face,
+      startItem: item,
+      currentItem: item
+    }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const onMove = (e: ReactPointerEvent<SVGSVGElement>): void => {
+    const d = dragRef.current
+    if (!d || d.pointerId !== e.pointerId) return
+    if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) <= 4) return
+    d.moved = true
+    const dx = e.clientX - d.prevX
+    const dy = e.clientY - d.prevY
+    d.prevX = e.clientX
+    d.prevY = e.clientY
+    const dist = Math.hypot(dx, dy)
+    if (dist < 0.2) return
+    const axis: Vec3 = [dy / dist, dx / dist, 0]
+    const qNext = quatNormalize(quatMul(quatFromAxisAngle(axis, dist * 0.022), effectiveQuat(d.currentItem.geo)))
+    const nextGeo = { ...d.currentItem.geo, dim3: effectiveDim3(d.currentItem.geo), rot3: qNext }
+    delete nextGeo.orbit
+    const next = withShapeUpdate(d.currentItem, { geo: nextGeo })
+    editor.scene.replace([d.currentItem], [next], false)
+    editor.setSelection([next])
+    d.currentItem = next
+  }
+
+  const finishDrag = (e: ReactPointerEvent<SVGSVGElement>, cancelled = false): void => {
+    const d = dragRef.current
+    if (!d || d.pointerId !== e.pointerId) return
+    dragRef.current = null
+    if (d.moved && d.currentItem !== d.startItem) {
+      editor.scene.record({ added: [d.currentItem], removed: [d.startItem] })
+      editor.setSelection([d.currentItem])
+    } else if (!cancelled && !d.moved && d.face) {
+      onPickSide(d.face)
+    }
+  }
+
+  // Subtle mini X/Y/Z orientation triad in the bottom-left corner of the view box.
+  const triadOrigin: [number, number] = [14, 82]
+  const triadAxes: readonly { v: Vec3; color: string }[] = [
+    { v: [1, 0, 0], color: '#e03131' },
+    { v: [0, 1, 0], color: '#2f9e44' },
+    { v: [0, 0, 1], color: '#1971c2' }
+  ]
+
+  return (
+    <div className="flex size-24 shrink-0 items-center justify-center rounded-xl bg-zinc-950/[0.03] ring-1 ring-zinc-950/10 dark:bg-white/[0.04] dark:ring-white/10">
+      <svg
+        viewBox="0 0 96 96"
+        className="size-24 cursor-grab touch-none select-none active:cursor-grabbing"
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={(e) => finishDrag(e, false)}
+        onPointerCancel={(e) => finishDrag(e, true)}
+        onPointerLeave={() => setHovered(null)}
+      >
+        {/* Mini X/Y/Z axis triad */}
+        {triadAxes.map((ax, i) => {
+          const r = rotate3dMat(ax.v, mat)
+          return (
+            <line
+              key={i}
+              x1={triadOrigin[0]}
+              y1={triadOrigin[1]}
+              x2={triadOrigin[0] + r[0] * 10}
+              y2={triadOrigin[1] - r[1] * 10}
+              stroke={ax.color}
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              strokeOpacity={0.85}
+            />
+          )
+        })}
+
+        {visibleFaces.map((f) => {
+          const isActive = activeView === f.id
+          const isHot = hovered === f.id
+          const label = t(`shapes.view.${f.id}` as MessageKey)
+          const shortLabel = label.length > 6 ? `${label.slice(0, 5)}.` : label
+          // Soft directional shading based on face facing angle so 3D form is immediately legible.
+          const shadeClass = isActive
+            ? 'fill-blue-600/20 stroke-blue-600 dark:fill-blue-400/25 dark:stroke-blue-400'
+            : isHot
+              ? 'fill-blue-500/12 stroke-blue-500/70 dark:fill-blue-400/18 dark:stroke-blue-300/80'
+              : f.nz > 0.72
+                ? 'fill-white stroke-zinc-400 dark:fill-zinc-700 dark:stroke-zinc-500'
+                : f.nz > 0.42
+                  ? 'fill-zinc-100 stroke-zinc-400 dark:fill-zinc-800 dark:stroke-zinc-500'
+                  : 'fill-zinc-200/80 stroke-zinc-400 dark:fill-zinc-900/90 dark:stroke-zinc-600'
+          return (
+            <g
+              key={f.id}
+              data-cube-face={f.id}
+              className="cursor-pointer"
+              onPointerEnter={() => setHovered(f.id)}
+              onPointerLeave={() => setHovered((cur) => (cur === f.id ? null : cur))}
+            >
+              <title>{label}</title>
+              <polygon
+                points={f.points}
+                strokeWidth={isActive ? 1.8 : 1.2}
+                strokeLinejoin="round"
+                className={clsx('transition-colors duration-75', shadeClass)}
+              />
+              {f.nz > 0.34 && (
+                <text
+                  x={f.avgX}
+                  y={f.avgY + 0.5}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className={clsx(
+                    'pointer-events-none text-[8.5px] font-semibold select-none',
+                    isActive
+                      ? 'fill-blue-700 dark:fill-blue-200'
+                      : 'fill-zinc-700 dark:fill-zinc-200'
+                  )}
+                >
+                  {shortLabel}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
 
 /** Compact color-coded X/Y/Z degree input built on Catalyst Input. */
 function EulerAxisInput({
@@ -292,18 +578,27 @@ export function ShapeItemEditorControls({
 
               <div>
                 <PanelTitle>{t('shapes.editSide')}</PanelTitle>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(['front', 'back', 'top', 'bottom', 'right', 'left'] as const satisfies readonly ViewPreset3d[]).map((preset) =>
-                    activeView === preset ? (
-                      <Button key={preset} color="blue" className="!px-2 !py-1 !text-xs" onClick={() => pickView(preset)}>
-                        {t(`shapes.view.${preset}` as MessageKey)}
-                      </Button>
-                    ) : (
-                      <Button key={preset} outline className="!px-2 !py-1 !text-xs" onClick={() => pickView(preset)}>
-                        {t(`shapes.view.${preset}` as MessageKey)}
-                      </Button>
-                    )
-                  )}
+                <div className="flex items-center gap-2.5">
+                  <ViewCube3d
+                    item={item}
+                    activeView={activeView}
+                    onPickSide={(side) => pickView(side)}
+                  />
+                  <div className="grid flex-1 grid-cols-2 gap-1.5">
+                    {(['top', 'bottom', 'front', 'back', 'left', 'right'] as const satisfies readonly SidePreset[]).map((preset) =>
+                      activeView === preset ? (
+                        <Button key={preset} color="blue" className="!justify-start !gap-1.5 !px-2 !py-1 !text-xs" onClick={() => pickView(preset)}>
+                          <CubeFaceIcon face={preset} active />
+                          <span className="truncate">{t(`shapes.view.${preset}` as MessageKey)}</span>
+                        </Button>
+                      ) : (
+                        <Button key={preset} outline className="!justify-start !gap-1.5 !px-2 !py-1 !text-xs" onClick={() => pickView(preset)}>
+                          <CubeFaceIcon face={preset} />
+                          <span className="truncate">{t(`shapes.view.${preset}` as MessageKey)}</span>
+                        </Button>
+                      )
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
