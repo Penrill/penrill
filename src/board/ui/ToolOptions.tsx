@@ -9,30 +9,40 @@ import { useT } from '../i18n'
 import { shortcutKey } from '../shortcuts'
 import { HIGHLIGHTER_COLORS, HIGHLIGHTER_SIZES, PEN_COLORS, PEN_SIZES, type InkSlot, prefsStore, usePrefs } from '../store'
 import type { SelectToolId } from '../toolbarLayout'
-import { allPlacedTools, flyoutAnchor, type OptionsDock } from '../workspaceLayout'
+import { allPlacedTools, flyoutAnchor, isVerticalDock, type OptionsDock } from '../workspaceLayout'
 import { Bar, BarDivider, FlyoutPanel, PanelTitle, Segmented, ToolButton } from './chrome'
 import { StyleIcon } from './icons'
 import { LineStyleControls, SizeSlider } from './LineStyle'
 import { isSelectMode, SELECT_MODES } from './ToolBar'
 import { useWorkspaceCustomize } from './WorkspaceCustomizer'
 
+const ERASER_QUICK_SIZES = [8, 16, 32, 56]
+
 function Swatches({
   colors,
   value,
   onChange,
-  grid
+  grid,
+  vertical
 }: {
   colors: string[]
   value: string
   onChange: (color: string) => void
   grid?: boolean
+  vertical?: boolean
 }) {
   const t = useT()
   return (
     <div
       role="radiogroup"
       aria-label={t('options.color')}
-      className={grid ? 'grid grid-cols-6 gap-1' : 'flex shrink-0 items-center gap-0.5'}
+      className={
+        grid
+          ? 'grid grid-cols-6 gap-1'
+          : vertical
+            ? 'flex shrink-0 flex-col items-center gap-0.5'
+            : 'flex shrink-0 items-center gap-0.5'
+      }
     >
       {colors.map((c) => (
         <button
@@ -62,12 +72,14 @@ function Sizes({
   sizes,
   value,
   onChange,
-  spread
+  spread,
+  vertical
 }: {
   sizes: number[]
   value: number
   onChange: (size: number) => void
   spread?: boolean
+  vertical?: boolean
 }) {
   const t = useT()
   const max = Math.max(...sizes)
@@ -75,7 +87,10 @@ function Sizes({
     <div
       role="radiogroup"
       aria-label={t('line.width')}
-      className={clsx('flex shrink-0 items-center', spread ? 'justify-between' : 'gap-0.5')}
+      className={clsx(
+        'flex shrink-0 items-center',
+        vertical ? 'flex-col gap-0.5' : spread ? 'justify-between' : 'gap-0.5'
+      )}
     >
       {sizes.map((s) => (
         <button
@@ -128,12 +143,13 @@ function InkOptions({
   onChange: (patch: Partial<InkSlot>) => void
 }) {
   const t = useT()
+  const vertical = isVerticalDock(edge)
   return (
     <>
-      <Swatches colors={colors} value={slot.color} onChange={(color) => onChange({ color })} />
-      <BarDivider vertical />
-      <Sizes sizes={sizes} value={slot.size} onChange={(size) => onChange({ size })} />
-      <BarDivider vertical />
+      <Swatches colors={colors} value={slot.color} onChange={(color) => onChange({ color })} vertical={vertical} />
+      <BarDivider vertical={!vertical} />
+      <Sizes sizes={sizes} value={slot.size} onChange={(size) => onChange({ size })} vertical={vertical} />
+      <BarDivider vertical={!vertical} />
       <More label={t('options.style')} edge={edge}>
         <SizeSlider value={slot.size} max={Math.max(...sizes) * 3} onChange={(size) => onChange({ size })} live />
         <LineStyleControls value={slot} onChange={onChange} showCaps />
@@ -175,6 +191,7 @@ function TextOptions({ edge }: { edge: OptionsDock }) {
   const editor = useEditor()
   const t = useT()
   const style = usePrefs((s) => s.textStyle)
+  const vertical = isVerticalDock(edge)
   const set = (patch: Partial<typeof style>): void => {
     prefsStore.setState((s) => ({ textStyle: { ...s.textStyle, ...patch } }))
     // Also restyle the text being typed right now.
@@ -182,9 +199,13 @@ function TextOptions({ edge }: { edge: OptionsDock }) {
   }
   return (
     <>
-      <Swatches colors={PEN_COLORS} value={style.color} onChange={(color) => set({ color })} />
-      <BarDivider vertical />
-      <div role="radiogroup" aria-label={t('line.width')} className="flex shrink-0 items-center gap-0.5">
+      <Swatches colors={PEN_COLORS} value={style.color} onChange={(color) => set({ color })} vertical={vertical} />
+      <BarDivider vertical={!vertical} />
+      <div
+        role="radiogroup"
+        aria-label={t('line.width')}
+        className={clsx('flex shrink-0 items-center gap-0.5', vertical && 'flex-col')}
+      >
         {TEXT_SIZES.map((s) => (
           <button
             key={s}
@@ -202,7 +223,7 @@ function TextOptions({ edge }: { edge: OptionsDock }) {
           </button>
         ))}
       </div>
-      <BarDivider vertical />
+      <BarDivider vertical={!vertical} />
       <More label={t('options.textSize')} edge={edge}>
         <SizeSlider value={style.size} max={160} onChange={(size) => set({ size })} live />
       </More>
@@ -252,10 +273,70 @@ export function TextOptionsCard() {
   )
 }
 
-function EraserOptions() {
+function EraserStrokeIcon() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 17c4-8 12-8 16 0" strokeDasharray="3 3" />
+      <path d="M6 6l12 12" />
+    </svg>
+  )
+}
+
+function EraserPointIcon() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 12h5M16 12h5" />
+      <circle cx="12" cy="12" r="3.5" strokeDasharray="2.2 2" />
+    </svg>
+  )
+}
+
+function EraserOptions({ edge }: { edge: OptionsDock }) {
   const t = useT()
   const mode = usePrefs((s) => s.eraserMode)
   const radius = usePrefs((s) => s.eraserRadius)
+  if (isVerticalDock(edge)) {
+    return (
+      <>
+        <ToolButton
+          label={t('eraser.stroke')}
+          active={mode === 'stroke'}
+          onClick={() => prefsStore.setState({ eraserMode: 'stroke' })}
+        >
+          <EraserStrokeIcon />
+        </ToolButton>
+        <ToolButton
+          label={t('eraser.point')}
+          active={mode === 'point'}
+          onClick={() => prefsStore.setState({ eraserMode: 'point' })}
+        >
+          <EraserPointIcon />
+        </ToolButton>
+        <BarDivider />
+        <Sizes
+          sizes={ERASER_QUICK_SIZES}
+          value={radius}
+          onChange={(eraserRadius) => prefsStore.setState({ eraserRadius })}
+          vertical
+        />
+        <BarDivider />
+        <More label={t('eraser.size')} edge={edge}>
+          <label className="flex items-center gap-2 text-sm/5 text-zinc-600 dark:text-zinc-300">
+            <span>{t('eraser.size')}</span>
+            <input
+              type="range"
+              min={4}
+              max={80}
+              value={radius}
+              className="min-w-0 flex-1 accent-blue-600"
+              onChange={(e) => prefsStore.setState({ eraserRadius: Number(e.target.value) })}
+            />
+            <span className="w-6 text-right tabular-nums">{radius}</span>
+          </label>
+        </More>
+      </>
+    )
+  }
   return (
     <>
       <Segmented
@@ -318,10 +399,27 @@ export function EraserOptionsCard() {
   )
 }
 
-function SelectOptions({ modes }: { modes: typeof SELECT_MODES }) {
+function SelectOptions({ modes, edge }: { modes: typeof SELECT_MODES; edge: OptionsDock }) {
   const editor = useEditor()
   const t = useT()
   const tool = useSession((s) => s.tool)
+  if (isVerticalDock(edge)) {
+    return (
+      <>
+        {modes.map((m) => (
+          <ToolButton
+            key={m.tool}
+            label={t(m.label)}
+            shortcut={shortcutKey(m.shortcut)}
+            active={tool === m.tool}
+            onClick={() => editor.session.getState().setTool(m.tool)}
+          >
+            {m.icon}
+          </ToolButton>
+        ))}
+      </>
+    )
+  }
   return (
     <Segmented
       label={t('select.label')}
@@ -367,9 +465,8 @@ export function SelectOptionsCard({ modes, onSelect }: { modes: SelectToolId[]; 
 }
 
 /**
- * Always-visible strip: how the current tool draws. Only that tool's settings, one tap away:
- * colours and widths for the pens, highlighter, shapes and text, the mode for the eraser and for
- * selecting (when selection tools are collapsed into one button). Nothing for tools with no settings.
+ * Always-visible strip (horizontal on top/bottom, vertical on left/right): how the current tool
+ * draws. Only that tool's settings, one tap away. Nothing for tools with no settings.
  */
 export function ToolOptions({
   edge = 'top',
@@ -386,6 +483,7 @@ export function ToolOptions({
   // Ways of selecting the user shows, plus the one in use (its key works even when hidden).
   const selectModes = SELECT_MODES.filter((m) => placed.has(m.tool) || m.tool === tool)
   const { updatePen, updateHighlighter } = prefsStore.getState()
+  const vertical = isVerticalDock(edge)
 
   if (customize.active) {
     const isDragged = customize.dragging?.kind === 'options'
@@ -394,19 +492,20 @@ export function ToolOptions({
         ref={(el) => customize.registerOptionsZone(edge, el)}
         role="toolbar"
         aria-label={t('options.label')}
-        className="flex max-w-full min-w-0 justify-center"
+        className={clsx('flex', vertical ? 'items-center' : 'max-w-full min-w-0 justify-center')}
       >
         <Bar
           onPointerDown={(e) => customize.startDrag(e, { kind: 'options' })}
           title={t('customize.dragOptions')}
           className={clsx(
-            'flex cursor-grab touch-none items-center gap-2 px-2.5 py-1.5 transition-opacity active:cursor-grabbing',
+            'flex cursor-grab touch-none items-center gap-2 transition-opacity active:cursor-grabbing',
+            vertical ? 'w-14 flex-col py-2.5' : 'px-2.5 py-1.5',
             isDragged && 'opacity-40'
           )}
         >
-          <Bars2Icon className="size-4 rotate-90 text-zinc-400 dark:text-zinc-500" />
-          <span className="text-xs/5 font-semibold text-zinc-700 dark:text-zinc-200">{t('options.label')}</span>
-          <span className="flex items-center gap-1" aria-hidden>
+          <Bars2Icon className={clsx('size-4 text-zinc-400 dark:text-zinc-500', !vertical && 'rotate-90')} />
+          {!vertical && <span className="text-xs/5 font-semibold text-zinc-700 dark:text-zinc-200">{t('options.label')}</span>}
+          <span className={clsx('flex items-center gap-1', vertical && 'flex-col')} aria-hidden>
             {PEN_COLORS.slice(0, 5).map((c) => (
               <span key={c} style={{ background: c }} className="size-3.5 rounded-full ring-1 ring-zinc-950/15 dark:ring-white/20" />
             ))}
@@ -422,15 +521,29 @@ export function ToolOptions({
     content = <InkOptions slot={pens[activePen]} colors={PEN_COLORS} sizes={PEN_SIZES} edge={edge} onChange={(patch) => updatePen(activePen, patch)} />
   else if (tool === 'highlighter')
     content = <InkOptions slot={highlighter} colors={HIGHLIGHTER_COLORS} sizes={HIGHLIGHTER_SIZES} edge={edge} onChange={updateHighlighter} />
-  else if (tool === 'eraser') content = <EraserOptions />
+  else if (tool === 'eraser') content = <EraserOptions edge={edge} />
   else if (tool === 'text') content = <TextOptions edge={edge} />
-  else if (collapseSelectTools && isSelectMode(tool) && selectModes.length > 1) content = <SelectOptions modes={selectModes} />
+  else if (collapseSelectTools && isSelectMode(tool) && selectModes.length > 1) content = <SelectOptions modes={selectModes} edge={edge} />
 
   if (!content) return null
 
   return (
-    <div role="toolbar" aria-label={t('options.label')} className="flex max-w-full min-w-0 justify-center">
-      <Bar className="flex max-w-full items-center gap-0.5 overflow-x-auto [scrollbar-width:none]">{content}</Bar>
+    <div
+      role="toolbar"
+      aria-label={t('options.label')}
+      aria-orientation={vertical ? 'vertical' : 'horizontal'}
+      className={clsx('flex', vertical ? 'items-center' : 'max-w-full min-w-0 justify-center')}
+    >
+      <Bar
+        className={clsx(
+          'flex items-center gap-0.5 [scrollbar-width:none]',
+          vertical
+            ? 'max-h-[calc(100dvh-8.5rem)] w-14 flex-col overflow-y-auto overflow-x-hidden'
+            : 'max-w-full overflow-x-auto'
+        )}
+      >
+        {content}
+      </Bar>
     </div>
   )
 }

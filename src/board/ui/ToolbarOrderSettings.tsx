@@ -44,10 +44,10 @@ export function ToolbarOrderSettings({
   const t = useT()
   const docks = usePrefs((s) => s.workspaceLayout.docks)
   const [selectedEdge, setSelectedEdge] = useState<DockEdge>(() => {
-    for (const edge of ['left', 'top', 'bottom', 'right'] as const) {
+    for (const edge of ['top', 'left', 'bottom', 'right'] as const) {
       if (docks[edge].length > 0) return edge
     }
-    return 'left'
+    return 'top'
   })
 
   const edgeItems = docks[selectedEdge]

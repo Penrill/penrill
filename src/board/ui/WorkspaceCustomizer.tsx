@@ -269,17 +269,30 @@ export function WorkspaceCustomizeProvider({ children }: { children: ReactNode }
     }
 
     if (payload.kind === 'options') {
-      const topEl = optionsZones.current.top
-      const botEl = optionsZones.current.bottom
-      if (topEl && insideRect(topEl.getBoundingClientRect(), clientX, clientY, 44)) {
-        return { kind: 'options-edge', edge: 'top' }
+      let best: OptionsDock | null = null
+      let bestDist = Infinity
+      for (const edge of DOCK_EDGES) {
+        const el = optionsZones.current[edge]
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        if (insideRect(rect, clientX, clientY, 48)) {
+          const d = distToRect(rect, clientX, clientY)
+          if (d < bestDist) {
+            bestDist = d
+            best = edge
+          }
+        }
       }
-      if (botEl && insideRect(botEl.getBoundingClientRect(), clientX, clientY, 44)) {
-        return { kind: 'options-edge', edge: 'bottom' }
-      }
-      if (clientY < window.innerHeight * 0.32) return { kind: 'options-edge', edge: 'top' }
-      if (clientY > window.innerHeight * 0.68) return { kind: 'options-edge', edge: 'bottom' }
-      return null
+      if (best) return { kind: 'options-edge', edge: best }
+      // Fallback: snap to the closest screen edge when dragged toward the perimeter.
+      const edgeDistances: [OptionsDock, number][] = [
+        ['top', clientY],
+        ['bottom', window.innerHeight - clientY],
+        ['left', clientX],
+        ['right', window.innerWidth - clientX]
+      ]
+      edgeDistances.sort((a, b) => a[1] - b[1])
+      return edgeDistances[0][1] < 160 ? { kind: 'options-edge', edge: edgeDistances[0][0] } : null
     }
 
     if (payload.kind === 'zoom') {
@@ -470,23 +483,27 @@ export function EmptyEdgeDropZone({ edge }: { edge: DockEdge }) {
   )
 }
 
-/** Drop zone shown on top/bottom while dragging the ToolOptions strip. */
+/** Drop zone shown on top/bottom/left/right while dragging the ToolOptions strip. */
 export function OptionsDropZone({ edge }: { edge: OptionsDock }) {
   const t = useT()
   const { dragging, dropTarget, registerOptionsZone } = useWorkspaceCustomize()
   if (dragging?.kind !== 'options') return null
+  const vertical = isVerticalDock(edge)
   const highlighted = dropTarget?.kind === 'options-edge' && dropTarget.edge === edge
   return (
     <div
       ref={(el) => registerOptionsZone(edge, el)}
       className={clsx(
-        'pointer-events-auto flex h-11 min-w-52 items-center justify-center rounded-2xl border-2 border-dashed px-4 text-xs/4 font-semibold transition-colors select-none',
+        'pointer-events-auto flex items-center justify-center rounded-2xl border-2 border-dashed text-xs/4 font-semibold transition-colors select-none',
+        vertical ? 'h-40 w-14 px-1 text-center' : 'h-11 min-w-52 px-4',
         highlighted
           ? 'border-blue-500 bg-blue-500/15 text-blue-700 dark:border-blue-400 dark:bg-blue-500/25 dark:text-blue-200'
           : 'border-blue-400/60 bg-white/90 text-zinc-700 dark:border-blue-400/50 dark:bg-zinc-800/90 dark:text-zinc-200'
       )}
     >
-      {t('options.label')} ({t(`layout.edge.${edge}` as MessageKey)})
+      <span className={vertical ? '[writing-mode:vertical-rl] rotate-180' : undefined}>
+        {t('options.label')} ({t(`layout.edge.${edge}` as MessageKey)})
+      </span>
     </div>
   )
 }
@@ -521,6 +538,7 @@ export function ZoomCornerDropZone({ corner }: { corner: ZoomDock }) {
 const PRESET_NAMES: Record<WorkspacePresetId, MessageKey> = {
   default: 'layout.preset.default',
   top: 'layout.preset.top',
+  left: 'layout.preset.left',
   right: 'layout.preset.right',
   bottom: 'layout.preset.bottom'
 }
@@ -549,6 +567,7 @@ export function WorkspaceCustomizeOverlay({ templates }: { templates: boolean })
   const [savingPreset, setSavingPreset] = useState(false)
   const [presetName, setPresetName] = useState('')
   const [justSaved, setJustSaved] = useState<string | null>(null)
+  const backdropDown = useRef(false)
 
   useEffect(() => {
     if (!active) {
@@ -615,7 +634,19 @@ export function WorkspaceCustomizeOverlay({ templates }: { templates: boolean })
     <>
       <div
         aria-hidden
-        onPointerDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          backdropDown.current = e.target === e.currentTarget && e.button === 0 && !dragging
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation()
+          const shouldClose = backdropDown.current && !dragging && !suppressClickRef.current && e.target === e.currentTarget
+          backdropDown.current = false
+          if (shouldClose) commit()
+        }}
+        onPointerCancel={() => {
+          backdropDown.current = false
+        }}
         className="fixed inset-0 z-[72] bg-zinc-950/20 backdrop-blur-[1px] dark:bg-black/45"
       />
       <section

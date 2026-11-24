@@ -37,7 +37,7 @@ test('tweaking any field or dock switches preset detection to custom', () => {
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, zoomDock: 'top-left' }), 'custom')
   const moved = {
     ...WORKSPACE_PRESETS.default,
-    docks: placeToolInDock(WORKSPACE_PRESETS.default.docks, 'undo', 'top')
+    docks: placeToolInDock(WORKSPACE_PRESETS.default.docks, 'undo', 'bottom')
   }
   assert.equal(detectWorkspacePreset(moved), 'custom')
 })
@@ -61,6 +61,11 @@ test('cleanEdgeDocks deduplicates tools across edges and migrates old instrument
 test('cleanWorkspaceLayout falls back to defaults and migrates v3 shapes automatically', () => {
   assert.deepEqual(cleanWorkspaceLayout(null), DEFAULT_WORKSPACE_LAYOUT)
   assert.deepEqual(cleanWorkspaceLayout('top'), DEFAULT_WORKSPACE_LAYOUT)
+
+  // Options strip can dock to any of the four screen edges.
+  for (const edge of ['top', 'bottom', 'left', 'right'] as const) {
+    assert.equal(cleanWorkspaceLayout({ ...DEFAULT_WORKSPACE_LAYOUT, optionsDock: edge }).optionsDock, edge)
+  }
 
   // Legacy v3 merged top layout migrates into docks.top.
   const migratedTop = cleanWorkspaceLayout({
@@ -93,23 +98,23 @@ test('cleanWorkspaceLayout falls back to defaults and migrates v3 shapes automat
 
 test('placeToolInDock moves tools across edges, reorders within an edge, and creates unique dividers', () => {
   let docks = cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT).docks
-  // Move undo from left to empty top edge.
-  docks = placeToolInDock(docks, 'undo', 'top', 0)
-  assert.deepEqual(docks.top, ['undo'])
-  assert.equal(docks.left.includes('undo'), false)
+  // Move undo from top to empty bottom edge.
+  docks = placeToolInDock(docks, 'undo', 'bottom', 0)
+  assert.deepEqual(docks.bottom, ['undo'])
+  assert.equal(docks.top.includes('undo'), false)
 
-  // Insert a fresh divider on top and reorder.
-  docks = placeToolInDock(docks, 'divider', 'top', 1)
-  docks = placeToolInDock(docks, 'redo', 'top', 2)
-  assert.equal(docks.top.length, 3)
-  assert.equal(docks.top[0], 'undo')
-  assert.ok(docks.top[1].startsWith('divider:'))
-  assert.equal(docks.top[2], 'redo')
+  // Insert a fresh divider on bottom and reorder.
+  docks = placeToolInDock(docks, 'divider', 'bottom', 1)
+  docks = placeToolInDock(docks, 'redo', 'bottom', 2)
+  assert.equal(docks.bottom.length, 3)
+  assert.equal(docks.bottom[0], 'undo')
+  assert.ok(docks.bottom[1].startsWith('divider:'))
+  assert.equal(docks.bottom[2], 'redo')
 
   // Move redo before undo on the same edge.
-  docks = placeToolInDock(docks, 'redo', 'top', 0)
-  assert.equal(docks.top[0], 'redo')
-  assert.equal(docks.top[1], 'undo')
+  docks = placeToolInDock(docks, 'redo', 'bottom', 0)
+  assert.equal(docks.bottom[0], 'redo')
+  assert.equal(docks.bottom[1], 'undo')
 })
 
 test('removeItemFromDocks hides tools and addToolToPreferredDock restores them', () => {
@@ -122,18 +127,18 @@ test('removeItemFromDocks hides tools and addToolToPreferredDock restores them',
 
   docks = addToolToPreferredDock(docks, 'laser')
   assert.equal(hiddenToolsInDocks(docks, true).length, 0)
-  assert.equal(docks.left.includes('laser'), true)
+  assert.equal(docks.top.includes('laser'), true)
 })
 
 test('moveWholeDock moves to an empty edge and merges onto an occupied edge with a divider', () => {
-  // Move left to empty right.
-  const movedRight = moveWholeDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'left', 'right')
-  assert.deepEqual(movedRight.left, [])
+  // Move top to empty right.
+  const movedRight = moveWholeDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'top', 'right')
+  assert.deepEqual(movedRight.top, [])
   assert.ok(movedRight.right.includes('pen1'))
 
-  // Merge bottom into right.
-  const merged = moveWholeDock(movedRight, 'bottom', 'right')
-  assert.deepEqual(merged.bottom, [])
+  // Merge left (insert tools) into right.
+  const merged = moveWholeDock(movedRight, 'left', 'right')
+  assert.deepEqual(merged.left, [])
   assert.ok(merged.right.includes('pen1'))
   assert.ok(merged.right.includes('shapes'))
   // Separating divider exists between redo and text.
@@ -146,7 +151,7 @@ test('moveWholeDock moves to an empty edge and merges onto an occupied edge with
 test('custom presets clean cleanly and match via matchWorkspacePreset', () => {
   const customLayout: typeof DEFAULT_WORKSPACE_LAYOUT = {
     ...cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT),
-    docks: placeToolInDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'undo', 'top'),
+    docks: placeToolInDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'undo', 'bottom'),
     showShortcutBadges: true
   }
   const presets = cleanCustomPresets([

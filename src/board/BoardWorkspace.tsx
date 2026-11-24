@@ -107,23 +107,29 @@ function WorkspaceChrome({
   const rightEdgeBar = renderEdgeBar('right')
   const bottomEdgeBar = renderEdgeBar('bottom')
 
-  const topOptions =
-    showStrip && layout.optionsDock === 'top' ? (
-      <ToolOptions key="options-top" edge="top" collapseSelectTools={layout.collapseSelectTools} />
-    ) : draggingOptions && layout.optionsDock !== 'top' ? (
-      <OptionsDropZone key="options-drop-top" edge="top" />
+  const optionsFor = (edge: 'top' | 'bottom' | 'left' | 'right') =>
+    showStrip && layout.optionsDock === edge ? (
+      <ToolOptions key={`options-${edge}`} edge={edge} collapseSelectTools={layout.collapseSelectTools} />
+    ) : draggingOptions && layout.optionsDock !== edge ? (
+      <OptionsDropZone key={`options-drop-${edge}`} edge={edge} />
     ) : null
 
-  const bottomOptions =
-    showStrip && layout.optionsDock === 'bottom' ? (
-      <ToolOptions key="options-bottom" edge="bottom" collapseSelectTools={layout.collapseSelectTools} />
-    ) : draggingOptions && layout.optionsDock !== 'bottom' ? (
-      <OptionsDropZone key="options-drop-bottom" edge="bottom" />
-    ) : null
+  const topOptions = optionsFor('top')
+  const bottomOptions = optionsFor('bottom')
+  const leftOptions = optionsFor('left')
+  const rightOptions = optionsFor('right')
 
   const topBars: ReactNode[] = []
   if (topEdgeBar) topBars.push(topEdgeBar)
   if (topOptions) topBars.push(topOptions)
+
+  const leftBars: ReactNode[] = []
+  if (leftEdgeBar) leftBars.push(leftEdgeBar)
+  if (leftOptions) leftBars.push(leftOptions)
+
+  const rightBars: ReactNode[] = []
+  if (rightOptions) rightBars.push(rightOptions)
+  if (rightEdgeBar) rightBars.push(rightEdgeBar)
 
   const bottomCenterBars: ReactNode[] = []
   if (!formulaEdit || customizing) {
@@ -131,8 +137,6 @@ function WorkspaceChrome({
     if (bottomEdgeBar) bottomCenterBars.push(bottomEdgeBar)
   }
 
-  const hasWideTopBar = layout.docks.top.length > 0 || customizing
-  const hasWideBottomBar = layout.docks.bottom.length > 0 || customizing
   const topPrimary = topBars[0] ?? null
   const topSecondary = topBars.slice(1)
 
@@ -152,12 +156,11 @@ function WorkspaceChrome({
       <div
         data-chrome="top"
         className={clsx(
-          'pointer-events-none absolute inset-x-3 top-3 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2',
-          zChrome,
-          hasWideTopBar ? 'lg:grid-cols-[auto_minmax(0,1fr)_auto]' : 'lg:grid-cols-[1fr_auto_1fr]'
+          'pointer-events-none absolute inset-x-3 top-3 grid grid-cols-[1fr_auto] items-start gap-x-3 gap-y-2 lg:grid-cols-[1fr_minmax(0,auto)_1fr]',
+          zChrome
         )}
       >
-        <div className="flex min-w-0 items-start justify-start gap-2">
+        <div className="flex min-w-0 items-start justify-start gap-2 lg:min-w-44">
           <div className={clsx('flex min-w-0', customizing && 'pointer-events-none opacity-45')} inert={customizing}>
             {menu}
           </div>
@@ -188,21 +191,21 @@ function WorkspaceChrome({
         )}
       </div>
 
-      {leftEdgeBar && (
+      {leftBars.length > 0 && (
         <div
           data-chrome="left"
-          className={clsx('pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2', zChrome)}
+          className={clsx('pointer-events-none absolute inset-y-0 left-3 flex items-center gap-2 empty:hidden', zChrome)}
         >
-          {leftEdgeBar}
+          {leftBars}
         </div>
       )}
 
-      {rightEdgeBar && (
+      {rightBars.length > 0 && (
         <div
           data-chrome="right"
-          className={clsx('pointer-events-none absolute inset-y-0 right-3 flex items-center gap-2', zChrome)}
+          className={clsx('pointer-events-none absolute inset-y-0 right-3 flex items-center gap-2 empty:hidden', zChrome)}
         >
-          {rightEdgeBar}
+          {rightBars}
         </div>
       )}
 
@@ -219,18 +222,18 @@ function WorkspaceChrome({
                 : hasBottomRight
                   ? 'grid-cols-[minmax(0,1fr)_auto]'
                   : 'grid-cols-1',
-            hasWideBottomBar ? 'lg:grid-cols-[auto_minmax(0,1fr)_auto]' : 'lg:grid-cols-[1fr_auto_1fr]'
+            'sm:grid-cols-[1fr_minmax(0,auto)_1fr]'
           )}
         >
           {hasBottomLeft && (
-            <div className="flex justify-start lg:col-start-1">
+            <div className="flex justify-start sm:col-start-1">
               {showZoomBottomLeft ? <ZoomControls /> : <ZoomCornerDropZone corner="bottom-left" />}
             </div>
           )}
           {bottomCenterBars.length > 0 && (
             <div
               className={clsx(
-                'flex min-w-0 flex-col items-center gap-2 empty:hidden lg:col-start-2',
+                'flex min-w-0 flex-col items-center gap-2 empty:hidden sm:col-start-2',
                 hasBottomLeft ? 'col-start-2' : 'col-start-1'
               )}
             >
@@ -238,7 +241,7 @@ function WorkspaceChrome({
             </div>
           )}
           {hasBottomRight && (
-            <div className={clsx('flex justify-end lg:col-start-3', hasBottomLeft ? 'col-start-3' : 'col-start-2')}>
+            <div className={clsx('flex justify-end sm:col-start-3', hasBottomLeft ? 'col-start-3' : 'col-start-2')}>
               {showZoomBottomRight ? <ZoomControls /> : <ZoomCornerDropZone corner="bottom-right" />}
             </div>
           )}

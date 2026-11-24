@@ -96,6 +96,15 @@ export function PresetPreview({ layout, active }: { layout: WorkspaceLayout; act
           )}
         />
       )}
+      {showStrip && layout.optionsDock === 'left' && (
+        <span
+          className={clsx(
+            'absolute top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-xs',
+            leftN > 0 ? 'left-4.5' : 'left-1.5',
+            optBg
+          )}
+        />
+      )}
 
       {/* Right edge bar */}
       {rightN > 0 && (
@@ -104,6 +113,15 @@ export function PresetPreview({ layout, active }: { layout: WorkspaceLayout; act
             'absolute top-1/2 right-1.5 w-2 -translate-y-1/2 rounded-xs',
             vHeight(rightN),
             isInsertOnlyBar(layout.docks.right) ? insertBg : barBg
+          )}
+        />
+      )}
+      {showStrip && layout.optionsDock === 'right' && (
+        <span
+          className={clsx(
+            'absolute top-1/2 h-10 w-1.5 -translate-y-1/2 rounded-xs',
+            rightN > 0 ? 'right-4.5' : 'right-1.5',
+            optBg
           )}
         />
       )}
@@ -141,6 +159,7 @@ export function PresetPreview({ layout, active }: { layout: WorkspaceLayout; act
 const PRESET_LABELS: Record<WorkspacePresetId, { title: MessageKey; hint: MessageKey }> = {
   default: { title: 'layout.preset.default', hint: 'layout.preset.defaultHint' },
   top: { title: 'layout.preset.top', hint: 'layout.preset.topHint' },
+  left: { title: 'layout.preset.left', hint: 'layout.preset.leftHint' },
   right: { title: 'layout.preset.right', hint: 'layout.preset.rightHint' },
   bottom: { title: 'layout.preset.bottom', hint: 'layout.preset.bottomHint' }
 }
@@ -404,7 +423,9 @@ export function LayoutSettings({ onCustomizeBoard }: { onCustomizeBoard?: () => 
                 onChange={(optionsDock) => setLayout({ optionsDock })}
                 options={[
                   { value: 'top', label: t('layout.edge.top') },
-                  { value: 'bottom', label: t('layout.edge.bottom') }
+                  { value: 'bottom', label: t('layout.edge.bottom') },
+                  { value: 'left', label: t('layout.edge.left') },
+                  { value: 'right', label: t('layout.edge.right') }
                 ]}
               />
             </Row>

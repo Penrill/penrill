@@ -21,13 +21,13 @@ import {
 export type DockEdge = 'top' | 'bottom' | 'left' | 'right'
 export type EdgeDocks = Record<DockEdge, ToolbarItemId[]>
 export type OptionsMode = 'strip' | 'popover'
-export type OptionsDock = 'top' | 'bottom'
+export type OptionsDock = DockEdge
 export type ZoomDock = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-export type WorkspacePresetId = 'default' | 'top' | 'right' | 'bottom'
+export type WorkspacePresetId = 'default' | 'top' | 'left' | 'right' | 'bottom'
 
 export const DOCK_EDGES: readonly DockEdge[] = ['top', 'bottom', 'left', 'right']
 export const ZOOM_DOCKS: readonly ZoomDock[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left']
-export const WORKSPACE_PRESET_IDS: readonly WorkspacePresetId[] = ['default', 'top', 'right', 'bottom']
+export const WORKSPACE_PRESET_IDS: readonly WorkspacePresetId[] = ['default', 'top', 'left', 'right', 'bottom']
 
 export interface WorkspaceLayout {
   /** Ordered tools and dividers docked to each screen edge. Each tool sits on at most one edge. */
@@ -90,9 +90,9 @@ export function cloneWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayout {
 export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
   default: {
     docks: {
-      top: [],
-      bottom: [...DEFAULT_INSERT_DOCK],
-      left: [...DEFAULT_DRAWING_DOCK],
+      top: [...DEFAULT_DRAWING_DOCK],
+      bottom: [],
+      left: [...DEFAULT_INSERT_DOCK],
       right: []
     },
     optionsMode: 'strip',
@@ -115,6 +115,20 @@ export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
     insertLabels: false,
     collapseSelectTools: false,
     showShortcutBadges: true
+  },
+  left: {
+    docks: {
+      top: [],
+      bottom: [...DEFAULT_INSERT_DOCK],
+      left: [...DEFAULT_DRAWING_DOCK],
+      right: []
+    },
+    optionsMode: 'strip',
+    optionsDock: 'top',
+    zoomDock: 'bottom-right',
+    insertLabels: true,
+    collapseSelectTools: true,
+    showShortcutBadges: false
   },
   right: {
     docks: {
@@ -149,7 +163,7 @@ export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = WORKSPACE_PRESETS.default
 
 const OPTIONS_MODES: readonly OptionsMode[] = ['strip', 'popover']
-const OPTIONS_DOCKS: readonly OptionsDock[] = ['top', 'bottom']
+const OPTIONS_DOCKS: readonly OptionsDock[] = DOCK_EDGES
 
 /** Sanitize a 4-edge docks map, ensuring each tool and divider ID appears at most once globally. */
 export function cleanEdgeDocks(value: unknown, fallback: EdgeDocks = DEFAULT_WORKSPACE_LAYOUT.docks): EdgeDocks {
@@ -206,12 +220,19 @@ export function migrateLegacyLayout(legacyLayout: unknown, legacyToolbarLayout: 
   const o = (legacyLayout && typeof legacyLayout === 'object' ? legacyLayout : {}) as Record<string, unknown>
   const def = DEFAULT_WORKSPACE_LAYOUT
 
-  const toolsDock: DockEdge = DOCK_EDGES.includes(o.toolsDock as DockEdge) ? (o.toolsDock as DockEdge) : 'left'
+  const hasExplicitV3 = typeof o.toolsDock === 'string' || typeof o.insertDock === 'string'
+  const toolsDock: DockEdge = DOCK_EDGES.includes(o.toolsDock as DockEdge)
+    ? (o.toolsDock as DockEdge)
+    : hasExplicitV3
+      ? 'left'
+      : 'top'
   const rawInsertDock = o.insertDock
   const insertDock: DockEdge | 'merged' =
     rawInsertDock === 'merged' || DOCK_EDGES.includes(rawInsertDock as DockEdge)
       ? (rawInsertDock as DockEdge | 'merged')
-      : 'bottom'
+      : hasExplicitV3
+        ? 'bottom'
+        : 'left'
 
   const cleanedFlat = cleanToolbarLayout(legacyToolbarLayout)
   const flatItems = cleanedFlat
@@ -408,14 +429,14 @@ export function moveWholeDock(docks: EdgeDocks, fromEdge: DockEdge, toEdge: Dock
 /** Pick a natural edge for quick-adding a hidden tool (e.g. clicking a tile in the palette). */
 export function preferredEdgeForTool(docks: EdgeDocks, toolId: ConcreteToolId): DockEdge {
   const insert = isInsertTool(toolId)
-  const order: readonly DockEdge[] = insert ? ['bottom', 'top', 'left', 'right'] : ['left', 'right', 'top', 'bottom']
+  const order: readonly DockEdge[] = insert ? ['left', 'bottom', 'top', 'right'] : ['top', 'left', 'right', 'bottom']
   for (const edge of order) {
     if (docks[edge].some((id) => !isToolbarDivider(id) && isInsertTool(id) === insert)) return edge
   }
   for (const edge of order) {
     if (docks[edge].length > 0) return edge
   }
-  return insert ? 'bottom' : 'left'
+  return insert ? 'left' : 'top'
 }
 
 /** Quick-add a hidden tool to the most natural bar edge. */
