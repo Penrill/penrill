@@ -2,6 +2,10 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Popover tool options by default in 0.13.13
+
+- **Cleaner default workspace.** Tool options in the default layout now open as a popover when clicking an active tool (or right-clicking it) instead of taking up a permanent strip at the top. You can still switch back to the always-visible strip on any screen edge in Settings → Layout or Customize mode.
+
 ## Updated default layout and 4-edge tool options in 0.13.12
 
 - **New default board layout.** Drawing and navigation tools sit at the top with the tool options strip right below them, insert tools (text, formulas, shapes, graphs, instruments, images and templates) sit on the left rail, and the bottom edge stays open. The previous left-rail + bottom-insert layout remains available as the *Left rail* preset.
