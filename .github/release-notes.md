@@ -2,6 +2,15 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Interactive 2D and 3D shapes in 0.13.10
+
+- **Direct editing on every 2D and 3D shape.** Drag corners and vertices directly on triangles, rectangles, rhombuses, parallelograms, trapezoids, polygons, stars, ellipses, cubes, prisms, pyramids, cylinders, cones and spheres. Hold `Alt` (or click *Free vertices*) to move individual vertices freely in 2D or 3D, and hold `Ctrl` (`⌘` on macOS) to snap shapes and vertices to the paper grid.
+- **3D rotation rings, isometric projection and side views.** Rotate 3D solids around X, Y and Z rings or with the interactive 3D orientation cube in the shape panel. Switch between Standard 3D, Isometric and six flat side views (Top, Bottom, Front, Back, Left, Right) for precise editing, or click the X/Y/Z axis markers on the rings.
+- **Geometric constructions, angles, lengths and labels.** Click any vertex or side on a selected shape to toggle vertex letters (`A, B, C, S, O`), 2D and 3D angles, side lengths (in centimetres or paper cells), altitudes, medians, bisectors, incircles, circumcircles, midpoints, sections and lines between any two vertices, centers or midpoints.
+- **Floating shape panel with 2D / 3D switching.** Open the shape inspector from the selection bar to adjust display options, switch between 2D and 3D shapes in one click, and drag the panel anywhere on the board while you work. Creating a shape now switches back to Select automatically.
+
+Boards that use the new editable shapes are saved as format version 12 and need version 0.13.10 or newer. Older boards remain readable, and boards without new shapes continue to save with the lowest compatible format version.
+
 ## Coordinate planes, formula keyboard and laser pointer in 0.13.9
 
 - New coordinate planes start at −5 to 5 on each axis, including when plotting selected formulas. The spacing between grid marks stays the same.
