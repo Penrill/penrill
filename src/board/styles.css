@@ -1240,7 +1240,8 @@ button:disabled {
 
 .triangle-circles {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--line);
@@ -1250,12 +1251,150 @@ button:disabled {
 .triangle-circles label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .triangle-circles input {
   accent-color: var(--primary-text);
+}
+
+.shape-reset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.shape-reset-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shape-el-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shape-el-label-input {
+  width: 44px;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  text-align: center;
+}
+
+.shape-el-label-input:focus {
+  outline: 1.5px solid var(--primary-text);
+  border-color: var(--primary-text);
+}
+
+.shape-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.shape-settings-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+.shape-settings-link:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.shape-reset-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.shape-reset-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.shape-element-popover {
+  position: fixed;
+  z-index: 22;
+  min-width: 170px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.shape-el-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.shape-el-list {
+  display: grid;
+  gap: 6px;
+}
+
+.shape-el-list label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.shape-el-list input {
+  accent-color: var(--primary-text);
+}
+
+.shape-el-actions {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.shape-el-action {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.shape-el-action:hover {
+  background: var(--hover);
+}
+
+.shape-el-action.danger {
+  color: #e03131;
 }
 
 .labeled-btn.locked {

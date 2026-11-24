@@ -1,9 +1,10 @@
 import { circleHitsPolyline, turnedBBox, turnPoint } from '@penrill/core/geometry'
-import { isLinear } from '@penrill/core/shapes'
+import { evaluateShape, shapeBBox } from '@penrill/core/shapeEval'
+import { boxOfVertices, is3D, isLinear, isVertexShape, shapeVertices } from '@penrill/core/shapes'
 import { formulaBBox, formulaLocalBox } from './formulatype'
 import { graphBBox } from './graph'
 import { scaleRuns, textBBox, textBox } from './text'
-import type { BBox, FormulaItem, ImageItem, Item, TextItem } from '@penrill/core/types'
+import type { BBox, FormulaItem, ImageItem, Item, ShapeGeometry, ShapeSpec, TextItem } from '@penrill/core/types'
 
 /**
  * Uniform scale `s` and turn `r` (radians, clockwise on screen) about anchor (ax, ay), then
@@ -57,20 +58,21 @@ export function localBox(item: Boxed): BBox {
 
 /** A turned image, text or formula: the centre it turns about and the angle; null when not turned. */
 export function itemTurn(item: Item): { cx: number; cy: number; rot: number } | null {
-  // Ink is drawn from its (already turned) points.
-  if (item.type === 'stroke' || item.type === 'graph' || !item.rot) return null
+  // Ink and shapes bake their turn into their own geometry.
+  if (item.type === 'stroke' || item.type === 'shape' || item.type === 'graph' || !item.rot) return null
   const b = localBox(item)
   return { cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, rot: item.rot }
 }
 
 /**
  * Whether a selection shows the ↻ handle: anything but locked items and coordinate lines and planes
- * (their axes stay level). A lone straight line has none: it turns by dragging its ends.
+ * (their axes stay level). A lone straight line turns by its ends; a lone 3D solid uses its 3D orbit handle.
  */
 export function canTurnSelection(items: readonly Item[]): boolean {
   if (!items.length || items.some((i) => i.locked || i.type === 'graph')) return false
   const one = items.length === 1 ? items[0] : null
   if (one?.type === 'stroke' && (one.shape ? isLinear(one.shape.kind) : one.geom === 'line' && one.points.length === 2)) return false
+  if (one?.type === 'shape' && (isLinear(one.geo.kind) || is3D(one.geo.kind))) return false
   return true
 }
 
@@ -96,11 +98,86 @@ function placeBoxed<T extends Boxed>(item: T, t: Xform, scaled: T): T {
   return { ...(rest as T), x: ncx - (cx - item.x) * t.s, y: ncy - (cy - item.y) * t.s, ...(rot !== undefined ? { rot } : {}) }
 }
 
+/** Transform a shape spec under `t`, preserving editability across moves, scales and rotations. */
+function xformShape(shape: ShapeSpec, t: Xform): ShapeSpec {
+  if (isLinear(shape.kind)) {
+    const [ax, ay] = xformPoint(t, shape.ax, shape.ay)
+    const [bx, by] = xformPoint(t, shape.bx, shape.by)
+    return { ...shape, ax, ay, bx, by }
+  }
+  if (isVertexShape(shape.kind) && (shape.vertices || t.r)) {
+    const verts = shapeVertices(shape).map(([x, y]): [number, number] => xformPoint(t, x, y))
+    const { rot: _r, ...rest } = shape
+    return { ...rest, ...boxOfVertices(verts), vertices: verts }
+  }
+  if (!t.r) {
+    const [ax, ay] = xformPoint(t, shape.ax, shape.ay)
+    const [bx, by] = xformPoint(t, shape.bx, shape.by)
+    return { ...shape, ax, ay, bx, by }
+  }
+  const cx = (shape.ax + shape.bx) / 2
+  const cy = (shape.ay + shape.by) / 2
+  const [ncx, ncy] = xformPoint(t, cx, cy)
+  const hw = ((shape.bx - shape.ax) / 2) * t.s
+  const hh = ((shape.by - shape.ay) / 2) * t.s
+  const rot = normRot((shape.rot ?? 0) + t.r)
+  const { rot: _old, ...rest } = shape
+  return { ...rest, ax: ncx - hw, ay: ncy - hh, bx: ncx + hw, by: ncy + hh, ...(rot !== undefined ? { rot } : {}) }
+}
+
+/** Transform a first-class ShapeGeometry under `t`, preserving editability across moves, scales and rotations. */
+function xformShapeGeo(geo: ShapeGeometry, t: Xform): ShapeGeometry {
+  if (isLinear(geo.kind)) {
+    const [ax, ay] = xformPoint(t, geo.ax, geo.ay)
+    const [bx, by] = xformPoint(t, geo.bx, geo.by)
+    return { ...geo, ax, ay, bx, by }
+  }
+  if (geo.vertices) {
+    const verts = geo.vertices.map(([x, y]): [number, number] => xformPoint(t, x, y))
+    const { rot: _r, ...rest } = geo
+    return { ...rest, ...boxOfVertices(verts), vertices: verts }
+  }
+  if (is3D(geo.kind)) {
+    const cx = (geo.ax + geo.bx) / 2
+    const cy = (geo.ay + geo.by) / 2
+    const [ncx, ncy] = xformPoint(t, cx, cy)
+    const hw = ((geo.bx - geo.ax) / 2) * t.s
+    const hh = ((geo.by - geo.ay) / 2) * t.s
+    return {
+      ...geo,
+      ax: ncx - hw,
+      ay: ncy - hh,
+      bx: ncx + hw,
+      by: ncy + hh,
+      ...(geo.dim3 ? { dim3: [geo.dim3[0] * t.s, geo.dim3[1] * t.s, geo.dim3[2] * t.s] } : {})
+    }
+  }
+  const cx = (geo.ax + geo.bx) / 2
+  const cy = (geo.ay + geo.by) / 2
+  const [ncx, ncy] = xformPoint(t, cx, cy)
+  const hw = ((geo.bx - geo.ax) / 2) * t.s
+  const hh = ((geo.by - geo.ay) / 2) * t.s
+  const rot = normRot((geo.rot ?? 0) + (t.r ?? 0))
+  const { rot: _old, ...rest } = geo
+  return { ...rest, ax: ncx - hw, ay: ncy - hh, bx: ncx + hw, by: ncy + hh, ...(rot !== undefined ? { rot } : {}) }
+}
+
 /** Returns a new item with the transform baked in (same id and z, so undo/redo swaps it cleanly). */
 export function applyXform(item: Item, t: Xform): Item {
+  if (item.type === 'shape') {
+    const { rot: _rot, ...rest } = item
+    const rot = is3D(item.geo.kind) ? undefined : normRot((item.rot ?? 0) + (t.r ?? 0))
+    const next = {
+      ...rest,
+      size: item.size * t.s,
+      geo: xformShapeGeo(item.geo, t),
+      ...(rot !== undefined ? { rot } : {})
+    }
+    return { ...next, bbox: shapeBBox(next) }
+  }
   if (item.type === 'stroke') {
     const points = item.points.map(([x, y, p]): [number, number, number] => [...xformPoint(t, x, y), p])
-    const pad = item.size * t.s
+    const pad = (item.geom ? 3 : 1) * item.size * t.s
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
     for (const [x, y] of points) {
       if (x < minX) minX = x
@@ -109,8 +186,6 @@ export function applyXform(item: Item, t: Xform): Item {
       if (y > maxY) maxY = y
     }
     const { shape, rot: _rot, ...rest } = item
-    // A shape's spec is an upright box: a turned shape keeps its look but becomes plain lines.
-    const keepShape = shape && !t.r
     const rot = normRot((item.rot ?? 0) + (t.r ?? 0))
     return {
       ...rest,
@@ -118,7 +193,7 @@ export function applyXform(item: Item, t: Xform): Item {
       size: item.size * t.s,
       points,
       bbox: t.r ? { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad } : xformBBox(item.bbox, t),
-      ...(keepShape ? { shape: { ...shape, ...pair('a', xformPoint(t, shape.ax, shape.ay)), ...pair('b', xformPoint(t, shape.bx, shape.by)) } } : {})
+      ...(shape ? { shape: xformShape(shape, t) } : {})
     }
   }
   if (item.type === 'graph') {
@@ -138,8 +213,6 @@ export function applyXform(item: Item, t: Xform): Item {
   const n = placeBoxed(item, t, { ...item, w: item.w * t.s, h: item.h * t.s })
   return { ...n, bbox: turnedBBox({ minX: n.x, minY: n.y, maxX: n.x + n.w, maxY: n.y + n.h }, n.rot) }
 }
-
-const pair = (k: 'a' | 'b', [x, y]: [number, number]) => (k === 'a' ? { ax: x, ay: y } : { bx: x, by: y })
 
 export function unionBBox(items: readonly Item[]): BBox | null {
   if (items.length === 0) return null
@@ -163,11 +236,25 @@ export function pointInPolygon(x: number, y: number, poly: readonly (readonly [n
   return inside
 }
 
-/** Items enclosed by a lasso: strokes with most of their points inside, images whose centre is inside. */
+/** Items enclosed by a lasso: strokes and shapes with most of their path inside, images whose centre is inside. */
 export function itemsInLasso(items: readonly Item[], lasso: readonly (readonly [number, number])[]): Item[] {
   if (lasso.length < 3) return []
   const out: Item[] = []
   for (const it of items) {
+    if (it.type === 'shape') {
+      const ev = evaluateShape(it)
+      const pts = ev.hitPaths.flat()
+      if (!pts.length) continue
+      const step = Math.max(1, Math.floor(pts.length / 40))
+      let total = 0
+      let inside = 0
+      for (let i = 0; i < pts.length; i += step) {
+        total++
+        if (pointInPolygon(pts[i][0], pts[i][1], lasso)) inside++
+      }
+      if (inside / total >= 0.5 || pointInPolygon(ev.center[0], ev.center[1], lasso)) out.push(it)
+      continue
+    }
     if (it.type !== 'stroke') {
       const b = it.bbox
       if (pointInPolygon((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, lasso)) out.push(it)
@@ -190,6 +277,11 @@ export function hitTest(items: readonly Item[], x: number, y: number, tol: numbe
   for (let i = items.length - 1; i >= 0; i--) {
     const it = items[i]
     if (x < it.bbox.minX - tol || x > it.bbox.maxX + tol || y < it.bbox.minY - tol || y > it.bbox.maxY + tol) continue
+    if (it.type === 'shape') {
+      const r = it.size / 2 + tol
+      if (evaluateShape(it).hitPaths.some((path) => circleHitsPolyline(x, y, r, path))) return it
+      continue
+    }
     if (it.type !== 'stroke') {
       // A turned box: test the point in the box's own frame, not against its larger bounds.
       const turn = itemTurn(it)

@@ -41,7 +41,7 @@ export function circleHitsPolyline(
   px: number,
   py: number,
   r: number,
-  points: readonly Point[]
+  points: readonly (readonly [number, number, ...number[]])[]
 ): boolean {
   const rSq = r * r
   if (points.length === 1) {

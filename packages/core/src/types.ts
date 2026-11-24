@@ -4,6 +4,12 @@ import type { ShapeKind } from './shapes'
 /** A sampled input point in world coordinates: x, y and pen pressure (0..1). */
 export type Point = [x: number, y: number, pressure: number]
 
+/** A 2D point in world coordinates. */
+export type Vec2 = [x: number, y: number]
+
+/** A 3D point in local right-handed shape coordinates (x right, y up, z toward viewer). */
+export type Vec3 = [x: number, y: number, z: number]
+
 export interface BBox {
   minX: number
   minY: number
@@ -52,18 +58,40 @@ export interface StrokeItem extends ItemBase, Turnable {
   shape?: ShapeSpec
 }
 
-/** Parameters a shape was generated from: kind, the dragged box (a → b) and the base of a solid. */
+/** Parameters a shape was generated from: kind, box (a -> b), optional rotation, vertices and geometry controls. */
 export interface ShapeSpec {
   kind: ShapeKind
   ax: number
   ay: number
   bx: number
   by: number
-  /** Number of base sides for pyramids and prisms. */
+  /** Clockwise rotation in radians around the unturned box centre (box-based shapes). */
+  rot?: number
+  /** Free world-space vertices for arbitrary triangles and polygons; ax..by mirror their bounds. */
+  vertices?: Vec2[]
+  /** Number of sides: base for pyramids/prisms, sides for polygon, points for star (3..24). */
   base?: number
-  /** Circles constructed from a triangle's vertices, recalculated when its box changes. */
+  /** Triangle constructions: circles are whole-shape; lines are per-vertex indices (0..2). */
   incircle?: boolean
   circumcircle?: boolean
+  altitudeAt?: number[]
+  medianAt?: number[]
+  bisectorAt?: number[]
+  /** Vertex indices whose interior angle (arc + degree, or 90 deg square) is shown. */
+  angleAt?: number[]
+  /** Edge indices whose length (or circle/ellipse dimensions, index 0) is shown. */
+  lengthAt?: number[]
+  /** Parallelogram horizontal skew fraction of width, in [-0.75, 0.75]. Default 0.25. */
+  skew?: number
+  /** Trapezoid top-left and top-right horizontal inset fractions of width, in [0, 0.95]. Defaults 0.22. */
+  topLeft?: number
+  topRight?: number
+  /** Star inner-to-outer radius ratio, in [0.15, 0.9]. Default 0.4. */
+  innerRatio?: number
+  /** Normalized apex / top-face position [ux, uy] relative to box (x0, y0, w, h) for pyramid, cone, prism, cylinder. */
+  apex?: Vec2
+  /** 3D depth / base foreshortening ratio for cube, prism, pyramid, obliquePyramid, cylinder, cone, sphere. */
+  depth?: number
 }
 
 export type LineDash = 'dashed' | 'dotted'
@@ -189,7 +217,73 @@ export interface FormulaItem extends ItemBase, Turnable {
   rows: Row
 }
 
-export type Item = StrokeItem | ImageItem | GraphItem | TextItem | FormulaItem
+/** Compositional geometric construction attached to a first-class ShapeItem. */
+export type ShapeConstruction =
+  | { id: string; kind: 'altitude'; from: string; toEdge?: string }
+  | { id: string; kind: 'median'; from: string; toEdge: string }
+  | { id: string; kind: 'bisector'; from: string }
+  | { id: string; kind: 'diagonal'; from: string; to: string }
+  | { id: string; kind: 'midpoint'; edge: string }
+  | { id: string; kind: 'midline'; edgeA: string; edgeB: string }
+  | { id: string; kind: 'incircle' | 'circumcircle' }
+  | { id: string; kind: 'center' }
+  | { id: string; kind: 'radius' | 'diameter'; angle?: number }
+  | { id: string; kind: 'apothem'; edge: string }
+  | { id: string; kind: 'axis' | 'section' | 'meridian' }
+
+/** Pure geometric definition of a 2D or 3D ShapeItem (independent of annotations and style). */
+export interface ShapeGeometry {
+  kind: ShapeKind
+  ax: number
+  ay: number
+  bx: number
+  by: number
+  /** Clockwise rotation in radians around the unturned box centre (2D shapes). */
+  rot?: number
+  /** Explicit world-space vertices for free triangles and unlocked polygons. */
+  vertices?: Vec2[]
+  /** Side / base / point count for polygon, star, prism, pyramid, obliquePyramid (3..24). */
+  sides?: number
+  /** Parallelogram horizontal skew fraction of width, in [-0.75, 0.75]. Default 0.25. */
+  skew?: number
+  /** Trapezoid top-left and top-right horizontal inset fractions of width, in [0, 0.95]. Defaults 0.22. */
+  topLeft?: number
+  topRight?: number
+  /** Star inner-to-outer radius ratio, in [0.15, 0.9]. Default 0.4. */
+  innerRatio?: number
+  /** Real 3D dimensions [width, height, depth] in board units (3D solids). */
+  dim3?: [w: number, h: number, d: number]
+  /** 3D camera orbit angles [yaw, pitch] in radians (3D solids). */
+  orbit?: [yaw: number, pitch: number]
+  /** 3D horizontal shift [sx, sz] of apex or top face in normalized base-radius units. */
+  slant3?: [sx: number, sz: number]
+}
+
+/**
+ * A first-class parametric 2D or 3D geometric shape.
+ * Geometry (`geo`), constructions, labels, angles and lengths sit at the top level so
+ * field-level sync merges concurrent edits (such as dragging a vertex while adding a label).
+ */
+export interface ShapeItem extends ItemBase, Turnable {
+  type: 'shape'
+  tool: 'pen' | 'highlighter'
+  color: string
+  size: number
+  dash?: LineDash
+  startCap?: LineCap
+  endCap?: LineCap
+  geo: ShapeGeometry
+  /** Optional custom vertex or centre letter labels keyed by vertex id. */
+  labels?: Record<string, string>
+  /** Vertex ids whose interior angle arc / degree or 90 deg mark is shown. */
+  angles?: string[]
+  /** Edge or construction ids whose true length / dimension is shown. */
+  lengths?: string[]
+  /** Compositional geometric constructions attached to this shape. */
+  constructions?: ShapeConstruction[]
+}
+
+export type Item = StrokeItem | ImageItem | GraphItem | TextItem | FormulaItem | ShapeItem
 
 /** Pattern printed on the board surface. */
 /**

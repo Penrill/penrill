@@ -1,5 +1,5 @@
 import { bboxOfPoints, newId } from './geometry'
-import { isTriangle, sameSpec, SHAPE_BASES, specParts } from './shapes'
+import { is3D, isTriangle, sameSpec, SHAPE_BASES, shapeEdges, shapePolygonVertices, specParts } from './shapes'
 import type { Item, LineCap, LineDash, ShapeSpec, StrokeItem } from './types'
 
 export interface ShapeStyle {
@@ -11,18 +11,49 @@ export interface ShapeStyle {
   endCap?: LineCap
 }
 
+function clampIndices(list: readonly number[] | undefined, count: number): number[] | undefined {
+  if (!list?.length || count <= 0) return undefined
+  const out = [...new Set(list.filter((i) => Number.isInteger(i) && i >= 0 && i < count))].sort((a, b) => a - b)
+  return out.length ? out : undefined
+}
+
 /** Keep compatible construction options when switching shape kinds. */
 export function patchShapeSpec(previous: ShapeSpec, patch: Partial<ShapeSpec>): ShapeSpec {
   const spec = { ...previous, ...patch }
-  if (spec.kind !== previous.kind && patch.base === undefined) {
-    const base = SHAPE_BASES[previous.kind]
-    if (base && SHAPE_BASES[spec.kind]) spec.base = previous.base ?? base.def
+  const kindChanged = spec.kind !== previous.kind
+  if (kindChanged && patch.base === undefined) {
+    const prevBase = SHAPE_BASES[previous.kind]
+    if (prevBase && SHAPE_BASES[spec.kind]) spec.base = previous.base ?? prevBase.def
     else delete spec.base
+  }
+  if (kindChanged) {
+    if (patch.vertices === undefined) delete spec.vertices
+    if (patch.skew === undefined) delete spec.skew
+    if (patch.topLeft === undefined) delete spec.topLeft
+    if (patch.topRight === undefined) delete spec.topRight
+    if (patch.innerRatio === undefined) delete spec.innerRatio
+    if (patch.apex === undefined) delete spec.apex
+    if (patch.depth === undefined && !(is3D(previous.kind) && is3D(spec.kind))) delete spec.depth
+  } else if (spec.kind === 'polygon' && patch.base !== undefined && patch.base !== previous.base && patch.vertices === undefined) {
+    // Picking a new side count for a polygon generates a fresh regular n-gon in the current box.
+    delete spec.vertices
   }
   if (!isTriangle(spec.kind)) {
     delete spec.incircle
     delete spec.circumcircle
+    delete spec.altitudeAt
+    delete spec.medianAt
+    delete spec.bisectorAt
   }
+  // Keep angleAt / lengthAt indices valid for the resulting shape's vertex and edge counts.
+  const vCount = shapePolygonVertices(spec).length
+  const eCount = spec.kind === 'ellipse' ? 1 : shapeEdges(spec).length
+  const nextAngles = clampIndices(spec.angleAt, vCount)
+  if (nextAngles) spec.angleAt = nextAngles
+  else delete spec.angleAt
+  const nextLengths = clampIndices(spec.lengthAt, eCount)
+  if (nextLengths) spec.lengthAt = nextLengths
+  else delete spec.lengthAt
   return spec
 }
 
@@ -41,9 +72,12 @@ export function buildShapeItems(
   const gid = groupId ?? (parts.length > 1 ? newId() : undefined)
   // Line ends only decorate the Line shape.
   const caps = spec.kind === 'line' ? { startCap: style.startCap, endCap: style.endCap } : {}
+  const hasLabels = Boolean(spec.lengthAt?.length || spec.angleAt?.length)
   return parts.map((part, i): StrokeItem => {
     const dash = part.dash ?? style.dash
     const { id, z } = slot(i)
+    // Primary outline pads its bbox when measurement labels are shown so exports and culling never clip them.
+    const pad = i === 0 && hasLabels ? Math.max(style.size * 3, 44) : style.size * 3
     return {
       type: 'stroke',
       id,
@@ -54,7 +88,7 @@ export function buildShapeItems(
       pressure: false,
       geom: 'line',
       points: part.points,
-      bbox: bboxOfPoints(part.points, style.size * 3),
+      bbox: bboxOfPoints(part.points, pad),
       shape: spec,
       ...(dash ? { dash } : {}),
       ...(caps.startCap ? { startCap: caps.startCap } : {}),

@@ -1,10 +1,13 @@
 // Board sync engine (packages/sync): replica convergence and the live session under dropped connections.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createShapeItem } from '@penrill/core/shapeConvert'
+import type { ShapeItem } from '@penrill/core/types'
 import { applyChange, diffItem, sameJson, stateOf } from '@penrill/sync/board'
 import type { Change, ClientMessage, Op, ServerMessage, Snapshot, WireItem } from '@penrill/sync/protocol'
 import { Replica, type ViewDelta } from '@penrill/sync/replica'
 import { LiveSession, WINDOW, SILENCE_MS, HEARTBEAT_MS, type ConnectionEvents, type DocumentPort, type Outbox, type OutboxEntry, type SessionState } from '@penrill/sync/session'
+import { fromWire, toWire } from '../src/renderer/src/sync/wire.ts'
 
 let next = 0
 const change = (...ops: Op[]): Change => ({ id: 'c' + ++next, ops })
@@ -316,4 +319,59 @@ test('a revoked session stops reconnecting', async () => {
   assert.equal(session.status, 'signed-out')
   timers.advance(60_000)
   assert.equal(sockets.length, 1)
+})
+
+test('first-class ShapeItem round-trips over wire and merges concurrent geometry, construction, label and colour edits without conflict', () => {
+  const baseShape = createShapeItem(
+    { geo: { kind: 'rhombus', ax: 0, ay: 0, bx: 120, by: 80 } },
+    { color: '#1e1e1e', size: 2, tool: 'pen' },
+    { id: 'sh1', z: 1 }
+  )
+  const w0 = toWire(baseShape)
+  const decoded0 = fromWire(w0) as ShapeItem
+  assert.equal(decoded0.type, 'shape')
+  assert.equal(decoded0.geo.kind, 'rhombus')
+
+  const server = new Server()
+  const rA = new Replica(snapshot(0))
+  const rB = new Replica(snapshot(0))
+  const seed = change({ op: 'put', item: w0 })
+  server.accept(seed)
+  rA.receive(1, seed)
+  rB.receive(1, seed)
+
+  // Replica A drags a vertex (only `geo` changes).
+  const dragged = { ...baseShape, geo: { ...baseShape.geo, ay: -20, by: 100 } }
+  const opA = diffItem(w0, toWire(dragged))!
+  assert.equal(opA.op, 'patch')
+  assert.deepEqual(Object.keys(opA.set ?? {}), ['geo'])
+
+  // Replica B simultaneously adds diagonals, labels and changes colour (`constructions`, `labels`, `color` change).
+  const annotated: ShapeItem = {
+    ...baseShape,
+    color: '#1971c2',
+    labels: { v0: 'A', v2: 'C' },
+    constructions: [{ id: 'diag:v0-v2', kind: 'diagonal', from: 'v0', to: 'v2' }]
+  }
+  const opB = diffItem(w0, toWire(annotated))!
+  assert.equal(opB.op, 'patch')
+  assert.deepEqual(Object.keys(opB.set ?? {}).sort(), ['color', 'constructions', 'labels'])
+
+  const cA = change(opA)
+  const cB = change(opB)
+  rA.local(cA)
+  rB.local(cB)
+  for (const c of [cB, cA]) {
+    const seq = server.accept(c)
+    rA.receive(seq, c)
+    rB.receive(seq, c)
+  }
+
+  const finalA = fromWire(rA.view().items.get('sh1')!) as ShapeItem
+  const finalB = fromWire(rB.view().items.get('sh1')!) as ShapeItem
+  assert.deepEqual(finalA, finalB)
+  assert.equal(finalA.geo.ay, -20)
+  assert.equal(finalA.color, '#1971c2')
+  assert.deepEqual(finalA.labels, { v0: 'A', v2: 'C' })
+  assert.deepEqual(finalA.constructions, [{ id: 'diag:v0-v2', kind: 'diagonal', from: 'v0', to: 'v2' }])
 })

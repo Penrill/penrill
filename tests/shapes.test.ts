@@ -159,3 +159,38 @@ test('a pyramid can switch between straight and oblique while retaining its base
   assert.equal(patchShapeSpec(triangle, { kind: 'rectangle' }).incircle, undefined)
   assert.equal(patchShapeSpec(triangle, { kind: 'rectangle' }).circumcircle, undefined)
 })
+
+test('per-vertex triangle constructions (altitude with 90 deg foot mark, median, bisector) are exact on arbitrary vertices', () => {
+  // Right triangle (0,0)-(0,30)-(40,30): single altitude from vertex 1 (0,30) onto hypotenuse + median from 0 + bisector from 2.
+  const rightSpec: ShapeSpec = {
+    kind: 'triangle',
+    ax: 0,
+    ay: 0,
+    bx: 40,
+    by: 30,
+    vertices: [[0, 0], [0, 30], [40, 30]],
+    altitudeAt: [1],
+    medianAt: [0],
+    bisectorAt: [2]
+  }
+  const parts = specParts(rightSpec, 2)
+  // 1 outline + 1 altitude + 1 perpendicular foot mark + 1 median + 1 bisector = 5 parts.
+  assert.equal(parts.length, 5)
+  assert.equal(parts[0].dash, undefined)
+  assert.equal(parts[1].dash, 'dashed')
+  assert.equal(parts[2].points.length, 3)
+
+  // Obtuse triangle adds a dotted side extension for an altitude whose foot falls outside the segment.
+  const obtuseSpec: ShapeSpec = {
+    kind: 'triangle',
+    ax: 0,
+    ay: 0,
+    bx: 140,
+    by: 60,
+    vertices: [[140, 0], [0, 60], [60, 60]],
+    altitudeAt: [0]
+  }
+  const obtuseParts = specParts(obtuseSpec, 2)
+  assert.ok(obtuseParts.some((p) => p.dash === 'dotted'))
+  assert.ok(obtuseParts.flatMap((p) => p.points.flat()).every(Number.isFinite))
+})

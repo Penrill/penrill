@@ -48,6 +48,10 @@ export interface Session {
   compass: Compass | null
   /** Settings card docked beside the protractor. */
   protractorPanel: boolean
+  /** Contextual vertex or edge mini-popover for the selected shape. */
+  shapePopover: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
+  /** Open Settings dialog to a section ('general' or 'shapes'), or null when closed. */
+  settingsSection: 'general' | 'shapes' | null
   setTool: (tool: Tool) => void
   selectPen: (index: number) => void
 }
@@ -77,6 +81,8 @@ export function createSessionStore(): SessionStore {
     protractor: null,
     compass: null,
     protractorPanel: false,
+    shapePopover: null,
+    settingsSection: null,
     setTool: (tool) => set({ tool }),
     selectPen: (index) => set({ tool: 'pen', activePen: index })
   }))

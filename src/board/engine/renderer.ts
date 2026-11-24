@@ -10,7 +10,7 @@ import { inkColor, isChalk, withInkSurface } from './surface'
 import { buildInkPath, drawCaps, fillInk, linePath, strokeLine, type InkStyle } from './ink'
 import { xformBBox, type Xform } from './transform'
 import type { BackgroundKind, BBox, Camera, Item, LineCap, LineDash, Point } from '@penrill/core/types'
-import type { FeatureRegistry } from '../registry'
+import type { FeatureRegistry, ShapeEditorOverlayState } from '../registry'
 
 export interface LiveStroke extends InkStyle {
   color: string
@@ -60,6 +60,8 @@ export interface SelectionOverlay {
   turn?: boolean
   /** While turning: the frame (`box`, unturned) is drawn turned by this angle about its centre (radians, clockwise). */
   angle?: number
+  /** Direct shape-editor handles and snap guides, drawn by the `shape-editor` module. */
+  shapeEditor?: ShapeEditorOverlayState | null
 }
 
 export const HANDLE_SIZE = 10
@@ -296,6 +298,8 @@ export class BoardRenderer {
         }
       }
     }
+
+    if (sel.shapeEditor) this.kinds.shapeEditor?.drawOverlay(ctx, cam, this.dpr, sel.shapeEditor)
 
     if (sel.ends?.length) {
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)

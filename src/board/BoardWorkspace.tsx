@@ -10,6 +10,7 @@ import { InstrumentPanel } from './ui/InstrumentPanel'
 import { GraphDialog } from './ui/GraphDialog'
 import { Board, type BoardFileActions } from './ui/Board'
 import { SelectionToolbar } from './ui/SelectionToolbar'
+import { ShapeElementPopover } from './modules/shapeEditor/ShapeElementPopover'
 import { ShortcutsDialog } from './ui/ShortcutsDialog'
 import { TextEditor } from './ui/TextEditor'
 import { InsertBar } from './ui/InsertBar'
@@ -72,6 +73,7 @@ export function BoardWorkspace({
       <TextEditor />
       <FormulaEditor />
       <SelectionToolbar actions={selectionActions} />
+      <ShapeElementPopover />
       {/* The chrome: each place on the screen has one job. Top: the board (left), how the current
           tool draws (centre), background and settings (right). Left: the drawing tools. Bottom:
           things to put on the board (centre) and the view (right). */}

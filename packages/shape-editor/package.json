@@ -1,0 +1,18 @@
+{
+  "name": "@penrill/shape-editor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Direct shape editing: handles, magnetic snapping and polygon vertex operations. No DOM, no UI.",
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@penrill/core": "*",
+    "@penrill/render": "*"
+  }
+}

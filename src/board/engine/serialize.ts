@@ -2,12 +2,29 @@ import { validateRows, type Row } from '@penrill/math/formula'
 import { isEquation } from './formulaexpr'
 import { formulaBBox } from './formulatype'
 import { graphBBox, sanitizeGraph } from './graph'
+import { shapeBBox } from '@penrill/core/shapeEval'
 import { isShapeKind, MAX_BASE, MIN_BASE } from '@penrill/core/shapes'
 import { turnedBBox } from '@penrill/core/geometry'
 import { bgPattern, isBackgroundKind, isChalk, SCHOOL_PATTERNS } from './surface'
 import { textBBox } from './text'
 import type { TextRun } from '@penrill/core/types'
-import type { BackgroundKind, Camera, FormulaItem, GraphItem, GraphParams, Item, LineCap, LineDash, Point, ShapeSpec, TextItem } from '@penrill/core/types'
+import type {
+  BackgroundKind,
+  Camera,
+  FormulaItem,
+  GraphItem,
+  GraphParams,
+  Item,
+  LineCap,
+  LineDash,
+  Point,
+  ShapeConstruction,
+  ShapeGeometry,
+  ShapeItem,
+  ShapeSpec,
+  TextItem,
+  Vec2
+} from '@penrill/core/types'
 
 /**
  * Board document format (`.penrill` files, formerly `.inkboard`): plain UTF-8 JSON (legacy gzip-compressed files are still accepted on read).
@@ -27,13 +44,37 @@ export const FORMAT = 'inkboard'
  * 9 = school paper patterns (`math`, `hand`, `slant` backgrounds, on paper or chalkboard).
  * 10 = turned images, texts and formulas (`rot`; turned ink needs nothing new, its points turn).
  * 11 = triangle incircles and circumcircles, oblique pyramids (editable shape specifications).
+ * 12 = direct shape editor: arbitrary triangle/polygon vertices, triangle constructions (altitudes,
+ *      medians, bisectors, right-angle mark), rotated editable shapes, parameterized 2D/3D shapes.
  * Readers accept ≤ this; older apps refuse newer files instead of silently dropping data.
  * A file is stamped with the lowest version that can show it.
  */
-export const FORMAT_VERSION = 11
+export const FORMAT_VERSION = 12
+
+function needsV12Shape(spec: ShapeSpec | undefined): boolean {
+  if (!spec) return false
+  return Boolean(
+    spec.kind === 'polygon' ||
+    spec.rot ||
+    spec.vertices ||
+    spec.altitudeAt?.length ||
+    spec.medianAt?.length ||
+    spec.bisectorAt?.length ||
+    spec.angleAt?.length ||
+    spec.lengthAt?.length ||
+    spec.skew !== undefined ||
+    spec.topLeft !== undefined ||
+    spec.topRight !== undefined ||
+    spec.innerRatio !== undefined ||
+    spec.apex ||
+    spec.depth !== undefined ||
+    (spec.kind === 'star' && spec.base !== undefined)
+  )
+}
 
 /** Lowest format version that can represent these items without losing anything. */
 export function requiredVersion({ items, background }: Pick<BoardData, 'items' | 'background'>): number {
+  if (items.some((i) => i.type === 'shape' || (i.type === 'stroke' && needsV12Shape(i.shape)))) return 12
   if (items.some((i) => i.type === 'stroke' && (i.shape?.kind === 'obliquePyramid' || i.shape?.incircle || i.shape?.circumcircle))) return 11
   if (items.some((i) => (i.type === 'image' || i.type === 'text' || i.type === 'formula') && !!i.rot)) return 10
   if (SCHOOL_PATTERNS.includes(bgPattern(background))) return 9
@@ -121,7 +162,27 @@ interface SerializedFormula {
   rot?: number
 }
 
-type SerializedItem = SerializedStroke | SerializedImage | SerializedGraph | SerializedText | SerializedFormula
+interface SerializedShape {
+  type: 'shape'
+  id: string
+  z: number
+  tool: 'pen' | 'highlighter'
+  color: string
+  size: number
+  dash?: LineDash
+  startCap?: LineCap
+  endCap?: LineCap
+  geo: ShapeGeometry
+  labels?: Record<string, string>
+  angles?: string[]
+  lengths?: string[]
+  constructions?: ShapeConstruction[]
+  groupId?: string
+  locked?: boolean
+  rot?: number
+}
+
+type SerializedItem = SerializedStroke | SerializedImage | SerializedGraph | SerializedText | SerializedFormula | SerializedShape
 
 export interface BoardFile {
   format: typeof FORMAT
@@ -166,7 +227,29 @@ export function serializeBoard(data: BoardData): BoardFile {
         ...(dash ? { dash } : {}),
         ...(startCap ? { startCap } : {}),
         ...(endCap ? { endCap } : {}),
-        ...(shape ? { shape } : {}),
+        ...(shape ? { shape: serializeSpec(shape) } : {}),
+        ...(locked ? { locked } : {}),
+        ...(rot ? { rot } : {})
+      }
+    }
+    if (it.type === 'shape') {
+      const { id, z, tool, color, size, dash, startCap, endCap, geo, labels, angles, lengths, constructions, groupId, locked, rot } = it
+      return {
+        type: 'shape',
+        id,
+        z,
+        tool,
+        color,
+        size,
+        geo: serializeGeo(geo),
+        ...(dash ? { dash } : {}),
+        ...(startCap ? { startCap } : {}),
+        ...(endCap ? { endCap } : {}),
+        ...(labels && Object.keys(labels).length ? { labels } : {}),
+        ...(angles?.length ? { angles } : {}),
+        ...(lengths?.length ? { lengths } : {}),
+        ...(constructions?.length ? { constructions } : {}),
+        ...(groupId ? { groupId } : {}),
         ...(locked ? { locked } : {}),
         ...(rot ? { rot } : {})
       }
@@ -254,6 +337,36 @@ export function deserializeBoard(file: BoardFile): BoardData {
       }
       f.bbox = formulaBBox(f)
       items.push(f)
+    } else if (s.type === 'shape') {
+      const geo = readShapeGeo(s.geo)
+      if (!geo || !(s.size > 0) || typeof s.color !== 'string') continue
+      const tool = s.tool === 'highlighter' ? 'highlighter' : 'pen'
+      const labels = readLabels(s.labels)
+      const angles = readIdList(s.angles)
+      const lengths = readIdList(s.lengths)
+      const constructions = readConstructions(s.constructions)
+      const item: ShapeItem = {
+        type: 'shape',
+        id: s.id,
+        z: s.z,
+        tool,
+        color: noWhite(s.color),
+        size: s.size,
+        geo,
+        ...(s.dash === 'dashed' || s.dash === 'dotted' ? { dash: s.dash } : {}),
+        ...(s.startCap ? { startCap: s.startCap } : {}),
+        ...(s.endCap ? { endCap: s.endCap } : {}),
+        ...(labels ? { labels } : {}),
+        ...(angles ? { angles } : {}),
+        ...(lengths ? { lengths } : {}),
+        ...(constructions ? { constructions } : {}),
+        ...(s.groupId ? { groupId: s.groupId } : {}),
+        ...(s.locked ? { locked: true } : {}),
+        ...readRot(s.rot),
+        bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+      }
+      item.bbox = shapeBBox(item)
+      items.push(item)
     } else if (s.type === 'image') {
       const src = file.assets[s.asset]
       if (!src) continue
@@ -290,17 +403,186 @@ export async function decodeBoard(bytes: Uint8Array): Promise<BoardData> {
   return deserializeBoard(JSON.parse(new TextDecoder().decode(raw)) as BoardFile)
 }
 
+function serializeSpec(spec: ShapeSpec): ShapeSpec {
+  if (!spec.vertices) return spec
+  return { ...spec, vertices: spec.vertices.map(([x, y]): Vec2 => [r2(x), r2(y)]) }
+}
+
+function serializeGeo(geo: ShapeGeometry): ShapeGeometry {
+  return {
+    ...geo,
+    ax: r2(geo.ax),
+    ay: r2(geo.ay),
+    bx: r2(geo.bx),
+    by: r2(geo.by),
+    ...(geo.vertices ? { vertices: geo.vertices.map(([x, y]): Vec2 => [r2(x), r2(y)]) } : {}),
+    ...(geo.dim3 ? { dim3: [r2(geo.dim3[0]), r2(geo.dim3[1]), r2(geo.dim3[2])] } : {}),
+    ...(geo.orbit ? { orbit: [r3(geo.orbit[0]), r3(geo.orbit[1])] } : {}),
+    ...(geo.slant3 ? { slant3: [r3(geo.slant3[0]), r3(geo.slant3[1])] } : {})
+  }
+}
+
+function readShapeGeo(v: unknown): ShapeGeometry | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  if (!isShapeKind(o.kind)) return null
+  if (![o.ax, o.ay, o.bx, o.by].every(isFiniteNum)) return null
+  const geo: ShapeGeometry = { kind: o.kind, ax: o.ax as number, ay: o.ay as number, bx: o.bx as number, by: o.by as number }
+  if (isFiniteNum(o.rot) && o.rot !== 0) geo.rot = o.rot
+  if (Array.isArray(o.vertices) && o.vertices.length >= MIN_BASE && o.vertices.length <= 64) {
+    const verts: Vec2[] = []
+    let ok = true
+    for (const pt of o.vertices) {
+      if (Array.isArray(pt) && pt.length >= 2 && isFiniteNum(pt[0]) && isFiniteNum(pt[1])) verts.push([pt[0], pt[1]])
+      else { ok = false; break }
+    }
+    if (ok) geo.vertices = verts
+  }
+  if (typeof o.sides === 'number' && Number.isInteger(o.sides) && o.sides >= MIN_BASE && o.sides <= MAX_BASE) geo.sides = o.sides
+  if (isFiniteNum(o.skew) && o.skew >= -0.75 && o.skew <= 0.75) geo.skew = o.skew
+  if (isFiniteNum(o.topLeft) && o.topLeft >= 0 && o.topLeft <= 0.95) geo.topLeft = o.topLeft
+  if (isFiniteNum(o.topRight) && o.topRight >= 0 && o.topRight <= 0.95) geo.topRight = o.topRight
+  if (isFiniteNum(o.innerRatio) && o.innerRatio >= 0.15 && o.innerRatio <= 0.9) geo.innerRatio = o.innerRatio
+  if (Array.isArray(o.dim3) && o.dim3.length === 3 && o.dim3.every((n) => isFiniteNum(n) && n > 0)) {
+    geo.dim3 = [o.dim3[0], o.dim3[1], o.dim3[2]]
+  }
+  if (Array.isArray(o.orbit) && o.orbit.length === 2 && isFiniteNum(o.orbit[0]) && isFiniteNum(o.orbit[1])) {
+    geo.orbit = [o.orbit[0], o.orbit[1]]
+  }
+  if (Array.isArray(o.slant3) && o.slant3.length === 2 && isFiniteNum(o.slant3[0]) && isFiniteNum(o.slant3[1])) {
+    geo.slant3 = [o.slant3[0], o.slant3[1]]
+  }
+  return geo
+}
+
+const isNonEmptyStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 64
+
+function readLabels(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined
+  const out: Record<string, string> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (isNonEmptyStr(k) && typeof val === 'string' && val.trim().length > 0 && val.length <= 8) out[k] = val
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+function readIdList(v: unknown): string[] | undefined {
+  if (!Array.isArray(v) || !v.length) return undefined
+  const out = [...new Set(v.filter(isNonEmptyStr))]
+  return out.length ? out : undefined
+}
+
+function readConstructions(v: unknown): ShapeConstruction[] | undefined {
+  if (!Array.isArray(v) || !v.length) return undefined
+  const out: ShapeConstruction[] = []
+  const seen = new Set<string>()
+  for (const raw of v) {
+    if (!raw || typeof raw !== 'object') continue
+    const c = raw as Record<string, unknown>
+    if (!isNonEmptyStr(c.id) || seen.has(c.id) || typeof c.kind !== 'string') continue
+    let parsed: ShapeConstruction | null = null
+    switch (c.kind) {
+      case 'altitude':
+        if (isNonEmptyStr(c.from)) parsed = { id: c.id, kind: 'altitude', from: c.from, ...(isNonEmptyStr(c.toEdge) ? { toEdge: c.toEdge } : {}) }
+        break
+      case 'median':
+        if (isNonEmptyStr(c.from) && isNonEmptyStr(c.toEdge)) parsed = { id: c.id, kind: 'median', from: c.from, toEdge: c.toEdge }
+        break
+      case 'bisector':
+        if (isNonEmptyStr(c.from)) parsed = { id: c.id, kind: 'bisector', from: c.from }
+        break
+      case 'diagonal':
+        if (isNonEmptyStr(c.from) && isNonEmptyStr(c.to)) parsed = { id: c.id, kind: 'diagonal', from: c.from, to: c.to }
+        break
+      case 'midpoint':
+        if (isNonEmptyStr(c.edge)) parsed = { id: c.id, kind: 'midpoint', edge: c.edge }
+        break
+      case 'midline':
+        if (isNonEmptyStr(c.edgeA) && isNonEmptyStr(c.edgeB)) parsed = { id: c.id, kind: 'midline', edgeA: c.edgeA, edgeB: c.edgeB }
+        break
+      case 'incircle':
+      case 'circumcircle':
+      case 'center':
+      case 'axis':
+      case 'section':
+      case 'meridian':
+        parsed = { id: c.id, kind: c.kind }
+        break
+      case 'radius':
+      case 'diameter':
+        parsed = { id: c.id, kind: c.kind, ...(isFiniteNum(c.angle) ? { angle: c.angle } : {}) }
+        break
+      case 'apothem':
+        if (isNonEmptyStr(c.edge)) parsed = { id: c.id, kind: 'apothem', edge: c.edge }
+        break
+    }
+    if (parsed) {
+      seen.add(parsed.id)
+      out.push(parsed)
+    }
+  }
+  return out.length ? out : undefined
+}
+
+const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+function readIndexList(v: unknown, max: number): number[] | undefined {
+  if (!Array.isArray(v) || !v.length) return undefined
+  const out = [...new Set(v.filter((n): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < max))].sort((a, b) => a - b)
+  return out.length ? out : undefined
+}
+
 /** Validate a stored shape spec (ignored if malformed, the strokes themselves still load). */
 function readSpec(v: unknown): ShapeSpec | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Record<string, unknown>
   if (!isShapeKind(o.kind)) return null
   const nums = [o.ax, o.ay, o.bx, o.by]
-  if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) return null
+  if (!nums.every(isFiniteNum)) return null
   const spec: ShapeSpec = { kind: o.kind, ax: o.ax as number, ay: o.ay as number, bx: o.bx as number, by: o.by as number }
+  if (isFiniteNum(o.rot) && o.rot !== 0) spec.rot = o.rot
+  if (Array.isArray(o.vertices) && o.vertices.length >= MIN_BASE && o.vertices.length <= 64) {
+    const verts: Vec2[] = []
+    let ok = true
+    for (const pt of o.vertices) {
+      if (Array.isArray(pt) && pt.length >= 2 && isFiniteNum(pt[0]) && isFiniteNum(pt[1])) verts.push([pt[0], pt[1]])
+      else {
+        ok = false
+        break
+      }
+    }
+    if (ok) spec.vertices = verts
+  }
   if (typeof o.base === 'number' && Number.isInteger(o.base) && o.base >= MIN_BASE && o.base <= MAX_BASE) spec.base = o.base
   if (o.incircle === true) spec.incircle = true
   if (o.circumcircle === true) spec.circumcircle = true
+  const altAt = readIndexList(o.altitudeAt, 3)
+  if (altAt) spec.altitudeAt = altAt
+  const medAt = readIndexList(o.medianAt, 3)
+  if (medAt) spec.medianAt = medAt
+  const bisAt = readIndexList(o.bisectorAt, 3)
+  if (bisAt) spec.bisectorAt = bisAt
+  const angAt = readIndexList(o.angleAt, 64)
+  if (angAt) spec.angleAt = angAt
+  const lenAt = readIndexList(o.lengthAt, 64)
+  if (lenAt) spec.lengthAt = lenAt
+  if (isFiniteNum(o.skew) && o.skew >= -0.75 && o.skew <= 0.75) spec.skew = o.skew
+  if (isFiniteNum(o.topLeft) && o.topLeft >= 0 && o.topLeft <= 0.95) spec.topLeft = o.topLeft
+  if (isFiniteNum(o.topRight) && o.topRight >= 0 && o.topRight <= 0.95) spec.topRight = o.topRight
+  if (isFiniteNum(o.innerRatio) && o.innerRatio >= 0.15 && o.innerRatio <= 0.9) spec.innerRatio = o.innerRatio
+  if (
+    Array.isArray(o.apex) &&
+    o.apex.length >= 2 &&
+    isFiniteNum(o.apex[0]) &&
+    isFiniteNum(o.apex[1]) &&
+    o.apex[0] >= -2 &&
+    o.apex[0] <= 3 &&
+    o.apex[1] >= -2 &&
+    o.apex[1] <= 3
+  ) {
+    spec.apex = [o.apex[0], o.apex[1]]
+  }
+  if (isFiniteNum(o.depth) && o.depth >= 0.05 && o.depth <= 0.5) spec.depth = o.depth
   return spec
 }
 

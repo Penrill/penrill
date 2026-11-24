@@ -6,19 +6,118 @@ import { decodeBoard, deserializeBoard, encodeBoard, FORMAT_VERSION, serializeBo
 import { EMPTY_FORMULA, typeChar } from '@penrill/math/formula'
 import { rowsToText } from '../src/board/engine/formulaexpr.ts'
 import type { FormulaItem, GraphItem } from '@penrill/core/types'
+import { createShapeItem } from '@penrill/core/shapeConvert'
 import { buildShapeItems, editableShape } from '@penrill/core/shapeItems'
-import type { ShapeSpec, StrokeItem } from '@penrill/core/types'
+import type { ShapeItem, ShapeSpec, StrokeItem } from '@penrill/core/types'
 
 const plane = {
   type: 'graph' as const, id: 'g1', z: 1, ox: 240, oy: 240, color: '#1e1e1e',
   kind: 'plane' as const, xMin: -10, xMax: 10, yMin: -10, yMax: 10, unit: 24, labelStep: 1, grid: false
 }
 
-test('the format version is 11; a board is stamped with the lowest version that can show it', () => {
-  assert.equal(FORMAT_VERSION, 11)
+test('the format version is 12; a board is stamped with the lowest version that can show it', () => {
+  assert.equal(FORMAT_VERSION, 12)
   // Nothing from version 7 on the board: apps that only know version 6 can still open it.
   const f = serializeBoard({ items: [{ ...plane, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
   assert.equal(f.version, 6)
+})
+
+test('first-class 2D and 3D ShapeItem round-trips at v12 with top-level sync-friendly fields and prunes malformed entries', () => {
+  const rhombus = createShapeItem(
+    {
+      geo: { kind: 'rhombus', ax: 10, ay: 20, bx: 150, by: 140, rot: 0.25 },
+      labels: { v0: 'A', v1: 'B', v2: 'C', v3: 'D' },
+      angles: ['v0', 'v1'],
+      lengths: ['e0', 'diag:v0-v2'],
+      constructions: [
+        { id: 'diag:v0-v2', kind: 'diagonal', from: 'v0', to: 'v2' },
+        { id: 'incircle', kind: 'incircle' },
+        { id: 'mid:e0', kind: 'midpoint', edge: 'e0' }
+      ]
+    },
+    { color: '#1971c2', size: 3, tool: 'pen', dash: 'dashed' },
+    { id: 'sh-rhomb', z: 1 }
+  )
+  const pyramid = createShapeItem(
+    {
+      geo: { kind: 'pyramid', ax: 200, ay: 40, bx: 360, by: 200, sides: 4, dim3: [120, 140, 120], orbit: [-0.45, 0.35], slant3: [0.3, -0.1] },
+      labels: { apex: 'S', b0: 'A' },
+      lengths: ['eb0', 'alt:apex'],
+      constructions: [
+        { id: 'alt:apex', kind: 'altitude', from: 'apex' },
+        { id: 'apo:eb0', kind: 'apothem', edge: 'eb0' }
+      ]
+    },
+    { color: '#1e1e1e', size: 2, tool: 'pen' },
+    { id: 'sh-pyr', z: 2 }
+  )
+  const file = JSON.parse(JSON.stringify(serializeBoard({ items: [rhombus, pyramid], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } }))) as BoardFile
+  assert.equal(file.version, 12)
+  assert.equal(file.items[0].type, 'shape')
+  assert.equal(file.items[1].type, 'shape')
+
+  const [backR, backP] = deserializeBoard(file).items as ShapeItem[]
+  assert.equal(backR.type, 'shape')
+  assert.deepEqual(backR.geo, rhombus.geo)
+  assert.deepEqual(backR.labels, rhombus.labels)
+  assert.deepEqual(backR.angles, rhombus.angles)
+  assert.deepEqual(backR.lengths, rhombus.lengths)
+  assert.deepEqual(backR.constructions, rhombus.constructions)
+  assert.equal(backR.dash, 'dashed')
+  assert.ok(backR.bbox.maxX > backR.bbox.minX)
+
+  assert.equal(backP.type, 'shape')
+  assert.deepEqual(backP.geo, pyramid.geo)
+  assert.deepEqual(backP.constructions, pyramid.constructions)
+  assert.deepEqual(backP.labels, pyramid.labels)
+
+  // Malformed constructions and labels are dropped cleanly without dropping the shape itself.
+  const broken = JSON.parse(JSON.stringify(file)) as BoardFile
+  Object.assign(broken.items[0], {
+    constructions: [{ id: 'bad1', kind: 'altitude' }, { id: 'ok', kind: 'center' }],
+    labels: { v0: 'A', bad: 'waytoolonglabeltext' }
+  })
+  const cleaned = deserializeBoard(broken).items[0] as ShapeItem
+  assert.deepEqual(cleaned.constructions, [{ id: 'ok', kind: 'center' }])
+  assert.deepEqual(cleaned.labels, { v0: 'A' })
+})
+
+test('v12 shape editor features round-trip cleanly and ignore malformed fields', () => {
+  const specs: ShapeSpec[] = [
+    {
+      kind: 'triangle',
+      ax: 0,
+      ay: 0,
+      bx: 150,
+      by: 90,
+      vertices: [[120, 0], [150, 90], [0, 90]],
+      incircle: true,
+      altitudeAt: [0],
+      medianAt: [1],
+      bisectorAt: [2],
+      angleAt: [0, 2],
+      lengthAt: [1]
+    },
+    { kind: 'polygon', ax: 0, ay: 0, bx: 100, by: 100, base: 5, vertices: [[50, 0], [100, 40], [80, 100], [20, 100], [0, 40]], angleAt: [0], lengthAt: [0, 1] },
+    { kind: 'parallelogram', ax: 0, ay: 0, bx: 120, by: 80, skew: -0.3, rot: 0.5 },
+    { kind: 'trapezoid', ax: 0, ay: 0, bx: 120, by: 80, topLeft: 0, topRight: 0.35 },
+    { kind: 'star', ax: 0, ay: 0, bx: 100, by: 100, base: 7, innerRatio: 0.5 },
+    { kind: 'pyramid', ax: 0, ay: 0, bx: 160, by: 120, base: 5, apex: [0.85, -0.1], depth: 0.22 }
+  ]
+  for (const spec of specs) {
+    const items = buildShapeItems(spec, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `v12-${i}`, z: i }))
+    const file = JSON.parse(JSON.stringify(serializeBoard({ items, background: 'dots', camera: { x: 0, y: 0, zoom: 1 } }))) as BoardFile
+    assert.equal(file.version, 12, spec.kind)
+    const back = deserializeBoard(file).items as StrokeItem[]
+    assert.deepEqual(editableShape(back)?.spec, spec)
+  }
+  const bad = serializeBoard({
+    items: buildShapeItems({ kind: 'rectangle', ax: 0, ay: 0, bx: 50, by: 50 }, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `b${i}`, z: i })),
+    background: 'dots',
+    camera: { x: 0, y: 0, zoom: 1 }
+  })
+  Object.assign((bad.items[0] as StrokeItem).shape!, { skew: 99, vertices: [[1, 2]], apex: ['bad'], depth: -5, altitudeAt: [99, 'x'], angleAt: [-1], lengthAt: 'no' })
+  assert.deepEqual(editableShape(deserializeBoard(bad).items)?.spec, { kind: 'rectangle', ax: 0, ay: 0, bx: 50, by: 50 })
 })
 
 test('triangle circles and oblique pyramids save as version 11 and retain editable geometry', () => {

@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Scene } from '@penrill/core/scene'
-import type { ImageItem, Item, StrokeItem } from '@penrill/core/types'
+import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
+import type { ImageItem, Item, ShapeItem, StrokeItem } from '@penrill/core/types'
 import { itemsTouched } from '../src/board/tools/brushSelect.ts'
 import { beginErase, eraseAlong, eraseUnit, type EraseRecord } from '../src/board/tools/eraser.ts'
 import { drawLaser } from '../src/board/engine/laser.ts'
@@ -146,7 +147,7 @@ test('lasso selects what it goes around; a tap selects the item under it or clea
   assert.deepEqual(editor.selected, [])
 })
 
-test('the shape tool drags out a shape, Shift keeps it regular, a click drops the default size', () => {
+test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, a click drops the default size', () => {
   const sc = new Scene()
   const { ctx } = fakeContext(sc)
   ctx.session.setState({ shape: 'rectangle' })
@@ -154,13 +155,15 @@ test('the shape tool drags out a shape, Shift keeps it regular, a click drops th
   drag.move([pt(100, 40)], { ...keys, shift: true })
   assert.ok(drag.overlay?.().live?.parts?.length, 'a preview is shown while dragging')
   drag.end()
-  const spec = (sc.getItems()[0] as StrokeItem).shape!
-  assert.equal(spec.kind, 'rectangle')
-  assert.equal(Math.abs(spec.bx - spec.ax), Math.abs(spec.by - spec.ay))
+  const item = sc.getItems()[0] as ShapeItem
+  assert.equal(item.type, 'shape')
+  assert.equal(item.geo.kind, 'rectangle')
+  assert.equal(Math.abs(item.geo.bx - item.geo.ax), Math.abs(item.geo.by - item.geo.ay))
   const click = beginShape(ctx, pt(500, 500))
   click.end()
-  const dropped = (sc.getItems().at(-1) as StrokeItem).shape!
-  assert.equal((dropped.ax + dropped.bx) / 2, 500)
+  const dropped = sc.getItems().at(-1) as ShapeItem
+  assert.equal(dropped.type, 'shape')
+  assert.equal((dropped.geo.ax + dropped.geo.bx) / 2, 500)
   assert.equal(sc.canUndo, true)
 })
 
@@ -171,23 +174,46 @@ test('pan moves the camera with the pointer', () => {
   assert.deepEqual(editor.camera, { x: -30, y: 20, zoom: 1 })
 })
 
-test('the shape tool previews and inserts triangle circles and oblique pyramids as one undo step', () => {
-  for (const kind of ['triangle', 'rightTriangle', 'obliquePyramid'] as const) {
+test('the shape tool previews, inserts and immediately selects one atomic ShapeItem per shape', () => {
+  for (const kind of ['triangle', 'rightTriangle', 'polygon', 'obliquePyramid', 'cube'] as const) {
     const scene = new Scene()
-    const { ctx } = fakeContext(scene)
+    const { ctx, editor } = fakeContext(scene)
     ctx.session.setState({ shape: kind })
-    Object.assign(ctx.prefs(), { triangleCircles: { incircle: true, circumcircle: true }, shapeBases: { obliquePyramid: 12 } })
+    Object.assign(ctx.prefs(), {
+      triangleCircles: { incircle: true, circumcircle: true },
+      shapeBases: { obliquePyramid: 12, polygon: 5 }
+    })
     const drag = beginShape(ctx, pt(0, 0))
     drag.move([pt(180, 100)], keys)
     const preview = drag.overlay!().live!.parts!
-    assert.equal(preview.length, kind === 'obliquePyramid' ? 24 : 3)
+    assert.ok(preview.length >= 3, kind)
     drag.end()
-    assert.deepEqual(scene.getItems().map((i) => (i as StrokeItem).points), preview.map((p) => p.points))
+    assert.equal(scene.getItems().length, 1, `${kind} is stored as one atomic ShapeItem`)
+    const item = scene.getItems()[0] as ShapeItem
+    assert.equal(item.type, 'shape')
+    assert.equal(item.geo.kind, kind)
+    assert.deepEqual(editor.selected, [item.id])
     scene.undo()
     assert.equal(scene.getItems().length, 0)
     scene.redo()
-    assert.equal(scene.getItems().length, preview.length)
+    assert.equal(scene.getItems().length, 1)
   }
+})
+
+test('stroke eraser and brush select hit edges of a ShapeItem and ignore empty interior space', () => {
+  const sc = new Scene()
+  const rect = createShapeItem(specToShapeData({ kind: 'rectangle', ax: 0, ay: 0, bx: 120, by: 120 }), { color: '#000', size: 2, tool: 'pen' }, { id: 'sh1', z: 1 })
+  sc.add([rect])
+  // Brush in empty interior does not select the shape; brushing an edge selects it.
+  assert.deepEqual(itemsTouched(sc.getItems(), 60, 60, 62, 60, 4), [])
+  assert.deepEqual(ids(itemsTouched(sc.getItems(), 60, 0, 65, 0, 4)), ['sh1'])
+  // Erasing in empty interior leaves shape intact; crossing an edge removes it in one step.
+  const rec = record()
+  eraseAlong(sc, 60, 50, 60, 70, 5, 'stroke', rec)
+  assert.equal(sc.getItems().length, 1)
+  eraseAlong(sc, 60, -10, 60, 10, 5, 'stroke', rec)
+  assert.equal(sc.getItems().length, 0)
+  assert.deepEqual(ids(rec.removed), ['sh1'])
 })
 
 test('laser rendering batches fast pen samples and starts a separate path after lifting', () => {

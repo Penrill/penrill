@@ -14,12 +14,15 @@ import {
   type LiveStroke
 } from '../engine/renderer'
 import { arcStroke, baseStroke, degText, hitProtractor, rayStroke, scaleAngle, snapDeg, toLocal, toWorld, turnText, type ProtractorHit, type ProtractorState } from '../engine/protractor'
-import { buildShapeItems, editableShape, regenerateShape } from '@penrill/core/shapeItems'
-import { isLinear, snapAngle } from '@penrill/core/shapes'
+import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
+import { evaluateShape } from '@penrill/core/shapeEval'
+import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
+import { isLinear, shapeEdges, snapAngle } from '@penrill/core/shapes'
 import { canTurnSelection, hitTest } from '../engine/transform'
-import type { BBox, Item, Point, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
+import type { BBox, Item, Point, ShapeItem, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
 import { useEditor } from '../editorContext'
-import type { RecognizedShape } from '../registry'
+import type { RecognizedShape, ShapeEditorHandle } from '../registry'
+import { beginShapeHandle, beginShapeItemHandle, tryRemovePolygonVertex, tryRemoveShapeItemVertex, type ShapeHandleGesture } from '../modules/shapeEditor/controller'
 import type { Session } from '../session'
 import { isBoardFileShortcut, matchShortcut, type BoardFileShortcut, type ShortcutId } from '../shortcuts'
 import { prefsStore, type InkSlot, type PenAction, type Prefs, type Tool } from '../store'
@@ -102,10 +105,26 @@ type Gesture =
       startX: number
       startY: number
     }
+  | {
+      kind: 'shapeHandle'
+      pointerId: number
+      controller: ShapeHandleGesture
+      prevPop: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
+    }
   // Tools moved to tool controllers (src/board/tools): the board only feeds them samples.
   | { kind: 'eraser' | 'laser' | 'brush' | 'pan' | 'lasso' | 'shape'; pointerId: number; tool: ToolGesture }
   | { kind: 'pinch'; dist: number; cx: number; cy: number }
-  | { kind: 'move'; pointerId: number; startX: number; startY: number }
+  | {
+      kind: 'move'
+      pointerId: number
+      startX: number
+      startY: number
+      startSx?: number
+      startSy?: number
+      moved?: boolean
+      tapTarget?: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
+      prevPop?: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
+    }
   | { kind: 'scale'; pointerId: number; ax: number; ay: number; cx: number; cy: number }
   /** Turning the selection about the centre of its frame `box`; `a0` = pointer angle at the press, `r` = turn so far. */
   | { kind: 'turn'; pointerId: number; box: BBox; cx: number; cy: number; a0: number; r: number }
@@ -121,6 +140,7 @@ function lineEnds(it: Item): [End, End] | null {
 }
 
 type SelHit =
+  | { kind: 'shapeHandle'; handle: ShapeEditorHandle }
   | { kind: 'handle'; corner: number; box: BBox }
   | { kind: 'side'; side: number }
   | { kind: 'turn'; box: BBox }
@@ -166,6 +186,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     let lastPenTime = -Infinity
     /** Last press on a text item (for double click / double tap = edit). */
     let lastTap: { id: string; t: number } | null = null
+    /** Last press on a polygon vertex handle (double click / double tap = remove vertex). */
+    let lastVertexTap: { id: string; t: number } | null = null
     const touches = new Map<number, { x: number; y: number }>()
     const trail = new LaserTrail()
     /** Hold-to-snap timer of the stroke being drawn and where the pen last moved noticeably. */
@@ -206,7 +228,44 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const ss = sq ? straightState('setSquare') : null
         const rul = ui.ruler
         const rs = rul ? straightState('ruler') : null
-        const hintText = cs?.hint || ps?.hint || ss?.hint || rs?.hint
+        const hotShapeHit =
+          !gesture && hover && (ui.tool === 'select' || ui.tool === 'move' || ui.tool === 'shape')
+            ? selectionHit(hover.sx, hover.sy)
+            : null
+        const hotShapeHandle = hotShapeHit?.kind === 'shapeHandle' ? hotShapeHit.handle : null
+        const shapeEd = editor.features.shapeEditor
+        const activePop = ui.shapePopover
+        const activeItem = info?.shapeItem ?? null
+        const activeSpec = info?.shape?.spec ?? info?.line?.shape ?? null
+        const hotEdge =
+          !gesture && hover && shapeEd && !hotShapeHandle &&
+          (hotShapeHit?.kind === 'body' || ui.tool === 'shape' || !!info?.line || !!activeItem) &&
+          (ui.tool === 'select' || ui.tool === 'move' || ui.tool === 'shape')
+            ? (() => {
+                const w = screenToWorld(editor.camera, hover.sx, hover.sy)
+                if (activeItem) return shapeEd.hitItemEdge(activeItem, w.x, w.y, editor.camera.zoom)
+                return activeSpec ? shapeEd.hitEdge(activeSpec, w.x, w.y, editor.camera.zoom) : null
+              })()
+            : null
+        const activeEdge =
+          activePop?.kind === 'edge'
+            ? activeItem
+              ? evaluateShape(activeItem).edges.find((e, i) => (activePop.targetId ? e.id === activePop.targetId : i === activePop.index)) ?? null
+              : activeSpec
+                ? shapeEdges(activeSpec)[activePop.index] ?? null
+                : null
+            : null
+        const activeHandle =
+          activePop?.kind === 'vertex'
+            ? (activePop.targetId ?? (activeItem ? `v${activePop.index}` : `v:${activePop.index}`))
+            : null
+        const shapeHint = hotShapeHandle
+          ? translate(ui.lang, hotShapeHandle.hint as MessageKey)
+          : hotEdge
+            ? translate(ui.lang, 'shape.hint.edge')
+            : null
+        const hintText = cs?.hint || ps?.hint || ss?.hint || rs?.hint || shapeHint
+        const isLinearItem = !!(activeItem && isLinear(activeItem.geo.kind))
         renderer.renderOverlay(live, cursorState(), editor.camera, {
           // While turning, the frame is the one at the press, drawn turned (its bounds would jump about).
           box: gesture?.kind === 'turn' ? gesture.box : (info?.box ?? null),
@@ -215,9 +274,19 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           lasso: shown?.lasso ?? null,
           hover: gesture ? null : hoverBox,
           locked: info?.locked,
-          corners: !info?.line,
-          sides: !!info?.shape,
-          ends: info?.line ? lineEnds(info.line) : hl ? lineEnds(hl) : null
+          corners: !info?.line && !isLinearItem,
+          sides: !!info?.showSides,
+          ends: info?.line ? lineEnds(info.line) : hl ? lineEnds(hl) : null,
+          shapeEditor: info?.shapeHandles?.length || hotEdge || activeEdge
+            ? {
+                handles: info?.shapeHandles ?? [],
+                hotHandle: gesture?.kind === 'shapeHandle' ? gesture.controller.handleId : (hotShapeHandle?.id ?? null),
+                activeHandle,
+                hotEdge,
+                activeEdge,
+                guides: gesture?.kind === 'shapeHandle' ? gesture.controller.guides() : null
+              }
+            : null
         }, {
           peerInk: editor.peerInk.values(),
           ruler: rul ? { s: rul, state: rs!.state } : null,
@@ -296,7 +365,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       box: BBox
       locked: boolean
       line: StrokeItem | null
+      shapeItem: ShapeItem | null
       shape: { spec: ShapeSpec; parts: StrokeItem[] } | null
+      shapeHandles: ShapeEditorHandle[] | null
+      showSides: boolean
       /** The selection can be turned (shows the ↻ handle). */
       turn: boolean
     } | null => {
@@ -305,10 +377,15 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const box = editor.selectionBBox()
       if (!box || !items.length) return null
       const locked = items.some((i) => i.locked)
-      const line = items.length === 1 && !locked && lineEnds(items[0]) ? (items[0] as StrokeItem) : null
-      const es = locked || line ? null : editableShape(items)
+      const shapeItem = items.length === 1 && !locked && items[0].type === 'shape' ? items[0] : null
+      const line = !shapeItem && items.length === 1 && !locked && lineEnds(items[0]) ? (items[0] as StrokeItem) : null
+      const es = locked || line || shapeItem ? null : editableShape(items)
+      const shape = es && !isLinear(es.spec.kind) ? es : null
+      const shapeEd = editor.features.shapeEditor
+      const shapeHandles = shapeItem && shapeEd ? shapeEd.itemHandles(shapeItem) : shape && shapeEd ? shapeEd.handles(shape.spec) : null
+      const showSides = !shapeItem && !!shape && !shape.spec.rot && !shapeEd?.usesVertexHandles(shape.spec.kind)
       const turn = canTurnSelection(items)
-      return { box, locked, line, shape: es && !isLinear(es.spec.kind) ? es : null, turn }
+      return { box, locked, line, shapeItem, shape, shapeHandles, showSides, turn }
     }
 
     const reach = (): number => (hover?.pointerType === 'mouse' ? 0 : 6)
@@ -349,6 +426,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     const selectionHit = (sx: number, sy: number): SelHit | null => {
       const info = selInfo()
       if (!info) return null
+      if (info.shapeHandles?.length && editor.features.shapeEditor) {
+        const hit = editor.features.shapeEditor.hitHandle(info.shapeHandles, sx, sy, editor.camera, reach())
+        if (hit) return { kind: 'shapeHandle', handle: hit }
+      }
       if (info.line) {
         const which = nearEnd(info.line, sx, sy)
         if (which !== null) return { kind: 'end', which, item: info.line }
@@ -360,11 +441,11 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const [hx, hy] = selectionTurnHandle(r)
         if (Math.hypot(sx - hx, sy - hy) <= TURN_R + 4 + reach()) return { kind: 'turn', box: info.box }
       }
-      if (!info.locked && !info.line) {
+      if (!info.locked && !info.line && !(info.shapeItem && isLinear(info.shapeItem.geo.kind))) {
         const corners = selectionCorners(r)
         for (let i = 0; i < 4; i++) if (near(corners[i])) return { kind: 'handle', corner: i, box: info.box }
       }
-      if (info.shape) {
+      if (info.showSides) {
         const sides = selectionSides(r)
         for (let i = 0; i < 4; i++) if (near(sides[i])) return { kind: 'side', side: i }
       }
@@ -593,8 +674,16 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const sHit = !gesture && hover && !pHit ? straightHitAt('setSquare', hover.sx, hover.sy) ?? straightHitAt('ruler', hover.sx, hover.sy) : null
       if (gesture?.kind === 'pan' || gesture?.kind === 'pinch') c = 'grabbing'
       else if (spaceDown || tool === 'pan') c = 'grab'
-      else if (tool === 'shape') c = 'crosshair'
-      else if (tool === 'text') c = 'text'
+      else if (gesture?.kind === 'shapeHandle') c = gesture.controller.handle.kind === 'orbit' ? 'grabbing' : 'crosshair'
+      else if (tool === 'shape') {
+        const h = !gesture && hover ? selectionHit(hover.sx, hover.sy) : null
+        if (h?.kind === 'shapeHandle') c = h.handle.cursor
+        else if (h?.kind === 'end') c = 'crosshair'
+        else if (h?.kind === 'turn') c = 'grab'
+        else if (h?.kind === 'side') c = h.side % 2 === 0 ? 'ns-resize' : 'ew-resize'
+        else if (h?.kind === 'handle') c = h.corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
+        else c = 'crosshair'
+      } else if (tool === 'text') c = 'text'
       else if (
         gesture?.kind === 'protMove' ||
         gesture?.kind === 'compMove' ||
@@ -634,7 +723,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         else if (h?.kind === 'turn') c = 'grab'
       } else if (tool === 'select' || tool === 'move') {
         const h = hover ? selectionHit(hover.sx, hover.sy) : null
-        if (h?.kind === 'end') c = 'crosshair'
+        if (h?.kind === 'shapeHandle') c = h.handle.cursor
+        else if (h?.kind === 'end') c = 'crosshair'
         else if (h?.kind === 'turn') c = 'grab'
         else if (h?.kind === 'side') c = h.side % 2 === 0 ? 'ns-resize' : 'ew-resize'
         else if (h?.kind === 'handle') c = h.corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
@@ -714,15 +804,16 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       if ('tool' in g) {
         g.tool.end()
       } else if (g.kind === 'ink' && g.held?.current.spec) {
-        // Snapped to a board primitive: it becomes an ordinary shape (side handles, switch kind…).
+        // Snapped to a board primitive: becomes a first-class ShapeItem with full editing and defaults.
         const { live } = g
-        scene.add(
-          buildShapeItems(
-            g.held.current.spec,
-            { color: live.color, size: live.size, tool: live.tool, dash: live.dash, startCap: live.startCap, endCap: live.endCap },
-            () => ({ id: newId(), z: scene.allocZ() })
-          )
+        const rawItem = createShapeItem(
+          specToShapeData(g.held.current.spec),
+          { color: live.color, size: live.size, tool: live.tool, dash: live.dash, startCap: live.startCap, endCap: live.endCap },
+          { id: newId(), z: scene.allocZ() }
         )
+        const shapeEd = editor.features.shapeEditor
+        const finalItem = shapeEd ? shapeEd.applyItemDefaults(rawItem, prefsStore.getState().shapeDefaults) : rawItem
+        scene.add([finalItem])
       } else if (g.kind === 'ink' && g.live.points.length > 0 && !(g.snap?.mode === 'compass' && Math.abs(g.snap.sweep) < 0.01)) {
         const { live } = g
         const stroke: StrokeItem = {
@@ -758,7 +849,17 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           scene.add([{ ...stroke, groupId }, { ...label, groupId }])
         } else scene.add([stroke])
         committedInk = true
-      } else if (g.kind === 'move' || g.kind === 'scale' || g.kind === 'turn') {
+      } else if (g.kind === 'move') {
+        if (g.moved === false && g.tapTarget) {
+          editor.setPreview(null)
+          const same =
+            g.prevPop?.kind === g.tapTarget.kind &&
+            (g.tapTarget.targetId ? g.prevPop?.targetId === g.tapTarget.targetId : g.prevPop?.index === g.tapTarget.index)
+          session.setState({ shapePopover: same ? null : g.tapTarget })
+        } else {
+          editor.commitPreview()
+        }
+      } else if (g.kind === 'scale' || g.kind === 'turn') {
         editor.commitPreview()
       } else if (g.kind === 'endpoint') {
         if (g.current !== g.original) scene.record({ added: [g.current], removed: [g.original] })
@@ -766,6 +867,19 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         if (g.current !== g.parts) {
           scene.record({ added: g.current, removed: g.parts })
           editor.setSelection(g.current)
+        }
+      } else if (g.kind === 'shapeHandle') {
+        const dragged = g.controller.end()
+        if (!dragged && g.controller.handle.kind === 'vertex') {
+          const nextPop = {
+            kind: 'vertex' as const,
+            index: g.controller.handle.index ?? 0,
+            ...(g.controller.handle.vertexId ? { targetId: g.controller.handle.vertexId } : {})
+          }
+          const same =
+            g.prevPop?.kind === nextPop.kind &&
+            (nextPop.targetId ? g.prevPop?.targetId === nextPop.targetId : g.prevPop?.index === nextPop.index)
+          session.setState({ shapePopover: same ? null : nextPop })
         }
       }
       if (g.kind === 'ink') editor.shareInk?.(g.id, g.live, true, committedInk)
@@ -907,6 +1021,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       }
       // The same for a formula being built.
       editor.commitFormula(false)
+      const prevPop = session.getState().shapePopover
+      if (prevPop) session.setState({ shapePopover: null })
       capture(e.pointerId)
       const p = local(e)
       const eff = effectiveFor(e)
@@ -1039,7 +1155,40 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         lastTap = tapHit && editable ? { id: tapHit.id, t: now } : null
         const h = selH
         const locked = editor.selectionLocked()
-        if (h?.kind === 'handle') {
+        if (h?.kind === 'shapeHandle') {
+          const curInfo = selInfo()
+          const shapeEd = editor.features.shapeEditor
+          if (curInfo?.shapeItem && shapeEd) {
+            const isPolyVert = h.handle.kind === 'vertex' && curInfo.shapeItem.geo.kind === 'polygon' && !!h.handle.vertexId
+            if (isPolyVert && lastVertexTap?.id === h.handle.id && now - lastVertexTap.t < 400) {
+              lastVertexTap = null
+              tryRemoveShapeItemVertex(shapeEd, editor, curInfo.shapeItem, h.handle.vertexId!)
+            } else {
+              lastVertexTap = isPolyVert ? { id: h.handle.id, t: now } : null
+              gesture = {
+                kind: 'shapeHandle',
+                pointerId: e.pointerId,
+                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y]),
+                prevPop
+              }
+            }
+          } else if (curInfo?.shape && shapeEd) {
+            const sel = curInfo.shape
+            const isPolyVert = h.handle.kind === 'vertex' && sel.spec.kind === 'polygon'
+            if (isPolyVert && lastVertexTap?.id === h.handle.id && now - lastVertexTap.t < 400) {
+              lastVertexTap = null
+              tryRemovePolygonVertex(shapeEd, editor, sel, h.handle)
+            } else {
+              lastVertexTap = isPolyVert ? { id: h.handle.id, t: now } : null
+              gesture = {
+                kind: 'shapeHandle',
+                pointerId: e.pointerId,
+                controller: beginShapeHandle(shapeEd, editor, sel, h.handle, [w.x, w.y]),
+                prevPop
+              }
+            }
+          }
+        } else if (h?.kind === 'handle') {
           // Scale uniformly about the opposite corner.
           const b = h.box
           const xs = [b.minX, b.maxX, b.maxX, b.minX]
@@ -1067,7 +1216,32 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             }
           }
         } else if (h?.kind === 'body' && !locked) {
-          gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y }
+          // Tapping an edge or corner of the selected shape opens its contextual popover; dragging moves the shape.
+          const curInfo = selInfo()
+          const shapeEd = editor.features.shapeEditor
+          const tapTarget = shapeEd
+            ? (() => {
+                if (curInfo?.shapeItem) {
+                  const edge = shapeEd.hitItemEdge(curInfo.shapeItem, w.x, w.y, editor.camera.zoom)
+                  if (edge) return { kind: 'edge' as const, index: edge.index, ...(edge.id ? { targetId: edge.id } : {}) }
+                  return null
+                }
+                const shapeSel = curInfo?.shape ?? (curInfo?.line?.shape ? { spec: curInfo.line.shape, parts: [curInfo.line] } : null)
+                if (!shapeSel) return null
+                const corner = !shapeEd.usesVertexHandles(shapeSel.spec.kind) ? shapeEd.hitCorner(shapeSel.spec, p.x, p.y, editor.camera, reach()) : null
+                if (corner) return { kind: 'vertex' as const, index: corner.index }
+                const edge = shapeEd.hitEdge(shapeSel.spec, w.x, w.y, editor.camera.zoom)
+                if (edge) return { kind: 'edge' as const, index: edge.index }
+                return null
+              })()
+            : null
+          gesture = {
+            kind: 'move',
+            pointerId: e.pointerId,
+            startX: w.x,
+            startY: w.y,
+            ...(tapTarget ? { startSx: p.x, startSy: p.y, moved: false, tapTarget, prevPop } : {})
+          }
         } else if (eff === 'move') {
           // Quick move: grab whatever is under the pointer and drag it; empty space drags the board.
           const target = h ? null : hoverTarget(p.x, p.y)
@@ -1090,7 +1264,103 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         }
         hoverBox = null
       } else if (eff === 'shape') {
-        gesture = { kind: 'shape', pointerId: e.pointerId, tool: beginShape(toolContext, sampleAt(p.x, p.y)) }
+        // Right after inserting a shape it stays selected: grabbing any handle or tapping an edge edits it without switching tools.
+        const h = selectionHit(p.x, p.y)
+        const w = screenToWorld(editor.camera, p.x, p.y)
+        const curInfo = selInfo()
+        const shapeEd = editor.features.shapeEditor
+        const edgeTap = !h || h.kind === 'body'
+          ? shapeEd
+            ? (() => {
+                if (curInfo?.shapeItem) {
+                  const edge = shapeEd.hitItemEdge(curInfo.shapeItem, w.x, w.y, editor.camera.zoom)
+                  if (edge) return { kind: 'edge' as const, index: edge.index, ...(edge.id ? { targetId: edge.id } : {}) }
+                  return null
+                }
+                const shapeSel = curInfo?.shape ?? (curInfo?.line?.shape ? { spec: curInfo.line.shape, parts: [curInfo.line] } : null)
+                if (!shapeSel) return null
+                const corner = !shapeEd.usesVertexHandles(shapeSel.spec.kind) ? shapeEd.hitCorner(shapeSel.spec, p.x, p.y, editor.camera, reach()) : null
+                if (corner) return { kind: 'vertex' as const, index: corner.index }
+                const edge = shapeEd.hitEdge(shapeSel.spec, w.x, w.y, editor.camera.zoom)
+                if (edge) return { kind: 'edge' as const, index: edge.index }
+                return null
+              })()
+            : null
+          : null
+        if (h?.kind === 'shapeHandle') {
+          const now = performance.now()
+          if (curInfo?.shapeItem && shapeEd) {
+            const isPolyVert = h.handle.kind === 'vertex' && curInfo.shapeItem.geo.kind === 'polygon' && !!h.handle.vertexId
+            if (isPolyVert && lastVertexTap?.id === h.handle.id && now - lastVertexTap.t < 400) {
+              lastVertexTap = null
+              tryRemoveShapeItemVertex(shapeEd, editor, curInfo.shapeItem, h.handle.vertexId!)
+            } else {
+              lastVertexTap = isPolyVert ? { id: h.handle.id, t: now } : null
+              gesture = {
+                kind: 'shapeHandle',
+                pointerId: e.pointerId,
+                controller: beginShapeItemHandle(shapeEd, editor, curInfo.shapeItem, h.handle, [w.x, w.y]),
+                prevPop
+              }
+            }
+          } else if (curInfo?.shape && shapeEd) {
+            const sel = curInfo.shape
+            const isPolyVert = h.handle.kind === 'vertex' && sel.spec.kind === 'polygon'
+            if (isPolyVert && lastVertexTap?.id === h.handle.id && now - lastVertexTap.t < 400) {
+              lastVertexTap = null
+              tryRemovePolygonVertex(shapeEd, editor, sel, h.handle)
+            } else {
+              lastVertexTap = isPolyVert ? { id: h.handle.id, t: now } : null
+              gesture = {
+                kind: 'shapeHandle',
+                pointerId: e.pointerId,
+                controller: beginShapeHandle(shapeEd, editor, sel, h.handle, [w.x, w.y]),
+                prevPop
+              }
+            }
+          }
+        } else if (h?.kind === 'end') {
+          gesture = { kind: 'endpoint', pointerId: e.pointerId, original: h.item, current: h.item, which: h.which }
+        } else if (h?.kind === 'handle' && !editor.selectionLocked()) {
+          const b = h.box
+          const xs = [b.minX, b.maxX, b.maxX, b.minX]
+          const ys = [b.minY, b.minY, b.maxY, b.maxY]
+          const o = (h.corner + 2) % 4
+          gesture = { kind: 'scale', pointerId: e.pointerId, ax: xs[o], ay: ys[o], cx: xs[h.corner], cy: ys[h.corner] }
+        } else if (h?.kind === 'turn' && !editor.selectionLocked()) {
+          gesture = pressTurn(e.pointerId, h.box, p.x, p.y)
+        } else if (h?.kind === 'side') {
+          const sel = selInfo()?.shape
+          if (sel) {
+            const gid = sel.parts[0].groupId
+            const inUserGroup = !!gid && scene.getItems().some((i) => i.groupId === gid && !sel.parts.includes(i as StrokeItem))
+            gesture = {
+              kind: 'reshape',
+              pointerId: e.pointerId,
+              side: h.side,
+              spec: sel.spec,
+              parts: sel.parts,
+              current: sel.parts,
+              inUserGroup,
+              startX: w.x,
+              startY: w.y
+            }
+          }
+        } else if (edgeTap && !editor.selectionLocked()) {
+          gesture = {
+            kind: 'move',
+            pointerId: e.pointerId,
+            startX: w.x,
+            startY: w.y,
+            startSx: p.x,
+            startSy: p.y,
+            moved: false,
+            tapTarget: edgeTap,
+            prevPop
+          }
+        } else {
+          gesture = { kind: 'shape', pointerId: e.pointerId, tool: beginShape(toolContext, sampleAt(p.x, p.y)) }
+        }
       } else if (eff === 'brush') {
         const h = selectionHit(p.x, p.y)
         if (h?.kind === 'handle' && !editor.selectionLocked()) {
@@ -1251,6 +1521,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             angleLabel = { sx: p.x, sy: p.y, text: `${turnText(deg, lang === 'uk')} · ${cmText(next.size, translate(lang, 'instruments.cm'), lang === 'uk')}` }
           }
         } else if (g.kind === 'move') {
+          if (g.moved === false && g.startSx !== undefined && g.startSy !== undefined && Math.hypot(p.x - g.startSx, p.y - g.startSy) <= 4) {
+            return
+          }
+          g.moved = true
           const w = screenToWorld(editor.camera, p.x, p.y)
           editor.setPreview({ s: 1, ax: 0, ay: 0, dx: w.x - g.startX, dy: w.y - g.startY })
         } else if (g.kind === 'endpoint') {
@@ -1305,6 +1579,11 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const next = regenerateShape(g.parts, { ...sp, ax: x0, ay: y0, bx: x1, by: y1 }, () => scene.allocZ(), g.inUserGroup)
           scene.replace(g.current, next, false)
           g.current = next
+        } else if (g.kind === 'shapeHandle') {
+          const w = screenToWorld(editor.camera, p.x, p.y)
+          g.controller.move([w.x, w.y], { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey }, gridSteps())
+          const lbl = g.controller.label()
+          angleLabel = lbl ? { sx: p.x, sy: p.y, text: lbl } : null
         } else if (g.kind === 'scale') {
           const w = screenToWorld(editor.camera, p.x, p.y)
           const vx = g.cx - g.ax
@@ -1407,7 +1686,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const prevLine = hoverLine
         hoverLine = !picking ? null : hoverLine && nearEnd(hoverLine, p.x, p.y) !== null ? hoverLine : lineAt(p.x, p.y)
         if (prevLine !== hoverLine) invalidate(false)
-        if (prev !== hoverBox || tool === 'select' || tool === 'move') updateCssCursor()
+        if (prev !== hoverBox || tool === 'select' || tool === 'move' || tool === 'shape') updateCssCursor()
       }
       invalidate(false)
     }
@@ -1522,7 +1801,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         group: () => editor.groupSelection(),
         ungroup: () => editor.ungroupSelection(),
         delete: () => editor.deleteSelection(),
-        escape: () => editor.clearSelection(),
+        escape: () => (session.getState().shapePopover ? session.setState({ shapePopover: null }) : editor.clearSelection()),
         pen1: () => ui.selectPen(0),
         pen2: () => ui.selectPen(1),
         pen3: () => ui.selectPen(2),

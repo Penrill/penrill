@@ -1,58 +1,64 @@
 import { useState, type ReactNode } from 'react'
 import { BUILTIN_GRAPHS, DEFAULT_PLANE, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
-import { lineSvgPath } from '../engine/ink'
-import { isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, specParts, type ShapeKind } from '@penrill/core/shapes'
-import type { GraphItem, GraphParams } from '@penrill/core/types'
+import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
+import { evaluateShape } from '@penrill/core/shapeEval'
+import { isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
+import type { GraphItem, GraphParams, ShapeSpec } from '@penrill/core/types'
+import { PAPER, toSvg } from '@penrill/render/display'
+import { shapeDisplay } from '@penrill/shape-editor/shapeDisplay'
 import { useT, type MessageKey } from '../i18n'
 import { usePrefs, prefsStore } from '../store'
 import { CompassIcon, PolygonIcon, ProtractorIcon, RulerIcon, SetSquare45Icon, SetSquare60Icon } from './icons'
 import { shortcutKey } from '../shortcuts'
 import { PanelTitle } from './chrome'
 import { useEditor, useSession } from '../editorContext'
-import { TriangleCircleControls, type TriangleCircleOptions } from '../modules/strokes/TriangleCircleControls'
+import { ShapePopoverFooter, TriangleConstructionControls, type TriangleConstructionOptions } from '../modules/shapeEditor/ShapeEditorControls'
 
-/** Tiny SVG preview of a shape, drawn with the real outline code. */
-export function ShapePreview({ kind, base, circles }: { kind: ShapeKind; base?: number; circles?: TriangleCircleOptions }) {
+/** Tiny SVG preview of a shape, drawn with the unified shapeDisplay renderer. */
+export function ShapePreview({ kind, base, circles }: { kind: ShapeKind; base?: number; circles?: TriangleConstructionOptions }) {
   const linear = kind === 'line' || kind === 'arrow' || kind === 'doubleArrow'
-  const parts = specParts({ ...circles, kind, ax: 4, ay: linear ? 20 : 4, bx: 24, by: linear ? 8 : 24, base }, 1.2)
-  // A circumcircle can extend beyond the triangle's box.
-  const points = parts.flatMap((p) => p.points)
-  const x0 = Math.min(0, ...points.map((p) => p[0] - 2)), y0 = Math.min(0, ...points.map((p) => p[1] - 2))
-  const x1 = Math.max(28, ...points.map((p) => p[0] + 2)), y1 = Math.max(28, ...points.map((p) => p[1] + 2))
+  const spec: ShapeSpec = { ...circles, kind, ax: 4, ay: linear ? 20 : 4, bx: 24, by: linear ? 8 : 24, base }
+  const item = createShapeItem(specToShapeData(spec), { color: 'currentColor', size: 1.5, tool: 'pen' }, { id: 'preview', z: 0 })
+  const ev = evaluateShape(item)
+  const x0 = Math.min(0, ev.bounds.minX - 2)
+  const y0 = Math.min(0, ev.bounds.minY - 2)
+  const x1 = Math.max(28, ev.bounds.maxX + 2)
+  const y1 = Math.max(28, ev.bounds.maxY + 2)
+  const prim = shapeDisplay(item, { unit: 'cm', unitLabel: 'cm', comma: false })
+  const html = toSvg(prim, (c) => (c === PAPER ? 'transparent' : c))
   return (
-    <svg width="28" height="28" viewBox={`${x0} ${y0} ${x1 - x0} ${y1 - y0}`} aria-hidden>
-      {parts.map((part, i) => (
-        <path
-          key={i}
-          d={lineSvgPath(part.points)}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={part.dash ? 1.2 : 1.7}
-          strokeDasharray={part.dash ? '2.2 2' : undefined}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      ))}
-    </svg>
+    <svg
+      width="28"
+      height="28"
+      viewBox={`${x0} ${y0} ${x1 - x0} ${y1 - y0}`}
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   )
 }
 
-/** "Base: △ □ ⬠ ⬡ [n]": number of sides of a pyramid's / prism's base; any n can be typed. */
+/** "Base: △ □ ⬠ ⬡ [n]": number of sides of a pyramid's / prism's base, polygon sides or star points. */
 export function BaseRow({ kind, value, onChange }: { kind: ShapeKind; value: number; onChange: (n: number) => void }) {
   const t = useT()
   const [draft, setDraft] = useState<string | null>(null)
   const opts = SHAPE_BASES[kind]
   if (!opts) return null
   const custom = !opts.options.includes(value)
+  const labelKey: MessageKey = kind === 'polygon' ? 'shapes.sides' : kind === 'star' ? 'shapes.points' : 'shapes.base'
   const commit = (raw: string): void => {
     const n = Math.round(Number(raw))
     if (Number.isFinite(n) && n >= MIN_BASE && n <= MAX_BASE && n !== value) onChange(n)
   }
   return (
     <div className="base-row">
-      <span className="base-label">{t('shapes.base')}</span>
+      <span className="base-label">{t(labelKey)}</span>
       {opts.options.map((n) => (
-        <button key={n} className={`shape-btn small ${value === n ? 'active' : ''}`} title={t(`shapes.base${n}` as MessageKey)} onClick={() => onChange(n)}>
+        <button
+          key={n}
+          className={`shape-btn small ${value === n ? 'active' : ''}`}
+          title={kind === 'star' || n > 6 ? String(n) : t(`shapes.base${n}` as MessageKey)}
+          onClick={() => onChange(n)}
+        >
           <PolygonIcon n={n} />
         </button>
       ))}
@@ -117,11 +123,12 @@ export function ShapesPanel({ close }: { close: () => void }) {
         />
       )}
       {tool === 'shape' && isTriangle(shape) && (
-        <TriangleCircleControls
+        <TriangleConstructionControls
           value={circles}
           onChange={(patch) => prefsStore.setState((s) => ({ triangleCircles: { ...s.triangleCircles, ...patch } }))}
         />
       )}
+      <ShapePopoverFooter onOpenSettings={close} />
     </>
   )
 }

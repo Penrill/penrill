@@ -24,6 +24,7 @@ export interface LinePrim {
   y2: number
   width: number
   color: string
+  dash?: number[]
 }
 
 /** An open polyline, stroked. */
@@ -33,6 +34,7 @@ export interface PolylinePrim {
   width: number
   color: string
   join?: 'round'
+  dash?: number[]
 }
 
 /** A closed polygon, filled. */
@@ -40,6 +42,19 @@ export interface PolygonPrim {
   kind: 'polygon'
   pts: Point2[]
   color: string
+  opacity?: number
+}
+
+/** A circle, filled and/or stroked. */
+export interface CirclePrim {
+  kind: 'circle'
+  cx: number
+  cy: number
+  r: number
+  fill?: string
+  stroke?: string
+  width?: number
+  opacity?: number
 }
 
 export interface TextPrim {
@@ -64,10 +79,11 @@ export interface GroupPrim {
   fill?: string
   cap?: 'round'
   join?: 'round'
+  opacity?: number
   children: Prim[]
 }
 
-export type Prim = LinePrim | PolylinePrim | PolygonPrim | TextPrim | GroupPrim
+export type Prim = LinePrim | PolylinePrim | PolygonPrim | CirclePrim | TextPrim | GroupPrim
 
 /** Turns an item's colour into the one to draw on the current surface. */
 export type ColorMap = (color: string) => string
@@ -85,17 +101,28 @@ const BASELINE: Record<Baseline, string> = { alphabetic: 'alphabetic', top: 'han
 /** The display list as SVG markup (for SVG and PDF exports). */
 export function toSvg(p: Prim, color: ColorMap): string {
   const c = (v: string): string => escapeXml(color(v))
+  const dashAttr = (d?: number[]): string => (d?.length ? ` stroke-dasharray="${d.map(r2).join(' ')}"` : '')
   switch (p.kind) {
     case 'group': {
-      const attrs = (p.fill ? ` fill="${c(p.fill)}"` : '') + (p.cap ? ` stroke-linecap="${p.cap}"` : '') + (p.join ? ` stroke-linejoin="${p.join}"` : '')
+      const attrs =
+        (p.fill ? ` fill="${c(p.fill)}"` : '') +
+        (p.cap ? ` stroke-linecap="${p.cap}"` : '') +
+        (p.join ? ` stroke-linejoin="${p.join}"` : '') +
+        (p.opacity !== undefined && p.opacity !== 1 ? ` opacity="${r2(p.opacity)}"` : '')
       return `<g${attrs}>${p.children.map((ch) => toSvg(ch, color)).join('')}</g>`
     }
     case 'line':
-      return `<line x1="${r2(p.x1)}" y1="${r2(p.y1)}" x2="${r2(p.x2)}" y2="${r2(p.y2)}" stroke="${c(p.color)}" stroke-width="${r2(p.width)}"/>`
+      return `<line x1="${r2(p.x1)}" y1="${r2(p.y1)}" x2="${r2(p.x2)}" y2="${r2(p.y2)}" stroke="${c(p.color)}" stroke-width="${r2(p.width)}"${dashAttr(p.dash)}/>`
     case 'polygon':
-      return `<path d="${pathData(p.pts)}Z" fill="${c(p.color)}"/>`
+      return `<path d="${pathData(p.pts)}Z" fill="${c(p.color)}"${p.opacity !== undefined && p.opacity !== 1 ? ` fill-opacity="${r2(p.opacity)}"` : ''}/>`
     case 'polyline':
-      return `<path d="${pathData(p.pts)}" fill="none" stroke="${c(p.color)}" stroke-width="${r2(p.width)}"${p.join ? ` stroke-linejoin="${p.join}"` : ''}/>`
+      return `<path d="${pathData(p.pts)}" fill="none" stroke="${c(p.color)}" stroke-width="${r2(p.width)}"${p.join ? ` stroke-linejoin="${p.join}"` : ''}${dashAttr(p.dash)}/>`
+    case 'circle': {
+      const fill = p.fill ? c(p.fill) : 'none'
+      const stroke = p.stroke ? ` stroke="${c(p.stroke)}" stroke-width="${r2(p.width ?? 1)}"` : ''
+      const opacity = p.opacity !== undefined && p.opacity !== 1 ? ` opacity="${r2(p.opacity)}"` : ''
+      return `<circle cx="${r2(p.cx)}" cy="${r2(p.cy)}" r="${r2(p.r)}" fill="${fill}"${stroke}${opacity}/>`
+    }
     case 'text': {
       // Only non-default alignment is written: start / alphabetic are what SVG assumes.
       const align = p.align && p.align !== 'left' ? ` text-anchor="${ANCHOR[p.align]}"` : ''

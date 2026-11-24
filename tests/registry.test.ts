@@ -1,9 +1,10 @@
 // Feature modules and their registry (src/board/registry.ts, src/board/modules). Run: npm test
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import type { Point } from '@penrill/core/types'
 import { graphSvg } from '../src/board/engine/graph.ts'
-import { builtinModules, formulasModule, graphsModule, shapeRecognitionModule, strokesModule } from '../src/board/modules/index.ts'
+import { builtinModules, formulasModule, graphsModule, shapeEditorModule, shapeRecognitionModule, shapesModule, strokesModule } from '../src/board/modules/index.ts'
 import { FeatureRegistry } from '../src/board/registry.ts'
 import { sampleFormulas, sampleGraphs } from './fixtures/displaySamples.ts'
 
@@ -18,14 +19,28 @@ function roughCircle(r: number): Point[] {
   return pts
 }
 
-test('the built-in modules draw every item type and add both behaviours', () => {
+test('the built-in modules draw every item type and add all feature behaviours', () => {
   const reg = new FeatureRegistry(builtinModules)
-  for (const id of ['ink', 'images', 'text', 'graphs', 'formulas', 'shape-recognition']) assert.ok(reg.has(id), id)
+  for (const id of ['ink', 'shapes', 'images', 'text', 'graphs', 'formulas', 'shape-recognition', 'shape-editor']) assert.ok(reg.has(id), id)
   assert.ok(reg.strokeRecognizer)
   assert.ok(reg.formulaEvaluator)
+  assert.ok(reg.shapeEditor)
   // Exports go through the registry and match the item's own SVG.
   assert.equal(reg.svg(sampleGraphs[0]), graphSvg(sampleGraphs[0]))
   assert.match(reg.svg(sampleFormulas[0]), /^<g fill=/)
+  const cube = createShapeItem(specToShapeData({ kind: 'cube', ax: 0, ay: 0, bx: 120, by: 120 }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: 'c1', z: 1 })
+  const cubeSvg = reg.svg(cube)
+  assert.match(cubeSvg, /<line /)
+  assert.match(cubeSvg, /stroke-dasharray/)
+  assert.ok(new FeatureRegistry([shapesModule]).svg(cube).length > 0)
+})
+
+test('without the shape editor module no handles are exposed while shapes still render and export', () => {
+  const withoutIt = new FeatureRegistry([strokesModule])
+  assert.equal(withoutIt.shapeEditor, null)
+  const withIt = new FeatureRegistry([strokesModule, shapeEditorModule])
+  assert.ok(withIt.shapeEditor)
+  assert.equal(withIt.shapeEditor!.handles({ kind: 'triangle', ax: 0, ay: 0, bx: 100, by: 100 }).length, 3)
 })
 
 test('without the shape recognition module strokes are never snapped', () => {

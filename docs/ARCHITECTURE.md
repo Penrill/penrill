@@ -36,8 +36,9 @@ Workspace packages live in `packages/` and are imported by name with a module pa
 | Package | What it holds | Depends on |
 |---|---|---|
 | `@penrill/math` | Formula trees and editing (the keypad model), lexer, parser, evaluator | nothing |
-| `@penrill/core` | Item types, scene with undo and redo, camera, geometry, shape outlines, point erasing | math |
+| `@penrill/core` | Item types (including first-class `ShapeItem`), scene with undo and redo, camera, geometry, unified 2D/3D shape evaluators, point erasing | math |
 | `@penrill/shape-recognition` | Hold-to-snap: recognises circles, ovals, arcs, rectangles, squares and triangles in a stroke | core |
+| `@penrill/shape-editor` | Direct shape editing: 2D/3D handles, 3D orbit, magnetic snapping, unified elements API and `shapeDisplay` vector renderer | core, render |
 | `@penrill/render` | Display lists (what to draw, as data) and their SVG form | nothing |
 | `@penrill/render-canvas` | Draws display lists on a Canvas 2D context; the only package with the DOM types | render |
 
@@ -80,12 +81,14 @@ registry (`src/board/registry.ts`, `editor.features`):
 
 | Module | Brings |
 |---|---|
-| `ink` | stroke items (pen, highlighter, lines, shapes); shape creation and triangle circle controls in `modules/strokes` |
+| `ink` | stroke items (pen, highlighter, lines, legacy shapes); shape tool in `modules/strokes` |
+| `shapes` | first-class parametric 2D and 3D `ShapeItem` rendering via `@penrill/render/display` (`shapeDisplay`) |
 | `images` | image items |
 | `text` | text items |
 | `graphs` | graph items (number lines, planes, 3D axes) and their plots |
 | `formulas` | formula items, and the answer worked out while a formula is typed |
 | `shape-recognition` | hold-to-snap: a stroke held still becomes the clean shape it resembles |
+| `shape-editor` | direct on-canvas 2D and 3D shape editing: constrained/free vertex handles, 3D orbit & dimensions, magnetic snapping, vertex/edge popovers and settings in `modules/shapeEditor` |
 
 - The renderer, thumbnails and every export draw items with `editor.features.draw / svg`; none of
   them switch on the item type any more.

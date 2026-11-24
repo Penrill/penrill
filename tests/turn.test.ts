@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { applyXform, hitTest, xformBBox, xformPoint, type Xform } from '../src/board/engine/transform.ts'
-import type { ImageItem, StrokeItem } from '@penrill/core/types'
+import { buildShapeItems, editableShape } from '@penrill/core/shapeItems'
+import { specParts } from '@penrill/core/shapes'
+import type { ImageItem, ShapeSpec, StrokeItem } from '@penrill/core/types'
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6
 const quarter: Xform = { s: 1, ax: 0, ay: 0, dx: 0, dy: 0, r: Math.PI / 2 }
@@ -17,18 +19,28 @@ test('a turned box keeps its centre and swaps width and height', () => {
   assert.ok(near(b.minX, -5) && near(b.maxX, 5) && near(b.minY, -20) && near(b.maxY, 20))
 })
 
-test('ink turns point by point; a turned shape becomes plain lines', () => {
-  const s: StrokeItem = {
-    type: 'stroke', id: 's', z: 1, tool: 'pen', color: '#000', size: 2, pressure: false, geom: 'line',
-    points: [[0, 0, 0.5], [10, 0, 0.5]],
-    shape: { kind: 'rect', ax: 0, ay: 0, bx: 10, by: 10 },
-    bbox: { minX: -2, minY: -2, maxX: 12, maxY: 2 }
-  } as StrokeItem
-  const t = applyXform(s, quarter) as StrokeItem
-  assert.ok(near(t.points[1][0], 0) && near(t.points[1][1], 10))
-  assert.equal(t.shape, undefined)
-  // Only moved or scaled, a shape stays editable.
-  assert.ok((applyXform(s, { s: 2, ax: 0, ay: 0, dx: 0, dy: 0 }) as StrokeItem).shape)
+test('ink turns point by point; turned shapes keep editable specs and triangles transform their vertices', () => {
+  const rectSpec: ShapeSpec = { kind: 'rectangle', ax: 0, ay: 0, bx: 20, by: 10 }
+  const rect = buildShapeItems(rectSpec, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `r${i}`, z: i }))[0]
+  const turnedRect = applyXform(rect, quarter) as StrokeItem
+  assert.ok(turnedRect.shape)
+  assert.ok(near(turnedRect.shape!.rot!, Math.PI / 2))
+  const rebuiltRect = specParts(turnedRect.shape!, turnedRect.size)[0].points
+  turnedRect.points.forEach((p, i) => assert.ok(near(p[0], rebuiltRect[i][0]) && near(p[1], rebuiltRect[i][1])))
+  // Turning back by -90 deg restores an upright shape with no stored rot.
+  const uprightRect = applyXform(turnedRect, { ...quarter, r: -Math.PI / 2 }) as StrokeItem
+  assert.equal(uprightRect.shape?.rot, undefined)
+
+  // Rotating a triangle with incircle transforms its exact vertices so it stays editable and its circle matches.
+  const triSpec: ShapeSpec = { kind: 'triangle', ax: 0, ay: 0, bx: 100, by: 80, incircle: true }
+  const triParts = buildShapeItems(triSpec, { color: '#000', size: 2, tool: 'pen' }, (i) => ({ id: `t${i}`, z: i }))
+  const turnedTri = triParts.map((p) => applyXform(p, { s: 1, ax: 50, ay: 40, dx: 0, dy: 0, r: 0.7 }) as StrokeItem)
+  const ed = editableShape(turnedTri)
+  assert.ok(ed)
+  assert.equal(ed!.spec.vertices?.length, 3)
+  assert.equal(ed!.spec.rot, undefined)
+  const rebuiltTri = specParts(ed!.spec, 2)
+  turnedTri[0].points.forEach((p, i) => assert.ok(near(p[0], rebuiltTri[0].points[i][0]) && near(p[1], rebuiltTri[0].points[i][1])))
 })
 
 test('an image turns about the selection, adding up its own turn', () => {

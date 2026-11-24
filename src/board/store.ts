@@ -23,6 +23,27 @@ export type Tool = 'select' | 'brushSelect' | 'move' | 'pen' | 'highlighter' | '
 export type EraserMode = 'stroke' | 'point'
 /** What the plain mouse wheel does on the board. */
 export type WheelMode = 'scroll' | 'zoom'
+/** Unit used for shape length / dimension labels. */
+export type ShapeLengthUnit = 'cm' | 'cells'
+
+export interface ShapeDefaults {
+  showLabels: boolean
+  showAngles: boolean
+  showLengths: boolean
+  unit: ShapeLengthUnit
+}
+
+export const DEFAULT_SHAPE_DEFAULTS: ShapeDefaults = { showLabels: false, showAngles: false, showLengths: false, unit: 'cm' }
+
+function cleanShapeDefaults(v: unknown): ShapeDefaults {
+  const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+  return {
+    showLabels: o.showLabels === true,
+    showAngles: o.showAngles === true,
+    showLengths: o.showLengths === true,
+    unit: o.unit === 'cells' ? 'cells' : 'cm'
+  }
+}
 
 /** How long the pen is held still before a stroke snaps to a shape (ms). */
 export const SNAP_DELAY = { min: 500, max: 2000, default: 1000 }
@@ -134,10 +155,12 @@ export interface Prefs {
   formulaStyle: { color: string; size: number }
   /** Formulas put on boards lately, newest first (the keypad's history). */
   formulaHistory: Row[]
-  /** Chosen base (number of sides) for pyramids and prisms. */
+  /** Chosen base / side / point count for pyramids, prisms, polygons and stars. */
   shapeBases: Partial<Record<ShapeKind, number>>
   /** Circles to include when drawing a triangle. */
   triangleCircles: { incircle?: boolean; circumcircle?: boolean }
+  /** Default measurement display and unit for shapes (both off by default). */
+  shapeDefaults: ShapeDefaults
   /** The user's own coordinate-plane/line presets. */
   graphPresets: GraphPreset[]
   pens: InkSlot[]
@@ -175,6 +198,7 @@ export const prefsStore = createStore<Prefs>()(
     (set) => ({
       shapeBases: {},
       triangleCircles: {},
+      shapeDefaults: DEFAULT_SHAPE_DEFAULTS,
       selectRadius: 24,
       iPadFingerMode: null,
       pencilPressure: true,
@@ -240,6 +264,7 @@ export const prefsStore = createStore<Prefs>()(
               ? p.shapeSnapDelay
               : SNAP_DELAY.default,
           instruments: cleanInstrumentPrefs(p.instruments),
+          shapeDefaults: cleanShapeDefaults(p.shapeDefaults),
           toolbarLayout: cleanToolbarLayout(p.toolbarLayout),
           hiddenTips: Array.isArray(p.hiddenTips) ? p.hiddenTips.filter((x) => typeof x === 'string') : [],
           formulaHistory: cleanFormulaHistory(p.formulaHistory)
@@ -260,6 +285,7 @@ export const prefsStore = createStore<Prefs>()(
         graphPresets: s.graphPresets,
         shapeBases: s.shapeBases,
         triangleCircles: s.triangleCircles,
+        shapeDefaults: s.shapeDefaults,
         selectRadius: s.selectRadius,
         iPadFingerMode: s.iPadFingerMode,
         pencilPressure: s.pencilPressure,

@@ -1,5 +1,6 @@
 import type { Row } from '@penrill/math/formula'
-import type { Item, Point, ShapeSpec } from '@penrill/core/types'
+import type { ShapeKind } from '@penrill/core/shapes'
+import type { Camera, Item, Point, ShapeGeometry, ShapeItem, ShapeSpec, StrokeItem, Vec2 } from '@penrill/core/types'
 import { paint } from '@penrill/render-canvas/paint'
 import { toSvg, type Prim } from '@penrill/render/display'
 import type { NumericResult } from './engine/formulaexpr'
@@ -44,6 +45,113 @@ export interface FormulaEvaluator {
   result(rows: Row, comma: boolean): NumericResult | null
 }
 
+/** One interactive handle exposed on a selected shape by the shape-editor module. */
+export interface ShapeEditorHandle {
+  id: string
+  kind: 'vertex' | 'control' | 'addVertex' | 'orbit'
+  x: number
+  y: number
+  hint: string
+  cursor: 'crosshair' | 'grab' | 'ew-resize' | 'ns-resize' | 'pointer'
+  index?: number
+  vertexId?: string
+  draggable?: boolean
+}
+
+/** Subtle geometric snap guide drawn while dragging a shape handle. */
+export interface ShapeEditorGuide {
+  kind: 'line' | 'rightAngle'
+  points: Vec2[]
+}
+
+export interface ShapeEditorDragOptions {
+  shift: boolean
+  ctrl: boolean
+  alt: boolean
+  snapTol: number
+  gridStep: readonly [number, number]
+}
+
+export interface ShapeEditorDragResult {
+  spec: ShapeSpec
+  label: string | null
+  guides: ShapeEditorGuide[]
+  snapped: boolean
+}
+
+export interface ShapeEditorItemDragResult {
+  item: ShapeItem
+  label: string | null
+  guides: ShapeEditorGuide[]
+  snapped: boolean
+}
+
+export interface ShapeEditorEdgeTarget {
+  id?: string
+  index: number
+  a: Vec2
+  b: Vec2
+  mid: Vec2
+  length: number
+}
+
+export interface ShapeEditorCornerTarget {
+  index: number
+  x: number
+  y: number
+}
+
+export interface ShapeEditorOverlayState {
+  handles: readonly ShapeEditorHandle[]
+  hotHandle?: string | null
+  activeHandle?: string | null
+  hotEdge?: { a: Vec2; b: Vec2 } | null
+  activeEdge?: { a: Vec2; b: Vec2 } | null
+  guides?: readonly ShapeEditorGuide[] | null
+}
+
+/** Direct on-canvas shape editing feature (registered by the `shape-editor` module). */
+export interface ShapeEditorFeature {
+  // First-class ShapeItem API
+  itemHandles(item: ShapeItem): ShapeEditorHandle[]
+  isCustomizedItem(item: ShapeItem): boolean
+  isConstrained2d(item: ShapeItem): boolean
+  unlockFreeVertices(item: ShapeItem): ShapeItem
+  resetItemGeometry(item: ShapeItem): ShapeItem
+  switchItemKind(item: ShapeItem, nextKind: ShapeKind): ShapeItem
+  setItemSides(item: ShapeItem, sides: number): ShapeItem
+  hitItemEdge(item: ShapeItem, wx: number, wy: number, zoom: number): ShapeEditorEdgeTarget | null
+  dragItemHandle(
+    item: ShapeItem,
+    handleId: string,
+    pt: Vec2,
+    opts: ShapeEditorDragOptions,
+    dragStart?: { startWorld: Vec2; startGeo: ShapeGeometry }
+  ): ShapeEditorItemDragResult
+  insertItemVertex(item: ShapeItem, edgeIndex: number, pt: Vec2): { item: ShapeItem; vertexId: string } | null
+  removeItemVertex(item: ShapeItem, vertexId: string): ShapeItem | null
+  applyItemDefaults(item: ShapeItem, defaults: { showAngles: boolean; showLengths: boolean; showLabels: boolean }): ShapeItem
+  // Legacy v4-v11 StrokeItem.shape API
+  handles(spec: ShapeSpec): ShapeEditorHandle[]
+  usesVertexHandles(kind: ShapeKind): boolean
+  isCustomized(spec: ShapeSpec): boolean
+  resetGeometry(spec: ShapeSpec): ShapeSpec
+  hitHandle(handles: readonly ShapeEditorHandle[], sx: number, sy: number, cam: Camera, reach: number): ShapeEditorHandle | null
+  hitEdge(spec: ShapeSpec, wx: number, wy: number, zoom: number): ShapeEditorEdgeTarget | null
+  hitCorner(spec: ShapeSpec, sx: number, sy: number, cam: Camera, reach: number): ShapeEditorCornerTarget | null
+  dragHandle(spec: ShapeSpec, handleId: string, pt: Vec2, opts: ShapeEditorDragOptions): ShapeEditorDragResult
+  insertVertex(spec: ShapeSpec, edgeIndex: number, pt: Vec2): { spec: ShapeSpec; vertexIndex: number } | null
+  removeVertex(spec: ShapeSpec, vertexIndex: number): ShapeSpec | null
+  toggleVertexFeature(spec: ShapeSpec, vertexIndex: number, feature: 'altitude' | 'median' | 'bisector' | 'angle'): ShapeSpec
+  toggleEdgeFeature(spec: ShapeSpec, edgeIndex: number, feature: 'length' | 'altitude' | 'median'): ShapeSpec
+  toggleAllAngles(spec: ShapeSpec, on: boolean): ShapeSpec
+  toggleAllLengths(spec: ShapeSpec, on: boolean): ShapeSpec
+  applyDefaults(spec: ShapeSpec, defaults: { showAngles: boolean; showLengths: boolean }): ShapeSpec
+  formatLength(worldLen: number): string
+  annotationsDisplay(item: StrokeItem): Prim | null
+  drawOverlay(ctx: CanvasRenderingContext2D, cam: Camera, dpr: number, state: ShapeEditorOverlayState): void
+}
+
 export interface FeatureModule {
   id: string
   /** Notify this editor when an external resource changes the drawing. */
@@ -51,11 +159,13 @@ export interface FeatureModule {
   items?: { [K in Item['type']]?: ItemKind<ItemOf<K>> }
   strokeRecognizer?: StrokeRecognizer
   formulaEvaluator?: FormulaEvaluator
+  shapeEditor?: ShapeEditorFeature
 }
 
 export class FeatureRegistry {
   readonly strokeRecognizer: StrokeRecognizer | null = null
   readonly formulaEvaluator: FormulaEvaluator | null = null
+  readonly shapeEditor: ShapeEditorFeature | null = null
   readonly modules: readonly FeatureModule[]
   private readonly kinds = new Map<string, ItemKind>()
 
@@ -68,6 +178,7 @@ export class FeatureRegistry {
       }
       if (m.strokeRecognizer) this.strokeRecognizer = m.strokeRecognizer
       if (m.formulaEvaluator) this.formulaEvaluator = m.formulaEvaluator
+      if (m.shapeEditor) this.shapeEditor = m.shapeEditor
     }
   }
 
@@ -97,13 +208,21 @@ export class FeatureRegistry {
     }
     if (kind?.display) paint(ctx, kind.display(item), inkColors)
     else kind?.draw?.(ctx, item)
+    if (item.type === 'stroke' && item.shape && this.shapeEditor) {
+      const ann = this.shapeEditor.annotationsDisplay(item)
+      if (ann) paint(ctx, ann, inkColors)
+    }
     if (turn) ctx.restore()
   }
 
   /** One item as SVG markup (for SVG and PDF exports); empty when no module draws its type. */
   svg(item: Item): string {
     const kind = this.kinds.get(item.type)
-    const out = kind?.display ? toSvg(kind.display(item), inkColors) : (kind?.svg?.(item) ?? '')
+    let out = kind?.display ? toSvg(kind.display(item), inkColors) : (kind?.svg?.(item) ?? '')
+    if (item.type === 'stroke' && item.shape && this.shapeEditor) {
+      const ann = this.shapeEditor.annotationsDisplay(item)
+      if (ann) out += toSvg(ann, inkColors)
+    }
     const turn = itemTurn(item)
     if (!turn || !out) return out
     const r2 = (v: number): number => Math.round(v * 100) / 100

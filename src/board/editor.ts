@@ -12,6 +12,7 @@ import {
   type BoardFile
 } from './engine/serialize'
 import { editableShape, patchShapeSpec, regenerateShape } from '@penrill/core/shapeItems'
+import { shapeBBox } from '@penrill/core/shapeEval'
 import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
 import { bgPattern, withPattern } from './engine/surface'
 import { COMPASS_CELL } from './engine/compass'
@@ -19,7 +20,7 @@ import { CM } from './engine/straightedge'
 import { formatAll, formatRange, fullRuns, textBBox, textFields, trimRunsEnd } from './engine/text'
 import { isBlank } from '@penrill/math/formula'
 import { formulaBBox, formulaBox } from './engine/formulatype'
-import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@penrill/core/types'
+import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeItem, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@penrill/core/types'
 import { translate, type MessageKey } from './i18n'
 import { FeatureRegistry, type FeatureModule } from './registry'
 import { createSessionStore, type Session } from './session'
@@ -30,7 +31,8 @@ const CLIPBOARD_MIME = 'application/x-penrill'
 const LEGACY_CLIPBOARD_MIME = 'application/x-inkboard'
 
 /** Line ends fit any open line: freehand ink, straight lines, the Line shape (not closed shapes or arrows). */
-export const canHaveEnds = (s: StrokeItem): boolean => !s.shape || s.shape.kind === 'line'
+export const canHaveEnds = (s: StrokeItem | ShapeItem): boolean =>
+  s.type === 'shape' ? s.geo.kind === 'line' : !s.shape || s.shape.kind === 'line'
 /** Height the math keypad needs at the bottom of the window (px), with a little air above it. */
 const KEYPAD_ROOM = 330
 
@@ -75,7 +77,9 @@ export class Editor {
     })
     this.unsubscribe.push(
       prefsStore.subscribe((p, prev) => {
-        if (p.background !== prev.background) this.invalidate(true)
+        if (p.background !== prev.background || p.shapeDefaults.unit !== prev.shapeDefaults.unit || p.lang !== prev.lang) {
+          this.invalidate(true)
+        }
       }),
       this.session.subscribe((s, prev) => this.onSessionChange(s, prev))
     )
@@ -96,6 +100,9 @@ export class Editor {
     // The function panel belongs to one selected plane: close it when that plane stops being the selection.
     if (s.fnPanel && (s.selectedIds.length !== 1 || s.selectedIds[0] !== s.fnPanel.id || !s.active)) {
       this.session.setState({ fnPanel: null })
+    }
+    if (s.shapePopover && (s.selectedIds !== prev.selectedIds || s.tool !== prev.tool || !s.active)) {
+      this.session.setState({ shapePopover: null })
     }
     if (s.tool !== prev.tool) {
       // Picking a drawing tool means "done with the selection": drop it (lasso ↔ move keep it).
@@ -198,11 +205,27 @@ export class Editor {
     this.session.setState({ selectedIds: all.map((i) => i.id) })
   }
 
-  /** Change colour / width / pattern / ends of the selected lines (undoable). Ends don't go on closed shapes. */
+  /** Change colour / width / pattern / ends of the selected lines and shapes (undoable). Ends don't go on closed shapes. */
   restyleSelection(patch: { color?: string; size?: number; dash?: LineDash; startCap?: LineCap; endCap?: LineCap }): void {
-    const strokes = this.selectedItems().filter((i): i is StrokeItem => i.type === 'stroke' && !i.locked)
-    if (!strokes.length) return
-    const next = strokes.map((s) => {
+    const targets = this.selectedItems().filter((i): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.locked)
+    if (!targets.length) return
+    const next = targets.map((s): StrokeItem | ShapeItem => {
+      if (s.type === 'shape') {
+        const n: ShapeItem = { ...s }
+        if ('color' in patch && patch.color) n.color = patch.color
+        if ('size' in patch && patch.size) n.size = patch.size
+        if ('dash' in patch) {
+          if (patch.dash) n.dash = patch.dash
+          else delete n.dash
+        }
+        for (const k of ['startCap', 'endCap'] as const) {
+          if (!(k in patch) || !canHaveEnds(n)) continue
+          if (patch[k]) n[k] = patch[k]
+          else delete n[k]
+        }
+        n.bbox = shapeBBox(n)
+        return n
+      }
       const n: StrokeItem = { ...s }
       if ('color' in patch && patch.color) n.color = patch.color
       if ('size' in patch && patch.size) {
@@ -220,7 +243,7 @@ export class Editor {
       }
       return n
     })
-    this.scene.replace(strokes, next)
+    this.scene.replace(targets, next)
   }
 
   // ---------------------------------------------------------------- text
@@ -490,11 +513,33 @@ export class Editor {
     )
   }
 
+  /** Replace the selected first-class ShapeItem (undoable). */
+  replaceShapeItem(next: ShapeItem): void {
+    const sel = this.selectedItems()
+    if (sel.length !== 1 || sel[0].type !== 'shape' || sel[0].locked) return
+    this.scene.replace([sel[0]], [next])
+    this.setSelection([next])
+  }
+
   /** Change the selected shape: another kind, another base, or another box (undoable). */
   updateShape(patch: Partial<ShapeSpec>): void {
+    const sel = this.selectedItems()
+    if (sel.length === 1 && sel[0].type === 'shape' && !sel[0].locked && this.features.shapeEditor) {
+      let cur = sel[0]
+      if (patch.kind && patch.kind !== cur.geo.kind) cur = this.features.shapeEditor.switchItemKind(cur, patch.kind)
+      if (patch.base !== undefined) cur = this.features.shapeEditor.setItemSides(cur, patch.base)
+      if (cur !== sel[0]) this.replaceShapeItem(cur)
+      return
+    }
+    const legacy = editableShape(sel)
+    if (!legacy || legacy.parts.some((p) => p.locked)) return
+    this.replaceShape(patchShapeSpec(legacy.spec, patch))
+  }
+
+  /** Replace the selected shape's full spec (e.g. geometry reset from the shape-editor module). */
+  replaceShape(spec: ShapeSpec): void {
     const sel = editableShape(this.selectedItems())
     if (!sel || sel.parts.some((p) => p.locked)) return
-    const spec = patchShapeSpec(sel.spec, patch)
     const gid = sel.parts[0].groupId
     const inUserGroup = !!gid && this.scene.getItems().some((i) => i.groupId === gid && !sel.parts.includes(i as StrokeItem))
     const next = regenerateShape(sel.parts, spec, () => this.scene.allocZ(), inUserGroup)

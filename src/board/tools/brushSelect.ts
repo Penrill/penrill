@@ -1,4 +1,5 @@
 import { bboxIntersects, circleHitsPolyline } from '@penrill/core/geometry'
+import { evaluateShape } from '@penrill/core/shapeEval'
 import type { Item } from '@penrill/core/types'
 import type { Gesture, Modifiers, Sample, ToolContext } from './types'
 
@@ -9,6 +10,7 @@ export function itemsTouched(items: readonly Item[], x0: number, y0: number, x1:
   const hit: Item[] = []
   for (const item of items) {
     if (!bboxIntersects(item.bbox, box)) continue
+    const shapePaths = item.type === 'shape' ? evaluateShape(item).hitPaths : null
     for (let i = 0; i <= steps; i++) {
       const t = i / steps
       const cx = x0 + (x1 - x0) * t
@@ -16,7 +18,9 @@ export function itemsTouched(items: readonly Item[], x0: number, y0: number, x1:
       const touches =
         item.type === 'stroke'
           ? circleHitsPolyline(cx, cy, r + item.size / 2, item.points)
-          : cx + r >= item.bbox.minX && cx - r <= item.bbox.maxX && cy + r >= item.bbox.minY && cy - r <= item.bbox.maxY
+          : item.type === 'shape' && shapePaths
+            ? shapePaths.some((path) => circleHitsPolyline(cx, cy, r + item.size / 2, path))
+            : cx + r >= item.bbox.minX && cx - r <= item.bbox.maxX && cy + r >= item.bbox.minY && cy - r <= item.bbox.maxY
       if (touches) {
         hit.push(item)
         break

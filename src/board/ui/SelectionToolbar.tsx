@@ -4,7 +4,7 @@ import { SELECTION_PAD } from '../engine/renderer'
 import { editableShape } from '@penrill/core/shapeItems'
 import { isLinear, isTriangle, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
 import { fullRuns, TEXT_SIZES } from '../engine/text'
-import type { FormulaItem, StrokeItem, TextItem } from '@penrill/core/types'
+import type { FormulaItem, ShapeItem, StrokeItem, TextItem } from '@penrill/core/types'
 import { useT, type MessageKey } from '../i18n'
 import { PEN_COLORS, PEN_SIZES } from '../store'
 import { DuplicateIcon, FitIcon, FormulaIcon, FunctionIcon, GearIcon, GroupIcon, LockIcon, ShapesIcon, StyleIcon, TextIcon, TrashIcon, UngroupIcon, UnlockIcon } from './icons'
@@ -13,7 +13,7 @@ import { LineStyleControls, SizeSlider } from './LineStyle'
 import { fitBox, screenArea } from './dock'
 import { Popover } from './Popover'
 import { useEditor, useSession } from '../editorContext'
-import { TriangleCircleControls } from '../modules/strokes/TriangleCircleControls'
+import { ShapeItemEditorControls, ShapeMeasurementControls, ShapePopoverFooter, TriangleConstructionControls } from '../modules/shapeEditor/ShapeEditorControls'
 
 /** Small floating action bar above the current selection (like Whiteboard's context menu). */
 export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'below') => ReactNode }) {
@@ -44,26 +44,28 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   // Formulas that are functions (y = x², f(t) = …) can be plotted on a new plane next to them.
   const plots = items.some((i) => i.type === 'formula') ? editor.selectedPlots().length : 0
   const graph = !anyLocked && items.length === 1 && items[0].type === 'graph' ? items[0] : null
-  const shape = anyLocked ? null : editableShape(items)
+  const shapeItem = !anyLocked && items.length === 1 && items[0].type === 'shape' ? items[0] : null
+  const legacyShape = anyLocked || shapeItem ? null : editableShape(items)
+  const activeKind = shapeItem?.geo.kind ?? legacyShape?.spec.kind ?? null
   // Shapes can be switched within their family: lines, flat shapes, solids.
-  const family: readonly ShapeKind[] = !shape
+  const family: readonly ShapeKind[] = !activeKind
     ? []
-    : isLinear(shape.spec.kind)
+    : isLinear(activeKind)
       ? SHAPES_2D.filter((k) => isLinear(k))
-      : (SHAPES_3D as readonly ShapeKind[]).includes(shape.spec.kind)
+      : (SHAPES_3D as readonly ShapeKind[]).includes(activeKind)
         ? SHAPES_3D
         : SHAPES_2D.filter((k) => !isLinear(k))
   const firstGroup = items[0]?.groupId
   const oneGroup = !!firstGroup && items.every((i) => i.groupId === firstGroup)
   const canGroup = items.length >= 2 && !oneGroup
-  // A solid's own group (its edges) isn't something to ungroup; that would only break the shape.
+  // A legacy solid's own group (its edges) isn't something to ungroup; that would only break the shape.
   const anyShape = editableShape(items)
   const shapeGid = anyShape?.parts[0].groupId
   const ownShapeGroup = !!shapeGid && editor.scene.getItems().filter((i) => i.groupId === shapeGid).length === anyShape!.parts.length
   const canUngroup = items.some((i) => i.groupId) && !ownShapeGroup
-  const strokes = items.filter((i): i is StrokeItem => i.type === 'stroke' && !i.locked)
-  const first = strokes[0]
-  const hasStraight = strokes.some(canHaveEnds)
+  const lineItems = items.filter((i): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.locked)
+  const first = lineItems[0]
+  const hasStraight = lineItems.some(canHaveEnds)
   const firstText = items.find((i): i is TextItem => i.type === 'text' && !i.locked)
   const firstFormula = items.find((i): i is FormulaItem => i.type === 'formula' && !i.locked)
   /** What the style panel shows the colour and size of. */
@@ -115,7 +117,7 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
           <div className="sep" />
         </>
       )}
-      {shape && (
+      {(shapeItem || legacyShape) && activeKind && (
         <div className="menu-anchor">
           <button data-popover-anchor className="labeled-btn" title={t('sel.shapeTitle')} onClick={() => setShaping((v) => !v)}>
             <ShapesIcon />
@@ -126,24 +128,49 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
                 {family.map((k) => (
                   <button
                     key={k}
-                    className={`shape-btn ${shape.spec.kind === k ? 'active' : ''}`}
+                    className={`shape-btn ${activeKind === k ? 'active' : ''}`}
                     title={t(`shape.${k}` as MessageKey)}
                     onClick={() => editor.updateShape({ kind: k })}
                   >
-                    <ShapePreview kind={k} base={k === shape.spec.kind ? shape.spec.base : undefined} circles={isTriangle(k) ? shape.spec : undefined} />
+                    <ShapePreview
+                      kind={k}
+                      base={k === activeKind ? (shapeItem?.geo.sides ?? legacyShape?.spec.base) : undefined}
+                      circles={
+                        isTriangle(k)
+                          ? shapeItem
+                            ? {
+                                incircle: shapeItem.constructions?.some((c) => c.kind === 'incircle'),
+                                circumcircle: shapeItem.constructions?.some((c) => c.kind === 'circumcircle')
+                              }
+                            : legacyShape?.spec
+                          : undefined
+                      }
+                    />
                   </button>
                 ))}
               </div>
-              {SHAPE_BASES[shape.spec.kind] && (
+              {SHAPE_BASES[activeKind] && (
                 <BaseRow
-                  kind={shape.spec.kind}
-                  value={shape.spec.base ?? SHAPE_BASES[shape.spec.kind]!.def}
+                  kind={activeKind}
+                  value={(shapeItem?.geo.sides ?? legacyShape?.spec.base) ?? SHAPE_BASES[activeKind]!.def}
                   onChange={(n) => editor.updateShape({ base: n })}
                 />
               )}
-              {isTriangle(shape.spec.kind) && (
-                <TriangleCircleControls value={shape.spec} onChange={(patch) => editor.updateShape(patch)} />
-              )}
+              {shapeItem ? (
+                <ShapeItemEditorControls
+                  item={shapeItem}
+                  onChange={(next) => editor.replaceShapeItem(next)}
+                  onOpenSettings={closeShape}
+                />
+              ) : legacyShape ? (
+                <>
+                  {isTriangle(legacyShape.spec.kind) && (
+                    <TriangleConstructionControls value={legacyShape.spec} onChange={(patch) => editor.updateShape(patch)} />
+                  )}
+                  <ShapeMeasurementControls spec={legacyShape.spec} onChange={(next) => editor.replaceShape(next)} />
+                  <ShapePopoverFooter spec={legacyShape.spec} onReset={(next) => editor.replaceShape(next)} onOpenSettings={closeShape} />
+                </>
+              ) : null}
             </Popover>
           )}
         </div>

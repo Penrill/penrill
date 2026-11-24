@@ -2,7 +2,9 @@ import type { FeatureModule } from '../registry'
 import { formulasModule } from './formulas'
 import { graphsModule } from './graphs'
 import { imagesModule } from './images'
+import { shapeEditorModule } from './shapeEditor'
 import { shapeRecognitionModule } from './shapeRecognition'
+import { shapesModule } from './shapes'
 import { strokesModule } from './strokes'
 import { textModule } from './text'
 
@@ -13,11 +15,13 @@ import { textModule } from './text'
  */
 export const builtinModules: readonly FeatureModule[] = [
   strokesModule,
+  shapesModule,
   imagesModule,
   textModule,
   graphsModule,
   formulasModule,
-  shapeRecognitionModule
+  shapeRecognitionModule,
+  shapeEditorModule
 ]
 
-export { formulasModule, graphsModule, imagesModule, shapeRecognitionModule, strokesModule, textModule }
+export { formulasModule, graphsModule, imagesModule, shapeEditorModule, shapeRecognitionModule, shapesModule, strokesModule, textModule }

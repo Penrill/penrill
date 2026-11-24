@@ -1,5 +1,5 @@
 import * as Headless from '@headlessui/react'
-import { BeakerIcon, Cog6ToothIcon, InformationCircleIcon, LinkIcon, LinkSlashIcon, PencilIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
+import { BeakerIcon, Cog6ToothIcon, CubeIcon, InformationCircleIcon, LinkIcon, LinkSlashIcon, PencilIcon, Squares2X2Icon, CircleStackIcon, XMarkIcon } from '@heroicons/react/20/solid'
 import { Dialog, DialogTitle } from '@penrill/ui/dialog'
 import { Select } from '@penrill/ui/select'
 import { Switch } from '@penrill/ui/switch'
@@ -15,6 +15,7 @@ import { LANGUAGES, useT, type Lang, type MessageKey } from '../i18n'
 import { type PenAction, type PenButtons, type ThemePref, type WheelMode, SNAP_DELAY, prefsStore, usePrefs } from '../store'
 import { DEFAULT_TOOLBAR, isToolShown, withToolShown, type ToolbarToolId } from '../toolbarLayout'
 import { isIPad } from '../tools/penInput'
+import { ShapeSettingsGroup } from '../modules/shapeEditor/ShapeSettingsGroup'
 import { Segmented } from './chrome'
 
 /** One setting: its name (and a line about it) on the left, the control on the right. */
@@ -317,6 +318,8 @@ function ExperimentalSettings() {
 export interface SettingsDialogProps {
   open: boolean
   onClose: () => void
+  /** When opened via a direct link (e.g. from Shapes), focus General and scroll to that group. */
+  focusSection?: 'general' | 'shapes' | null
   /** App-provided sections (backup folder, version and updates); left out where they don't apply. */
   storageSettings?: ReactNode
   about?: ReactNode
@@ -327,8 +330,11 @@ export interface SettingsDialogProps {
 }
 
 /** Settings of the app, not of one board: a dialog with its sections listed on the left. */
-export function SettingsDialog({ open, onClose, storageSettings, about, fixedLanguage, hideExperimental, templates = false }: SettingsDialogProps) {
+export function SettingsDialog({ open, onClose, focusSection, storageSettings, about, fixedLanguage, hideExperimental, templates = false }: SettingsDialogProps) {
+  const editor = useEditor()
   const t = useT()
+  const hasShapeEditor = !!editor.features.shapeEditor
+  const [selectedIndex, setSelectedIndex] = useState(0)
   const [vertical, setVertical] = useState(() => window.matchMedia('(min-width: 40rem)').matches)
   useEffect(() => {
     if (!open) return
@@ -341,15 +347,22 @@ export function SettingsDialog({ open, onClose, storageSettings, about, fixedLan
   const sections: { id: string; label: MessageKey; icon: ReactNode; content: ReactNode }[] = [
     { id: 'general', label: 'settings.general', icon: <Cog6ToothIcon />, content: <GeneralSettings fixedLanguage={fixedLanguage} /> },
     { id: 'pen', label: 'settings.pen', icon: <PencilIcon />, content: <PenAndMouseSettings /> },
+    ...(hasShapeEditor ? [{ id: 'shapes', label: 'shapes.title' as MessageKey, icon: <CubeIcon />, content: <ShapeSettingsGroup /> }] : []),
     { id: 'toolbar', label: 'settings.toolbar', icon: <Squares2X2Icon />, content: <ToolbarSettings templates={templates} /> }
   ]
   if (storageSettings) sections.push({ id: 'storage', label: 'settings.storage', icon: <CircleStackIcon />, content: storageSettings })
   if (!hideExperimental) sections.push({ id: 'experimental', label: 'settings.experimental', icon: <BeakerIcon />, content: <ExperimentalSettings /> })
   if (about) sections.push({ id: 'about', label: 'settings.about', icon: <InformationCircleIcon />, content: about })
 
+  useEffect(() => {
+    if (!open || !focusSection) return
+    const idx = sections.findIndex((s) => s.id === focusSection)
+    setSelectedIndex(idx >= 0 ? idx : 0)
+  }, [open, focusSection, hasShapeEditor])
+
   return (
     <Dialog open={open} onClose={onClose} size="3xl" className="relative overflow-hidden p-0!">
-      <Headless.TabGroup vertical={vertical} className="flex max-sm:flex-col sm:h-[min(36rem,calc(100dvh-8rem))]">
+      <Headless.TabGroup selectedIndex={selectedIndex} onChange={setSelectedIndex} vertical={vertical} className="flex max-sm:flex-col sm:h-[min(36rem,calc(100dvh-8rem))]">
         <div className="shrink-0 border-zinc-950/5 bg-zinc-50 p-3 max-sm:border-b sm:w-56 sm:border-r dark:border-white/5 dark:bg-white/2.5">
           <DialogTitle className="px-2 pt-2 pb-4">{t('settings.title')}</DialogTitle>
           <Headless.TabList className="flex gap-0.5 max-sm:overflow-x-auto sm:flex-col">

@@ -1,6 +1,7 @@
 import { splitStroke } from '@penrill/core/erase'
 import { bboxIntersects, circleHitsPolyline, newId } from '@penrill/core/geometry'
 import type { Scene } from '@penrill/core/scene'
+import { evaluateShape } from '@penrill/core/shapeEval'
 import { shapeMembers } from '@penrill/core/shapeItems'
 import type { Item, StrokeItem } from '@penrill/core/types'
 import type { EraserMode } from '../store'
@@ -57,11 +58,26 @@ export function eraseAlong(scene: Scene, x0: number, y0: number, x1: number, y1:
     record.added.push(...pieces)
     return
   }
-  // Sample along the eraser movement so fast swipes don't skip strokes.
+  // Sample along the eraser movement so fast swipes don't skip strokes or shapes.
   const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (r * 0.5)))
   const hit = new Set<Item>()
   for (const item of items) {
-    if (item.type !== 'stroke' || item.locked || hit.has(item) || !bboxIntersects(item.bbox, box)) continue
+    if (item.locked || hit.has(item) || !bboxIntersects(item.bbox, box)) continue
+    if (item.type === 'shape') {
+      const rr = r + item.size / 2
+      const paths = evaluateShape(item).hitPaths
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps
+        const px = x0 + (x1 - x0) * t
+        const py = y0 + (y1 - y0) * t
+        if (paths.some((path) => circleHitsPolyline(px, py, rr, path))) {
+          hit.add(item)
+          break
+        }
+      }
+      continue
+    }
+    if (item.type !== 'stroke') continue
     const rr = r + item.size / 2
     for (let i = 0; i <= steps; i++) {
       const t = i / steps

@@ -1,5 +1,7 @@
-import type { Point, ShapeSpec } from './types'
+import { turnPoint } from './geometry'
+import type { LineDash, Point, ShapeSpec, Vec2 } from './types'
 import { triangleCircles } from './triangleCircles'
+import { triangleAltitudes, triangleBisectors, triangleMedians } from './triangleConstructions'
 
 export const SHAPES_2D = [
   'line',
@@ -14,36 +16,44 @@ export const SHAPES_2D = [
   'trapezoid',
   'pentagon',
   'hexagon',
+  'polygon',
   'star'
 ] as const
 export const SHAPES_3D = ['cube', 'prism', 'pyramid', 'obliquePyramid', 'cylinder', 'cone', 'sphere'] as const
 export const SHAPES = [...SHAPES_2D, ...SHAPES_3D] as const
 export type ShapeKind = (typeof SHAPES)[number]
 
-/** One polyline of a shape; 3D solids draw hidden edges dashed. */
+/** One polyline of a shape; 3D solids and triangle constructions draw auxiliary edges dashed or dotted. */
 export interface ShapePart {
   points: Point[]
-  dash?: 'dashed'
+  dash?: LineDash
 }
 
 const LINEAR: ReadonlySet<ShapeKind> = new Set(['line', 'arrow', 'doubleArrow'])
 
-/** Limits for a solid's base (number of sides); the base row also lets you type any n in between. */
+/** Limits for polygon sides, star points and a solid's base (number of sides). */
 export const MIN_BASE = 3
 export const MAX_BASE = 24
 
-/** Solids whose base can be chosen (number of sides) and the default. */
+/** Shapes with a configurable side/point count and their quick presets and default. */
 export const SHAPE_BASES: Partial<Record<ShapeKind, { options: number[]; def: number }>> = {
   pyramid: { options: [3, 4, 5, 6], def: 4 },
   obliquePyramid: { options: [3, 4, 5, 6], def: 4 },
-  prism: { options: [3, 4, 5, 6], def: 3 }
+  prism: { options: [3, 4, 5, 6], def: 3 },
+  polygon: { options: [3, 4, 5, 6], def: 5 },
+  star: { options: [4, 5, 6, 8], def: 5 }
 }
 
 export const isShapeKind = (k: unknown): k is ShapeKind => typeof k === 'string' && (SHAPES as readonly string[]).includes(k)
 export const isTriangle = (k: ShapeKind): boolean => k === 'triangle' || k === 'rightTriangle'
+export const isVertexShape = (k: ShapeKind): boolean => isTriangle(k) || k === 'polygon'
+
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+const clampBase = (n: number | undefined, def: number): number =>
+  n !== undefined && Number.isFinite(n) ? Math.max(MIN_BASE, Math.min(MAX_BASE, Math.round(n))) : def
 
 /**
- * The box a drag from a to b really produces: with `keep` (Shift) lines snap to 45° and boxes become
+ * The box a drag from a to b really produces: with `keep` (Shift) lines snap to 45 deg and boxes become
  * squares. Stored in the shape spec so the shape can be re-generated later.
  */
 export function shapeBox(kind: ShapeKind, ax: number, ay: number, bx: number, by: number, keep: boolean): [number, number, number, number] {
@@ -56,29 +66,157 @@ export function shapeBox(kind: ShapeKind, ax: number, ay: number, bx: number, by
   return [ax, ay, ax + Math.sign(bx - ax || 1) * s, ay + Math.sign(by - ay || 1) * s]
 }
 
+/** Bounding box of a list of 2D vertices. */
+export function boxOfVertices(verts: readonly Vec2[]): { ax: number; ay: number; bx: number; by: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const [x, y] of verts) {
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (x > maxX) maxX = x
+    if (y > maxY) maxY = y
+  }
+  return { ax: minX, ay: minY, bx: maxX, by: maxY }
+}
+
+/** Exact world vertices for vertex-driven shapes (`triangle`, `rightTriangle`, `polygon`). */
+export function shapeVertices(spec: ShapeSpec): Vec2[] {
+  if (isTriangle(spec.kind)) {
+    if (spec.vertices?.length === 3) return spec.vertices.map(([x, y]) => [x, y])
+    const x0 = Math.min(spec.ax, spec.bx), x1 = Math.max(spec.ax, spec.bx)
+    const y0 = Math.min(spec.ay, spec.by), y1 = Math.max(spec.ay, spec.by)
+    const cx = (x0 + x1) / 2
+    const base: Vec2[] = spec.kind === 'rightTriangle' ? [[x0, y0], [x0, y1], [x1, y1]] : [[cx, y0], [x1, y1], [x0, y1]]
+    if (spec.rot) {
+      const cy = (y0 + y1) / 2
+      return base.map(([x, y]) => turnPoint(x, y, cx, cy, spec.rot!))
+    }
+    return base
+  }
+  if (spec.kind === 'polygon') {
+    if (spec.vertices && spec.vertices.length >= MIN_BASE) return spec.vertices.map(([x, y]) => [x, y])
+    const x0 = Math.min(spec.ax, spec.bx), x1 = Math.max(spec.ax, spec.bx)
+    const y0 = Math.min(spec.ay, spec.by), y1 = Math.max(spec.ay, spec.by)
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+    const rx = (x1 - x0) / 2, ry = (y1 - y0) / 2
+    const n = clampBase(spec.base, SHAPE_BASES.polygon!.def)
+    const rot = -Math.PI / 2 + (n === 4 ? Math.PI / 4 : 0)
+    const verts: Vec2[] = []
+    for (let i = 0; i < n; i++) {
+      const a = rot + (i / n) * Math.PI * 2
+      const pt: Vec2 = [cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]
+      verts.push(spec.rot ? turnPoint(pt[0], pt[1], cx, cy, spec.rot) : pt)
+    }
+    return verts
+  }
+  return []
+}
+
+const POLYGONAL_2D: ReadonlySet<ShapeKind> = new Set([
+  'rectangle',
+  'triangle',
+  'rightTriangle',
+  'rhombus',
+  'parallelogram',
+  'trapezoid',
+  'pentagon',
+  'hexagon',
+  'polygon'
+])
+
+/** Ordered world-space corner vertices for any polygonal 2D shape (empty for curves, stars, lines and 3D solids). */
+export function shapePolygonVertices(spec: ShapeSpec): Vec2[] {
+  if (!POLYGONAL_2D.has(spec.kind)) return []
+  if (isVertexShape(spec.kind)) return shapeVertices(spec)
+  const pts = shapeOutline(spec.kind, spec.ax, spec.ay, spec.bx, spec.by, false, 0, spec)
+  // Closed outlines repeat their first point at the end.
+  const open = pts.length > 1 ? pts.slice(0, -1) : pts
+  const cx = (spec.ax + spec.bx) / 2
+  const cy = (spec.ay + spec.by) / 2
+  return open.map(([x, y]): Vec2 => (spec.rot ? turnPoint(x, y, cx, cy, spec.rot) : [x, y]))
+}
+
+/** Ordered world-space edges for any polygonal 2D shape or straight linear shape. */
+export function shapeEdges(spec: ShapeSpec): { index: number; a: Vec2; b: Vec2 }[] {
+  if (LINEAR.has(spec.kind)) {
+    return [{ index: 0, a: [spec.ax, spec.ay], b: [spec.bx, spec.by] }]
+  }
+  const verts = shapePolygonVertices(spec)
+  if (verts.length < 2) return []
+  return verts.map((a, i) => ({ index: i, a, b: verts[(i + 1) % verts.length] }))
+}
+
+const P = (x: number, y: number): Point => [x, y, 0.5]
+
 /** All parts of a stored shape. */
 export function specParts(spec: ShapeSpec, size: number): ShapePart[] {
-  const parts = shapeParts(spec.kind, spec.ax, spec.ay, spec.bx, spec.by, false, size, spec.base)
-  if (isTriangle(spec.kind) && (spec.incircle || spec.circumcircle)) {
-    const [a, b, c] = parts[0].points
-    const circles = triangleCircles(a, b, c)
-    if (circles) {
-      for (const key of ['incircle', 'circumcircle'] as const) {
-        if (!spec[key]) continue
-        const { x, y, radius } = circles[key]
-        parts.push({ points: ellipseArc(x, y, radius, radius, 0, Math.PI * 2, 128) })
+  if (isTriangle(spec.kind)) {
+    const verts = shapeVertices(spec)
+    const pts = [...verts.map(([x, y]) => P(x, y)), P(verts[0][0], verts[0][1])]
+    const parts: ShapePart[] = [{ points: pts }]
+    const [a, b, c] = pts
+    if (spec.incircle || spec.circumcircle) {
+      const circles = triangleCircles(a, b, c)
+      if (circles) {
+        for (const key of ['incircle', 'circumcircle'] as const) {
+          if (!spec[key]) continue
+          const { x, y, radius } = circles[key]
+          parts.push({ points: ellipseArc(x, y, radius, radius, 0, Math.PI * 2, 128) })
+        }
       }
     }
+    if (spec.altitudeAt?.length) parts.push(...triangleAltitudes(a, b, c, spec.altitudeAt, size))
+    if (spec.medianAt?.length) parts.push(...triangleMedians(a, b, c, spec.medianAt))
+    if (spec.bisectorAt?.length) parts.push(...triangleBisectors(a, b, c, spec.bisectorAt))
+    return parts
+  }
+  if (spec.kind === 'polygon') {
+    const verts = shapeVertices(spec)
+    return [{ points: [...verts.map(([x, y]) => P(x, y)), P(verts[0][0], verts[0][1])] }]
+  }
+  const parts = shapePartsFromSpec(spec, size)
+  if (spec.rot && !LINEAR.has(spec.kind)) {
+    const cx = (spec.ax + spec.bx) / 2
+    const cy = (spec.ay + spec.by) / 2
+    const r = spec.rot
+    return parts.map((part) => ({
+      ...part,
+      points: part.points.map(([x, y, pr]): Point => [...turnPoint(x, y, cx, cy, r), pr])
+    }))
   }
   return parts
 }
 
-export function sameSpec(a: ShapeSpec | undefined, b: ShapeSpec | undefined): boolean {
-  return !!a && !!b && a.kind === b.kind && a.ax === b.ax && a.ay === b.ay && a.bx === b.bx && a.by === b.by && a.base === b.base
-    && !!a.incircle === !!b.incircle && !!a.circumcircle === !!b.circumcircle
+const sameVec2 = (a: Vec2 | undefined, b: Vec2 | undefined): boolean =>
+  (!a && !b) || (!!a && !!b && a[0] === b[0] && a[1] === b[1])
+
+const sameVertices = (a: readonly Vec2[] | undefined, b: readonly Vec2[] | undefined): boolean =>
+  (!a && !b) || (!!a && !!b && a.length === b.length && a.every((v, i) => v[0] === b[i][0] && v[1] === b[i][1]))
+
+const sameIndexList = (a: readonly number[] | undefined, b: readonly number[] | undefined): boolean => {
+  const al = a?.length ?? 0
+  const bl = b?.length ?? 0
+  if (al !== bl) return false
+  for (let i = 0; i < al; i++) if (a![i] !== b![i]) return false
+  return true
 }
 
-/** Snap an angle to multiples of 45° when it's within `tolDeg` of one (Shift lines). */
+export function sameSpec(a: ShapeSpec | undefined, b: ShapeSpec | undefined): boolean {
+  return !!a && !!b && a.kind === b.kind && a.ax === b.ax && a.ay === b.ay && a.bx === b.bx && a.by === b.by
+    && a.rot === b.rot
+    && a.base === b.base
+    && !!a.incircle === !!b.incircle && !!a.circumcircle === !!b.circumcircle
+    && sameIndexList(a.altitudeAt, b.altitudeAt)
+    && sameIndexList(a.medianAt, b.medianAt)
+    && sameIndexList(a.bisectorAt, b.bisectorAt)
+    && sameIndexList(a.angleAt, b.angleAt)
+    && sameIndexList(a.lengthAt, b.lengthAt)
+    && a.skew === b.skew && a.topLeft === b.topLeft && a.topRight === b.topRight
+    && a.innerRatio === b.innerRatio && a.depth === b.depth
+    && sameVec2(a.apex, b.apex)
+    && sameVertices(a.vertices, b.vertices)
+}
+
+/** Snap an angle to multiples of 45 deg when it's within `tolDeg` of one (Shift lines). */
 export function snapAngle(ax: number, ay: number, bx: number, by: number, tolDeg = 6): [number, number] {
   const dx = bx - ax
   const dy = by - ay
@@ -90,8 +228,6 @@ export function snapAngle(ax: number, ay: number, bx: number, by: number, tolDeg
   if (Math.abs(ang - snapped) > (tolDeg * Math.PI) / 180) return [bx, by]
   return [ax + Math.cos(snapped) * len, ay + Math.sin(snapped) * len]
 }
-
-const P = (x: number, y: number): Point => [x, y, 0.5]
 
 function arrowHead(ax: number, ay: number, bx: number, by: number, size: number): Point[] {
   const len = Math.hypot(bx - ax, by - ay) || 1
@@ -111,11 +247,31 @@ function regular(cx: number, cy: number, rx: number, ry: number, n: number, rot 
   return pts
 }
 
+function starOutline(cx: number, cy: number, rx: number, ry: number, n: number, innerRatio: number): Point[] {
+  const pts: Point[] = []
+  const total = n * 2
+  for (let i = 0; i <= total; i++) {
+    const a = -Math.PI / 2 + (i / total) * Math.PI * 2
+    const r = i % 2 === 0 ? 1 : innerRatio
+    pts.push(P(cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r))
+  }
+  return pts
+}
+
 /**
  * Outline of a shape dragged from (ax, ay) to (bx, by), as one continuous polyline (closed shapes
- * repeat their first point). With `keep` (Shift) boxes become squares and lines snap to 45°.
+ * repeat their first point). With `keep` (Shift) boxes become squares and lines snap to 45 deg.
  */
-export function shapeOutline(kind: ShapeKind, ax: number, ay: number, bx: number, by: number, keep: boolean, size: number): Point[] {
+export function shapeOutline(
+  kind: ShapeKind,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  keep: boolean,
+  size: number,
+  opts?: Pick<ShapeSpec, 'base' | 'skew' | 'topLeft' | 'topRight' | 'innerRatio'>
+): Point[] {
   if (LINEAR.has(kind)) {
     if (keep) [bx, by] = snapAngle(ax, ay, bx, by, 45)
     if (kind === 'line') return [P(ax, ay), P(bx, by)]
@@ -150,25 +306,37 @@ export function shapeOutline(kind: ShapeKind, ax: number, ay: number, bx: number
     case 'rhombus':
       return [P(cx, y0), P(x1, cy), P(cx, y1), P(x0, cy), P(cx, y0)]
     case 'parallelogram': {
-      const o = w * 0.25
-      return [P(x0 + o, y0), P(x1, y0), P(x1 - o, y1), P(x0, y1), P(x0 + o, y0)]
+      const skew = clamp(opts?.skew ?? 0.25, -0.75, 0.75)
+      if (skew >= 0) {
+        const o = w * skew
+        return [P(x0 + o, y0), P(x1, y0), P(x1 - o, y1), P(x0, y1), P(x0 + o, y0)]
+      }
+      const o = w * -skew
+      return [P(x0, y0), P(x1 - o, y0), P(x1, y1), P(x0 + o, y1), P(x0, y0)]
     }
     case 'trapezoid': {
-      const o = w * 0.22
-      return [P(x0 + o, y0), P(x1 - o, y0), P(x1, y1), P(x0, y1), P(x0 + o, y0)]
+      let tl = clamp(opts?.topLeft ?? 0.22, 0, 0.95)
+      let tr = clamp(opts?.topRight ?? 0.22, 0, 0.95)
+      if (tl + tr > 0.96) {
+        const k = 0.96 / (tl + tr)
+        tl *= k
+        tr *= k
+      }
+      return [P(x0 + w * tl, y0), P(x1 - w * tr, y0), P(x1, y1), P(x0, y1), P(x0 + w * tl, y0)]
     }
     case 'pentagon':
       return regular(cx, cy, w / 2, h / 2, 5)
     case 'hexagon':
       return regular(cx, cy, w / 2, h / 2, 6, 0)
+    case 'polygon': {
+      const n = clampBase(opts?.base, SHAPE_BASES.polygon!.def)
+      const rot = -Math.PI / 2 + (n === 4 ? Math.PI / 4 : 0)
+      return regular(cx, cy, w / 2, h / 2, n, rot)
+    }
     case 'star': {
-      const pts: Point[] = []
-      for (let i = 0; i <= 10; i++) {
-        const a = -Math.PI / 2 + (i / 10) * Math.PI * 2
-        const r = i % 2 === 0 ? 1 : 0.4
-        pts.push(P(cx + Math.cos(a) * (w / 2) * r, cy + Math.sin(a) * (h / 2) * r))
-      }
-      return pts
+      const n = clampBase(opts?.base, SHAPE_BASES.star!.def)
+      const inner = clamp(opts?.innerRatio ?? 0.4, 0.15, 0.9)
+      return starOutline(cx, cy, w / 2, h / 2, n, inner)
     }
     default:
       return [P(ax, ay), P(bx, by)]
@@ -179,7 +347,7 @@ export function shapeOutline(kind: ShapeKind, ax: number, ay: number, bx: number
 export const DEFAULT_SHAPE_SIZE = 144
 export const isLinear = (k: ShapeKind): boolean => LINEAR.has(k)
 
-const is3D = (k: ShapeKind): boolean => (SHAPES_3D as readonly string[]).includes(k)
+export const is3D = (k: ShapeKind): boolean => (SHAPES_3D as readonly string[]).includes(k)
 
 /** Points along part of an ellipse (angles in radians, canvas orientation: y grows downwards). */
 function ellipseArc(cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, n = 48): Point[] {
@@ -205,12 +373,13 @@ export function shapeParts(
   size: number,
   base?: number
 ): ShapePart[] {
-  if (!is3D(kind)) return [{ points: shapeOutline(kind, ax, ay, bx, by, keep, size) }]
-  if (keep) {
-    const sz = Math.max(Math.abs(bx - ax), Math.abs(by - ay))
-    bx = ax + Math.sign(bx - ax || 1) * sz
-    by = ay + Math.sign(by - ay || 1) * sz
-  }
+  const [sx0, sy0, sx1, sy1] = shapeBox(kind, ax, ay, bx, by, keep)
+  return shapePartsFromSpec({ kind, ax: sx0, ay: sy0, bx: sx1, by: sy1, ...(base !== undefined ? { base } : {}) }, size)
+}
+
+function shapePartsFromSpec(spec: ShapeSpec, size: number): ShapePart[] {
+  const { kind, ax, ay, bx, by, base, apex, depth } = spec
+  if (!is3D(kind)) return [{ points: shapeOutline(kind, ax, ay, bx, by, false, size, spec) }]
   const x0 = Math.min(ax, bx)
   const y0 = Math.min(ay, by)
   const x1 = Math.max(ax, bx)
@@ -223,7 +392,7 @@ export function shapeParts(
 
   switch (kind) {
     case 'cube': {
-      const d = Math.min(w, h) * 0.3
+      const d = Math.min(w, h) * clamp(depth ?? 0.3, 0.08, 0.48)
       const F = [P(x0, y0 + d), P(x1 - d, y0 + d), P(x1 - d, y1), P(x0, y1)]
       const B = F.map(([x, y]) => P(x + d, y - d))
       return [
@@ -235,39 +404,85 @@ export function shapeParts(
       ]
     }
     case 'prism':
-      return polygonSolid('prism', x0, y0, x1, y1, base ?? SHAPE_BASES.prism!.def)
+      return polygonSolid('prism', x0, y0, x1, y1, base ?? SHAPE_BASES.prism!.def, apex, depth)
     case 'pyramid':
-      return polygonSolid('pyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.pyramid!.def)
+      return polygonSolid('pyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.pyramid!.def, apex, depth)
     case 'obliquePyramid':
-      return polygonSolid('obliquePyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.obliquePyramid!.def)
+      return polygonSolid('obliquePyramid', x0, y0, x1, y1, base ?? SHAPE_BASES.obliquePyramid!.def, apex, depth)
     case 'cylinder': {
-      const ry = Math.min(h * 0.14, w * 0.25)
+      const ry = Math.min(h * clamp(depth ?? 0.14, 0.05, 0.45), w * 0.42)
       const rx = w / 2
-      const ty = y0 + ry
+      const dx = apex ? (apex[0] - 0.5) * w : 0
+      const dy = apex ? apex[1] * h : 0
+      const tcx = cx + dx
+      const ty = y0 + ry + dy
       const byy = y1 - ry
+      const vx = -dx
+      const vy = byy - ty
+      const t = (Math.abs(vx) < 1e-6 && Math.abs(vy) < 1e-6) || rx === 0 ? 0 : Math.atan2(-ry * vx, rx * vy)
+      const p1x = Math.cos(t) * rx, p1y = Math.sin(t) * ry
+      const p2x = Math.cos(t + Math.PI) * rx, p2y = Math.sin(t + Math.PI) * ry
+      // When the top face is dragged below the bottom face, flip which ellipse is fully visible.
+      if (ty > byy) {
+        return [
+          solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI * 2, 72)),
+          solid(P(cx + p1x, byy + p1y), P(tcx + p1x, ty + p1y)),
+          solid(P(cx + p2x, byy + p2y), P(tcx + p2x, ty + p2y)),
+          solid(...ellipseArc(tcx, ty, rx, ry, t, t + Math.PI)),
+          hidden(...ellipseArc(tcx, ty, rx, ry, t + Math.PI, t + Math.PI * 2))
+        ]
+      }
       return [
-        solid(...ellipseArc(cx, ty, rx, ry, 0, Math.PI * 2, 72)),
-        solid(P(x0, ty), P(x0, byy)),
-        solid(P(x1, ty), P(x1, byy)),
-        solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI)),
-        hidden(...ellipseArc(cx, byy, rx, ry, Math.PI, Math.PI * 2))
+        solid(...ellipseArc(tcx, ty, rx, ry, 0, Math.PI * 2, 72)),
+        solid(P(tcx + p2x, ty + p2y), P(cx + p2x, byy + p2y)),
+        solid(P(tcx + p1x, ty + p1y), P(cx + p1x, byy + p1y)),
+        solid(...ellipseArc(cx, byy, rx, ry, t, t + Math.PI)),
+        hidden(...ellipseArc(cx, byy, rx, ry, t + Math.PI, t + Math.PI * 2))
       ]
     }
     case 'cone': {
-      const ry = Math.min(h * 0.14, w * 0.25)
+      const ry = Math.min(h * clamp(depth ?? 0.14, 0.05, 0.45), w * 0.42)
       const rx = w / 2
       const byy = y1 - ry
+      const axp = apex ? x0 + apex[0] * w : cx
+      const ayp = apex ? y0 + apex[1] * h : y0
+      const u = rx > 0 ? (axp - cx) / rx : 0
+      const v = ry > 0 ? (ayp - byy) / ry : 0
+      const dist = Math.hypot(u, v)
+      if (!apex && depth === undefined) {
+        return [
+          solid(P(x0, byy), P(cx, y0), P(x1, byy)),
+          solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI)),
+          hidden(...ellipseArc(cx, byy, rx, ry, Math.PI, Math.PI * 2))
+        ]
+      }
+      if (dist <= 1.001) {
+        return [solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI * 2, 72))]
+      }
+      const theta = Math.atan2(v, u)
+      const alpha = Math.acos(1 / dist)
+      const t1 = theta + alpha
+      const t2 = theta - alpha
+      const T1 = P(cx + Math.cos(t1) * rx, byy + Math.sin(t1) * ry)
+      const T2 = P(cx + Math.cos(t2) * rx, byy + Math.sin(t2) * ry)
+      if (v > 0) {
+        // Inverted cone (apex below base): base is on top, fully visible.
+        return [
+          solid(T2, P(axp, ayp), T1),
+          solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI * 2, 72))
+        ]
+      }
       return [
-        solid(P(x0, byy), P(cx, y0), P(x1, byy)),
-        solid(...ellipseArc(cx, byy, rx, ry, 0, Math.PI)),
-        hidden(...ellipseArc(cx, byy, rx, ry, Math.PI, Math.PI * 2))
+        solid(T2, P(axp, ayp), T1),
+        solid(...ellipseArc(cx, byy, rx, ry, t1, t2 + Math.PI * 2)),
+        hidden(...ellipseArc(cx, byy, rx, ry, t2, t1))
       ]
     }
     case 'sphere': {
       const cy = (y0 + y1) / 2
       const rx = w / 2
       const ry = h / 2
-      const ery = ry * 0.28
+      const ery = ry * clamp(depth ?? 0.28, 0.08, 0.48)
       return [
         solid(...ellipseArc(cx, cy, rx, ry, 0, Math.PI * 2, 96)),
         solid(...ellipseArc(cx, cy, rx, ery, 0, Math.PI)),
@@ -275,19 +490,28 @@ export function shapeParts(
       ]
     }
     default:
-      return [{ points: shapeOutline(kind, ax, ay, bx, by, keep, size) }]
+      return [{ points: shapeOutline(kind, ax, ay, bx, by, false, size, spec) }]
   }
 }
 
 /**
- * Prism or pyramid over a regular n-gon base, seen slightly from above. Pyramids classify side faces
- * by their projected winding so hidden edges follow the apex, including in an oblique pyramid.
+ * Prism or pyramid over a regular n-gon base, seen slightly from above. Pyramids and oblique prisms
+ * classify side faces by their projected winding so hidden edges follow the apex or top face cleanly.
  */
-function polygonSolid(kind: 'prism' | 'pyramid' | 'obliquePyramid', x0: number, y0: number, x1: number, y1: number, n: number): ShapePart[] {
-  n = Number.isFinite(n) ? Math.max(MIN_BASE, Math.min(MAX_BASE, Math.round(n))) : SHAPE_BASES[kind]!.def
+function polygonSolid(
+  kind: 'prism' | 'pyramid' | 'obliquePyramid',
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  n: number,
+  apexParam?: Vec2,
+  depthParam?: number
+): ShapePart[] {
+  n = clampBase(n, SHAPE_BASES[kind]!.def)
   const w = x1 - x0
   const h = y1 - y0
-  const ry = Math.min(h * 0.16, w * 0.28)
+  const ry = Math.min(h * clamp(depthParam ?? 0.16, 0.05, 0.45), w * 0.42)
   // Unit polygon, turned a little so no edge is seen exactly edge-on.
   const off = Math.PI / 2 - 0.17
   const unit = Array.from({ length: n }, (_, i) => {
@@ -302,31 +526,48 @@ function polygonSolid(kind: 'prism' | 'pyramid' | 'obliquePyramid', x0: number, 
   const mapY = (u: number, cy: number): number => cy - ry + ((u - minY) / (maxY - minY)) * 2 * ry
   const bottomCy = y1 - ry
   const bottom = unit.map(([ux, uy]) => P(mapX(ux), mapY(uy, bottomCy)))
-  const apex = P(kind === 'obliquePyramid' ? x0 + w * 0.9 : mapX(0), y0)
-  const front = unit.map((_, i) => {
-    if (kind !== 'prism') {
-      const a = bottom[i], b = bottom[(i + 1) % n]
-      return (b[0] - a[0]) * (apex[1] - a[1]) - (b[1] - a[1]) * (apex[0] - a[0]) > 0
-    }
-    // A prism's vertical side faces the viewer when its outward normal points down the screen.
-    const a = off + ((i + 0.5) / n) * Math.PI * 2
-    return Math.sin(a) > 1e-6
-  })
-  const vertVisible = (i: number): boolean => front[i] || front[(i - 1 + n) % n]
   const solid: ShapePart[] = []
   const hidden: ShapePart[] = []
   const edge = (a: Point, b: Point, visible: boolean): void => {
     ;(visible ? solid : hidden).push(visible ? { points: [a, b] } : { points: [a, b], dash: 'dashed' })
   }
-  for (let i = 0; i < n; i++) edge(bottom[i], bottom[(i + 1) % n], front[i])
+
   if (kind !== 'prism') {
+    const apex = apexParam
+      ? P(x0 + apexParam[0] * w, y0 + apexParam[1] * h)
+      : P(kind === 'obliquePyramid' ? x0 + w * 0.9 : mapX(0), y0)
+    const inverted = apex[1] > bottomCy
+    const front = unit.map((_, i) => {
+      const a = bottom[i], b = bottom[(i + 1) % n]
+      const wind = (b[0] - a[0]) * (apex[1] - a[1]) - (b[1] - a[1]) * (apex[0] - a[0])
+      return inverted ? wind < 0 : wind > 0
+    })
+    const vertVisible = (i: number): boolean => front[i] || front[(i - 1 + n) % n]
+    for (let i = 0; i < n; i++) edge(bottom[i], bottom[(i + 1) % n], inverted ? true : front[i])
     for (let i = 0; i < n; i++) edge(apex, bottom[i], vertVisible(i))
-  } else {
-    const top = unit.map(([ux, uy]) => P(mapX(ux), mapY(uy, y0 + ry)))
-    // The top face is fully visible: one closed outline.
-    solid.unshift({ points: [...top, top[0]] })
-    for (let i = 0; i < n; i++) edge(top[i], bottom[i], vertVisible(i))
+    return [...solid, ...hidden]
   }
+
+  const dx = apexParam ? (apexParam[0] - 0.5) * w : 0
+  const dy = apexParam ? apexParam[1] * h : 0
+  const topCy = y0 + ry + dy
+  const top = unit.map(([ux, uy]) => P(mapX(ux) + dx, mapY(uy, topCy)))
+  const inverted = topCy > bottomCy
+  const front = unit.map((_, i) => {
+    const a = bottom[i], b = bottom[(i + 1) % n]
+    const t0 = top[i]
+    const wind = (b[0] - a[0]) * (t0[1] - a[1]) - (b[1] - a[1]) * (t0[0] - a[0])
+    return inverted ? wind < 0 : wind > 0
+  })
+  const vertVisible = (i: number): boolean => front[i] || front[(i - 1 + n) % n]
+  if (inverted) {
+    solid.push({ points: [...bottom, bottom[0]] })
+    for (let i = 0; i < n; i++) edge(top[i], top[(i + 1) % n], front[i])
+  } else {
+    solid.push({ points: [...top, top[0]] })
+    for (let i = 0; i < n; i++) edge(bottom[i], bottom[(i + 1) % n], front[i])
+  }
+  for (let i = 0; i < n; i++) edge(top[i], bottom[i], vertVisible(i))
   // Solid parts first: the first part's pattern is the shape's own line style.
   return [...solid, ...hidden]
 }
