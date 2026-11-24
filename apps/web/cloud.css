@@ -1,17 +1,15 @@
 .cloud-entry { min-height: 100dvh; overflow: auto; height: 100%; background: var(--home-bg); color: var(--text); padding: clamp(20px, 4vw, 48px); }
-.cloud-entry header { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; }
+.cloud-entry header { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; flex-wrap: wrap; }
 .cloud-entry section { margin: clamp(32px, 10vh, 100px) auto 24px; max-width: 420px; padding: clamp(20px, 4vw, 36px); border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
 .cloud-entry h1 { margin: 0; font-size: 28px; line-height: 1.15; }
 .cloud-entry p, .cloud-entry small { color: var(--muted); line-height: 1.5; white-space: pre-line; }
-.cloud-tabs { margin: 24px 0 18px; display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
-.cloud-tabs button { color: var(--muted); border: 0; border-bottom: 2px solid transparent; background: none; padding: 8px 12px; cursor: pointer; }
-.cloud-tabs button[aria-pressed=true] { color: var(--text); border-color: currentColor; }
+.cloud-entry p.cloud-notice { margin: 16px 0 20px; padding: 12px 14px; border-radius: 10px; background: var(--warning-soft); border: 1px solid color-mix(in oklab, var(--warning) 35%, transparent); color: var(--warning-text); font-size: 0.9rem; }
 .cloud-entry form, .cloud-entry label { display: grid; gap: 7px; }
-.cloud-entry form { gap: 16px; }
+.cloud-entry form { margin-top: 20px; gap: 16px; }
 .cloud-entry input { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--surface); color: var(--text); }
 .cloud-entry .primary { justify-content: center; }
 .cloud-entry [role=alert] { color: var(--danger-text); }
 
-/* Device approval (/link). */
+/* Device approval (/link) and invite actions. */
 .cloud-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.9rem; font-weight: 600; letter-spacing: 0.12em; }
-.cloud-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.cloud-actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }

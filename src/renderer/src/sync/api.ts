@@ -102,6 +102,22 @@ export class PenrillClient {
     return this.json({ method: 'POST', path: register ? '/api/register' : '/api/login', ...jsonBody({ name, password }) }, false)
   }
 
+  /** Whether an invite link is still active (false on 404). */
+  async checkInvite(token: string): Promise<boolean> {
+    try {
+      await this.call({ method: 'GET', path: `/api/invites/${encodeURIComponent(token)}` }, false)
+      return true
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return false
+      throw error
+    }
+  }
+
+  /** Creates an account using an invite link and returns its session. */
+  acceptInvite(token: string, name: string, password: string): Promise<Account> {
+    return this.json({ method: 'POST', path: `/api/invites/${encodeURIComponent(token)}`, ...jsonBody({ name, password }) }, false)
+  }
+
   async serverInfo(): Promise<ServerInfo> {
     const info = await this.json<ServerInfo>({ method: 'GET', path: '/api/server' }, false)
     if (info?.service !== 'penrill') throw new Error('Not a Penrill server')

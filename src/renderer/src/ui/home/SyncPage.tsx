@@ -111,12 +111,13 @@ function openPage(url: string): Promise<void> {
   return Promise.resolve()
 }
 
-function Choice({ icon, title, hint, children }: { icon: ReactNode; title: string; hint: string; children: ReactNode }) {
+function Choice({ icon, title, badge, hint, children }: { icon: ReactNode; title: string; badge?: ReactNode; hint: string; children: ReactNode }) {
   return (
     <section className="py-2">
-      <Subheading className="m-0 flex items-center gap-2">
+      <Subheading className="m-0 flex flex-wrap items-center gap-2">
         <span className="flex text-zinc-500 *:size-4 dark:text-zinc-400">{icon}</span>
         {title}
+        {badge}
       </Subheading>
       <Text className="mt-1">{hint}</Text>
       <div className="mt-4">{children}</div>
@@ -142,7 +143,12 @@ function Choices() {
     <>
       {cloudOrigin && (
         <>
-          <Choice icon={<CloudIcon />} title={t(cloudLabel)} hint={t('sync.cloudHint')}>
+          <Choice
+            icon={<CloudIcon />}
+            title={t(cloudLabel)}
+            badge={<Badge color="amber">{t('cloud.inDevelopment')}</Badge>}
+            hint={t('sync.cloudHint')}
+          >
             <Button color="blue" onClick={() => void connectFlow.connect('cloud')}>
               {t('storage.connect')}
             </Button>
