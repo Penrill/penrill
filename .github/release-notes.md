@@ -2,6 +2,10 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## About credits and license in 0.13.15
+
+- Updated Settings → About credits in English and Ukrainian and updated the license copyright notice.
+
 ## Classic top-bar default layout and reliable photo sync in 0.13.14
 
 - **Classic top bar by default.** All drawing and insert tools sit in one bar at the top with popover options, leaving the left, right and bottom edges open for the canvas. The previous split arrangement remains available as the *Top & left* preset in Settings → Layout.
