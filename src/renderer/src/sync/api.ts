@@ -5,17 +5,23 @@ import type { Account } from './accounts'
 export class ApiError extends Error {
   readonly status: number
   readonly reason?: string
+  readonly upgradeUrl?: string
+  readonly title?: string
 
-  constructor(status: number, reason?: string) {
+  constructor(status: number, reason?: string, upgradeUrl?: string, title?: string) {
     super(`HTTP ${status}${reason ? ` (${reason})` : ''}`)
     this.status = status
     this.reason = reason
+    this.upgradeUrl = upgradeUrl
+    this.title = title
   }
 }
 
-export const isAuthError = (error: unknown) => error instanceof ApiError && error.status === 401
-export const isAccessError = (error: unknown) => error instanceof ApiError && (error.status === 403 || error.status === 404)
-export const isPermanent = (error: unknown) =>
+export const isAuthError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 401
+export const isAccessError = (error: unknown): error is ApiError => error instanceof ApiError && (error.status === 403 || error.status === 404)
+export const isQuotaError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 402
+export const isReadOnlyError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 403 && error.reason === 'read-only'
+export const isPermanent = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429
 
 export interface RemoteBoard {
@@ -29,6 +35,10 @@ export interface RemoteBoard {
   copying?: boolean
   /** For its owner: someone else can open it. Missing on servers before 0.5. */
   shared?: boolean
+  /** Access level reported by cloud servers (owner, edit, comment, view). */
+  permission?: string
+  /** Workspace identifier on cloud servers. */
+  workspaceId?: string
 }
 
 /** What happens to the copies of the people a board was shared with when its owner deletes it. */
@@ -59,6 +69,15 @@ export interface BoardContent {
   items: WireItem[]
 }
 
+export interface ServerCapabilities {
+  cloudApi?: string
+  workspaces?: boolean
+  permissions?: string[]
+  versionHistory?: boolean
+  billing?: boolean
+  relay?: boolean
+}
+
 /** What `GET /api/server` tells before signing in. Older servers do not have it. */
 export interface ServerInfo {
   service: string
@@ -67,6 +86,9 @@ export interface ServerInfo {
   /** Device linking is supported. */
   link: boolean
   pin: string | null
+  edition?: 'self-hosted' | 'cloud' | string
+  auth?: string[]
+  capabilities?: ServerCapabilities
 }
 
 export interface LinkStart {
@@ -300,12 +322,17 @@ export class PenrillClient {
     const response = await this.http(this.origin, { ...request, ...(token ? { token } : {}) })
     if (response.status < 400) return response
     let reason: string | undefined
+    let upgradeUrl: string | undefined
+    let title: string | undefined
     try {
-      reason = JSON.parse(decoder.decode(response.body)).reason
+      const parsed = JSON.parse(decoder.decode(response.body)) as Record<string, unknown>
+      if (typeof parsed.reason === 'string') reason = parsed.reason
+      if (typeof parsed.upgradeUrl === 'string') upgradeUrl = parsed.upgradeUrl
+      if (typeof parsed.title === 'string') title = parsed.title
     } catch {
       reason = undefined
     }
-    throw new ApiError(response.status, reason)
+    throw new ApiError(response.status, reason, upgradeUrl, title)
   }
 
   private async json<T>(request: Omit<HttpRequest, 'token'>, authenticated = true): Promise<T> {

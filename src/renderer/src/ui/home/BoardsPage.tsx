@@ -211,9 +211,12 @@ function BoardCard({ entry, tags }: { entry: BoardEntry; tags: Tag[] }) {
             </Badge>
           )}
           {link && (
-            <Badge color={status === 'denied' ? 'red' : status === 'offline' ? 'amber' : 'zinc'} title={t(`storage.${status ?? 'pending'}`)}>
-              {status === 'denied' ? <ExclamationTriangleIcon className="size-3" /> : <CloudIcon className="size-3" />}
-              {status === 'denied' || status === 'offline' ? t(`storage.${status}`) : t('sync.badge')}
+            <Badge
+              color={status === 'denied' || status === 'quota' ? 'red' : status === 'offline' || status === 'read-only' || status === 'room-full' ? 'amber' : 'zinc'}
+              title={t(`storage.${status ?? 'pending'}`)}
+            >
+              {status === 'denied' || status === 'quota' || status === 'read-only' || status === 'room-full' ? <ExclamationTriangleIcon className="size-3" /> : <CloudIcon className="size-3" />}
+              {status === 'denied' || status === 'offline' || status === 'read-only' || status === 'quota' || status === 'room-full' ? t(`storage.${status}`) : t('sync.badge')}
             </Badge>
           )}
           {link && status === 'denied' && copyable && (

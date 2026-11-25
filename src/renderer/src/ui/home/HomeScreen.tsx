@@ -13,7 +13,6 @@ import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from '@penrill/ui/nav
 import {
   Sidebar,
   SidebarBody,
-  SidebarFooter,
   SidebarHeader,
   SidebarHeading,
   SidebarItem,
@@ -31,7 +30,7 @@ import { useApp } from '../../appState'
 import { boardLibrary } from '../../boardLibrary'
 import { platform } from '../../platform'
 import { homePath, routePath } from '../../router'
-import { cloudLabel, hostedCloud, storagePreference } from '../../storagePreference'
+import { storagePreference } from '../../storagePreference'
 import { account, useAccounts } from '../../sync/accounts'
 import { syncCoordinator } from '../../sync/coordinator'
 import { useRemoteBoards } from '../../sync/librarySync'
@@ -53,7 +52,7 @@ function Brand({ className }: { className?: string }) {
   return (
     <span className={clsx('flex min-w-0 items-center gap-3', className)}>
       <img src={appIcon} alt="" draggable={false} className="size-7 shrink-0 rounded-md" />
-      <span className="truncate text-base/6 font-semibold text-zinc-950 sm:text-sm/5 dark:text-white">{hostedCloud ? 'Penrill Cloud' : 'Penrill'}</span>
+      <span className="truncate text-base/6 font-semibold text-zinc-950 sm:text-sm/5 dark:text-white">Penrill</span>
     </span>
   )
 }
@@ -110,7 +109,6 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
     return () => clearInterval(id)
   }, [])
 
-  const signedIn = !!account(pref.origin)
   const live = boards.filter((b) => !b.deletedAt)
   const deletedCount = boards.length - live.length
   const back = current && live.some((b) => b.id === current.id) ? current : null
@@ -197,13 +195,6 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
           </SidebarItem>
         </SidebarSection>
       </SidebarBody>
-      {hostedCloud && signedIn && (
-        <SidebarFooter>
-          <p className="m-0 truncate px-2 text-xs/5 text-zinc-500 dark:text-zinc-400">
-            {account(pref.origin)?.name} · {t(cloudLabel)}
-          </p>
-        </SidebarFooter>
-      )}
     </Sidebar>
   )
 

@@ -1,5 +1,3 @@
-import { account } from '../sync/accounts'
-import { hostedCloud, cloudOrigin } from '../storagePreference'
 import { sendHttp } from '../../../shared/http'
 import { cleanOverrides, parseFeaturesFile } from '../../../shared/features'
 import type { BoardStoreApi, PlatformApi } from '../../../shared/platform'
@@ -45,7 +43,7 @@ function persistAfterFirstSave(store: BoardStoreApi): BoardStoreApi {
 
 /** The app's platform in a browser: IndexedDB library, file pickers, print-to-PDF, no installer updates. */
 export function createWebPlatform(): PlatformApi {
-  const store = persistAfterFirstSave(createIndexedDbStore(hostedCloud ? 'penrill-cloud:' + account(cloudOrigin)?.name : undefined))
+  const store = persistAfterFirstSave(createIndexedDbStore())
   const features = parseFeaturesFile(readFeatures())
   return {
     platform: 'web',

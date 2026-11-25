@@ -151,8 +151,8 @@ export function SyncedBoards({ origin }: { origin: string }) {
                 entry={b}
                 control={
                   <span className="flex shrink-0 items-center gap-3">
-                    {on && (status === 'offline' || status === 'denied') && (
-                      <Badge color={status === 'denied' ? 'red' : 'amber'}>{t(`storage.${status}`)}</Badge>
+                    {on && (status === 'offline' || status === 'denied' || status === 'read-only' || status === 'quota' || status === 'room-full') && (
+                      <Badge color={status === 'denied' || status === 'quota' ? 'red' : 'amber'}>{t(`storage.${status}`)}</Badge>
                     )}
                     {/* A board someone else shared without copying stays synced: unsynced, it would become a free copy. */}
                     <Switch color="blue" aria-label={b.title} checked={on} disabled={on && !canCopy(b.id)} onChange={(value) => set(b, value)} />
