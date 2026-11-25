@@ -2,6 +2,12 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Classic top-bar default layout and reliable photo sync in 0.13.14
+
+- **Classic top bar by default.** All drawing and insert tools sit in one bar at the top with popover options, leaving the left, right and bottom edges open for the canvas. The previous split arrangement remains available as the *Top & left* preset in Settings → Layout.
+- **Reliable photo uploads and Apple HEIC support.** Images dropped, pasted or picked on synced boards now decode directly without CSP failures, upload cleanly when publishing a new board, request JPEG from Apple photo pickers, and automatically convert HEIC/HEIF photos to universal JPEG so every platform renders them.
+- **Clearer cloud sync statuses.** Boards show explicit read-only, storage quota and room-full indicators instead of retrying silently.
+
 ## Popover tool options by default in 0.13.13
 
 - **Cleaner default workspace.** Tool options in the default layout now open as a popover when clicking an active tool (or right-clicking it) instead of taking up a permanent strip at the top. You can still switch back to the always-visible strip on any screen edge in Settings → Layout or Customize mode.
