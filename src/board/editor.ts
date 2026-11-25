@@ -2,7 +2,7 @@ import { clampZoom, screenToWorld, zoomAt } from '@penrill/core/camera'
 import { DEFAULT_PLANE, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
 import { plotFormula, plotHead, rowsToText } from './engine/formulaexpr'
 import { bboxOfPoints, newId } from '@penrill/core/geometry'
-import { loadImage, readFileAsDataURL } from './engine/images'
+import { isImageFile, loadImage, normalizeImageDataUrl, readFileAsDataURL } from './engine/images'
 import type { LiveStroke } from './engine/renderer'
 import { Scene } from '@penrill/core/scene'
 import {
@@ -641,7 +641,7 @@ export class Editor {
         // Not our data after all; fall through to images.
       }
     }
-    const files = [...data.files].filter((f) => f.type.startsWith('image/'))
+    const files = [...data.files].filter(isImageFile)
     if (files.length) {
       void this.insertImages(files)
       return true
@@ -844,37 +844,42 @@ export class Editor {
 
   /** Insert image files at a screen point (defaults to the viewport centre). */
   async insertImages(files: File[], sx?: number, sy?: number): Promise<void> {
-    const images = files.filter((f) => f.type.startsWith('image/'))
+    const images = files.filter(isImageFile)
     let offset = 0
     const inserted: Item[] = []
     for (const file of images) {
-      const src = await readFileAsDataURL(file)
-      const img = await loadImage(src)
-      const cam = this.camera
-      const { width, height } = this.view()
-      const center = screenToWorld(cam, sx ?? width / 2, sy ?? height / 2)
-      // Fit into ~60% of the visible area, never upscale. The original pixels are kept as-is.
-      const maxW = (width / cam.zoom) * 0.6
-      const maxH = (height / cam.zoom) * 0.6
-      const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight)
-      const w = img.naturalWidth * scale
-      const h = img.naturalHeight * scale
-      const x = center.x - w / 2 + offset
-      const y = center.y - h / 2 + offset
-      offset += 24 / cam.zoom
-      const item: ImageItem = {
-        type: 'image',
-        id: newId(),
-        z: this.scene.allocZ(),
-        src,
-        x,
-        y,
-        w,
-        h,
-        bbox: { minX: x, minY: y, maxX: x + w, maxY: y + h }
+      try {
+        const rawSrc = await readFileAsDataURL(file)
+        const img = await loadImage(rawSrc)
+        const src = normalizeImageDataUrl(rawSrc, img)
+        const cam = this.camera
+        const { width, height } = this.view()
+        const center = screenToWorld(cam, sx ?? width / 2, sy ?? height / 2)
+        // Fit into ~60% of the visible area, never upscale. The original pixels are kept as-is.
+        const maxW = (width / cam.zoom) * 0.6
+        const maxH = (height / cam.zoom) * 0.6
+        const scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight)
+        const w = img.naturalWidth * scale
+        const h = img.naturalHeight * scale
+        const x = center.x - w / 2 + offset
+        const y = center.y - h / 2 + offset
+        offset += 24 / cam.zoom
+        const item: ImageItem = {
+          type: 'image',
+          id: newId(),
+          z: this.scene.allocZ(),
+          src,
+          x,
+          y,
+          w,
+          h,
+          bbox: { minX: x, minY: y, maxX: x + w, maxY: y + h }
+        }
+        this.scene.add([item])
+        inserted.push(item)
+      } catch {
+        // Skip files the current browser cannot decode without blocking other dropped images.
       }
-      this.scene.add([item])
-      inserted.push(item)
     }
     if (inserted.length) {
       this.session.setState({ tool: 'select' })

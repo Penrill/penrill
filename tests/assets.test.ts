@@ -6,6 +6,7 @@ import { LiveSession, PermanentError, type ConnectionEvents, type DocumentPort, 
 import type { ViewDelta } from '@penrill/sync/replica'
 import { ApiError, PenrillClient } from '../src/renderer/src/sync/api.ts'
 import { assetCodec, decodeDataUrl } from '../src/renderer/src/sync/assets.ts'
+import { IMAGE_ACCEPT, isImageFile, normalizeImageDataUrl } from '../src/board/engine/images.ts'
 
 // Minimal valid 1x1 PNG bytes
 const PNG_BYTES = new Uint8Array([
@@ -33,6 +34,65 @@ test('decodeDataUrl decodes base64 and URL-encoded data URLs without touching fe
   const svg = decodeDataUrl('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3C%2Fsvg%3E')
   assert.equal(svg.type, 'image/svg+xml')
   assert.ok(new TextDecoder().decode(svg.bytes).startsWith('<svg'))
+
+  const heicBytes = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63])
+  const heicSniffed = decodeDataUrl(`data:application/octet-stream;base64,${Buffer.from(heicBytes).toString('base64')}`)
+  assert.equal(heicSniffed.type, 'image/heic')
+})
+
+test('Apple HEIC handling: file picker asks for JPEG/standard formats and non-universal images transcode to JPEG', () => {
+  // Explicit MIME types without image/* or image/heic instruct iOS/iPadOS Photos to deliver JPEG.
+  assert.equal(IMAGE_ACCEPT.includes('image/*'), false)
+  assert.equal(IMAGE_ACCEPT.includes('heic'), false)
+  assert.equal(IMAGE_ACCEPT.includes('image/jpeg'), true)
+
+  assert.equal(isImageFile({ name: 'IMG_1024.HEIC', type: '' }), true)
+  assert.equal(isImageFile({ name: 'IMG_1024.heif', type: 'image/heif' }), true)
+  assert.equal(isImageFile({ name: 'notes.pdf', type: 'application/pdf' }), false)
+
+  // Mock minimal canvas DOM so normalizeImageDataUrl can transcode HEIC -> JPEG in Node.
+  const prevDoc = (globalThis as { document?: unknown }).document
+  let drawn = false
+  let canvasWidth = 0
+  let canvasHeight = 0
+  const jpegDataUrl = `data:image/jpeg;base64,${JPEG_B64}${'A'.repeat(20)}`
+  ;(globalThis as { document?: unknown }).document = {
+    createElement: (tag: string) => {
+      assert.equal(tag, 'canvas')
+      return {
+        set width(v: number) { canvasWidth = v },
+        get width() { return canvasWidth },
+        set height(v: number) { canvasHeight = v },
+        get height() { return canvasHeight },
+        getContext: () => ({
+          fillStyle: '',
+          fillRect: () => {},
+          drawImage: () => { drawn = true }
+        }),
+        toDataURL: (type: string) => {
+          assert.equal(type, 'image/jpeg')
+          return jpegDataUrl
+        }
+      }
+    }
+  }
+  try {
+    const fakeImg = { naturalWidth: 8064, naturalHeight: 6048 } as HTMLImageElement
+    const heicUrl = `data:image/heic;base64,${JPEG_B64}`
+    const converted = normalizeImageDataUrl(heicUrl, fakeImg)
+    assert.equal(drawn, true)
+    assert.equal(converted, jpegDataUrl)
+    // 48MP iPhone image is capped at 4096px max side to avoid Safari's 16.7MP canvas limit.
+    assert.equal(canvasWidth, 4096)
+    assert.equal(canvasHeight, 3072)
+
+    // Standard PNG passes through untouched without canvas re-encoding.
+    drawn = false
+    assert.equal(normalizeImageDataUrl(PNG_DATA_URL, fakeImg), PNG_DATA_URL)
+    assert.equal(drawn, false)
+  } finally {
+    ;(globalThis as { document?: unknown }).document = prevDoc
+  }
 })
 
 test('assetCodec encodes and decodes images even when globalThis.fetch rejects data: URLs (CSP connect-src regression)', async () => {

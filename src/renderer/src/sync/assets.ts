@@ -1,5 +1,6 @@
 import type { Change, Op, WireItem } from '@penrill/sync/protocol'
 import { PermanentError, type WireCodec } from '@penrill/sync/session'
+import { transcodeDataUrlToJpeg, UNIVERSAL_IMAGE_TYPES } from '../../../board/engine/images'
 import { isAccessError, isAuthError, isPermanent, isQuotaError, isReadOnlyError, type PenrillClient } from './api'
 
 const HASH = /^[0-9a-f]{64}$/
@@ -9,6 +10,7 @@ interface Asset {
   hash: string
   type: string
   bytes: Uint8Array
+  dataUrl: string
 }
 
 let database: Promise<IDBDatabase> | undefined
@@ -69,6 +71,7 @@ function sniffImageMime(bytes: Uint8Array): string {
   if (bytes.length >= 12 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11])
     if (brand === 'avif' || brand === 'avis') return 'image/avif'
+    if (brand === 'heic' || brand === 'heix' || brand === 'hevc' || brand === 'hevx' || brand === 'mif1' || brand === 'msf1') return 'image/heic'
   }
   const head = new TextDecoder().decode(bytes.subarray(0, Math.min(bytes.length, 256))).trimStart()
   if (head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg'))) return 'image/svg+xml'
@@ -114,9 +117,18 @@ function digest(src: string): Promise<Asset> {
   const existing = digests.get(src)
   if (existing) return existing
   const pending = (async () => {
-    const { type, bytes } = decodeDataUrl(src)
+    let dataUrl = src
+    let decoded = decodeDataUrl(src)
+    if (!UNIVERSAL_IMAGE_TYPES.has(decoded.type)) {
+      const converted = await transcodeDataUrlToJpeg(src).catch(() => null)
+      if (converted) {
+        dataUrl = converted
+        decoded = decodeDataUrl(converted)
+      }
+    }
+    const { type, bytes } = decoded
     const sum = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource))
-    return { hash: Array.from(sum, byte => byte.toString(16).padStart(2, '0')).join(''), type, bytes }
+    return { hash: Array.from(sum, byte => byte.toString(16).padStart(2, '0')).join(''), type, bytes, dataUrl }
   })().catch(error => {
     digests.delete(src)
     throw error
@@ -160,7 +172,7 @@ export function assetCodec(client: PenrillClient, board: string): WireCodec {
       throw error
     }
     uploaded.add(asset.hash)
-    void remember(asset.hash, src).catch(() => undefined)
+    void remember(asset.hash, asset.dataUrl).catch(() => undefined)
     return asset.hash
   }
 

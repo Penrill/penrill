@@ -13,6 +13,7 @@ import {
   type ReactNode
 } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { IMAGE_ACCEPT } from '../engine/images'
 import { useEditor, useSession } from '../editorContext'
 import { useT, type MessageKey } from '../i18n'
 import { shortcutKey, type ShortcutId } from '../shortcuts'
@@ -810,7 +811,7 @@ export function ToolBar({
         <input
           ref={fileRef}
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           multiple
           hidden
           onChange={(event) => {
