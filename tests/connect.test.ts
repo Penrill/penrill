@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { parseConnectTarget, shortPin } from '../src/shared/connect.ts'
-import { ApiError, PenrillClient, type Http } from '../src/renderer/src/sync/api.ts'
+import { ApiError, isQuotaError, isReadOnlyError, PenrillClient, type Http } from '../src/renderer/src/sync/api.ts'
 
 const PIN = 'sha256/DKcfXd3pcBnwWg0mV8ZCdAH/Kcc1XypDV7CU4Yd1ofI='
 
@@ -55,4 +55,67 @@ test('invite client checks and redeems invite tokens anonymously', async () => {
   assert.deepEqual(await client.acceptInvite('good', 'ann', 'correct horse battery'), { name: 'ann', token: 'tok' })
   await assert.rejects(() => client.acceptInvite('taken', 'ann', 'correct horse battery'), (err: unknown) => err instanceof ApiError && err.status === 409)
   assert.ok(calls.every((call) => call.token === undefined))
+})
+
+test('serverInfo parses cloud edition and capabilities while tolerating older servers', async () => {
+  const encoder = new TextEncoder()
+  const cloudHttp: Http = async () => ({
+    status: 200,
+    contentType: 'application/json',
+    body: encoder.encode(JSON.stringify({
+      service: 'penrill',
+      name: 'Penrill Cloud',
+      registration: 'invite',
+      link: true,
+      pin: null,
+      edition: 'cloud',
+      auth: ['password', 'google'],
+      capabilities: {
+        cloudApi: '/api/v1',
+        workspaces: true,
+        permissions: ['owner', 'editor', 'commenter', 'viewer'],
+        versionHistory: true,
+        billing: false,
+        relay: true
+      }
+    }))
+  })
+  const info = await new PenrillClient('https://cloud.penrill.com', cloudHttp, () => null).serverInfo()
+  assert.equal(info.edition, 'cloud')
+  assert.deepEqual(info.auth, ['password', 'google'])
+  assert.equal(info.capabilities?.workspaces, true)
+  assert.equal(info.capabilities?.billing, false)
+})
+
+test('ApiError captures quota upgradeUrl (402) and read-only reason (403)', async () => {
+  const encoder = new TextEncoder()
+  const http: Http = async (_origin, req) => {
+    if (req.method === 'PUT') {
+      return {
+        status: 402,
+        contentType: 'application/problem+json',
+        body: encoder.encode(JSON.stringify({
+          status: 402,
+          title: 'Workspace board limit reached.',
+          reason: 'quota-exceeded',
+          upgradeUrl: '/billing'
+        }))
+      }
+    }
+    return {
+      status: 403,
+      contentType: 'application/problem+json',
+      body: encoder.encode(JSON.stringify({ status: 403, title: 'read-only', reason: 'read-only' }))
+    }
+  }
+  const client = new PenrillClient('https://cloud.penrill.com', http, () => 'tok')
+
+  await assert.rejects(
+    () => client.createBoard('00112233445566778899aabbccddeeff', { title: 'Test', background: 'dots', items: [] }),
+    (err: unknown) => isQuotaError(err) && err instanceof ApiError && err.reason === 'quota-exceeded' && err.upgradeUrl === '/billing'
+  )
+  await assert.rejects(
+    () => client.submit('00112233445566778899aabbccddeeff', { id: 'c1', ops: [] }),
+    (err: unknown) => isReadOnlyError(err)
+  )
 })

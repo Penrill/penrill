@@ -57,7 +57,7 @@ export interface Logger {
   warn(message: string, details?: Record<string, unknown>): void
 }
 
-export type SessionStatus = 'connecting' | 'live' | 'offline' | 'signed-out' | 'no-access' | 'stopped'
+export type SessionStatus = 'connecting' | 'live' | 'offline' | 'room-full' | 'signed-out' | 'no-access' | 'stopped'
 
 export interface SessionState {
   status: SessionStatus
@@ -76,6 +76,7 @@ export interface SessionPorts {
   onState?(state: SessionState): void
   onPeers?(peers: Peer[]): void
   onSignal?(peer: Peer, data: JsonObject): void
+  onReject?(reason: string): void
 }
 
 export const WINDOW = 32
@@ -229,6 +230,7 @@ class Live extends Phase {
       case 'reject':
         this.core.ports.log.warn('The server refused a change for good', { change: message.id, reason: message.reason })
         this.core.settle(message.id, false)
+        this.core.ports.onReject?.(message.reason)
         break
       case 'signal':
         this.core.ports.onSignal?.({ client: message.client, user: message.user }, message.data)
@@ -258,8 +260,13 @@ class Live extends Phase {
 }
 
 class Waiting extends Phase {
-  readonly status = 'offline'
+  readonly status: 'offline' | 'room-full'
   private timer: unknown = null
+
+  constructor(core: Core, status: 'offline' | 'room-full' = 'offline') {
+    super(core)
+    this.status = status
+  }
 
   enter(): void {
     const { timers } = this.core.ports
@@ -389,6 +396,7 @@ class Core {
     this.wentOffline()
     if (code === 4401) this.transition(new Denied(this, 'signed-out'))
     else if (code === 4403 || code === 4404) this.transition(new Denied(this, 'no-access'))
+    else if (code === 4429) this.transition(new Waiting(this, 'room-full'))
     else this.transition(new Waiting(this))
   }
 

@@ -14,7 +14,7 @@ import { shortPin } from '../../../../shared/connect'
 import type { FoundServer } from '../../../../shared/platform'
 import { boardLibrary } from '../../boardLibrary'
 import { platform } from '../../platform'
-import { cloudLabel, cloudOrigin, hostedCloud, setStoragePreference, storagePreference } from '../../storagePreference'
+import { cloudLabel, cloudOrigin, setStoragePreference, storagePreference } from '../../storagePreference'
 import { account, rememberAccount, useAccounts } from '../../sync/accounts'
 import { ApiError } from '../../sync/api'
 import { clientFor } from '../../sync/clients'
@@ -68,8 +68,6 @@ function Connected({ pref, name, onChange }: { pref: Preference; name: string; o
       setStoragePreference('device')
       connectFlow.cancel()
       onChange()
-      // Penrill Cloud only has boards of a signed-in account: start over at its sign-in page.
-      if (hostedCloud) window.location.reload()
     } catch {
       setFailed(true)
     } finally {
@@ -88,16 +86,16 @@ function Connected({ pref, name, onChange }: { pref: Preference; name: string; o
       </DescriptionList>
       <div className="mt-6 flex flex-wrap gap-3">
         <Button outline disabled={busy} onClick={() => void disconnect()}>
-          {hostedCloud ? t('share.logout') : t('sync.disconnect')}
+          {t('sync.disconnect')}
         </Button>
-        {pref.source === 'server' && (
-          <Button plain onClick={() => void openPage(`${pref.origin}/account`)}>
+        {(pref.source === 'server' || pref.source === 'cloud') && (
+          <Button plain onClick={() => void openPage(pref.source === 'cloud' ? pref.origin : `${pref.origin}/account`)}>
             {t('sync.manage')}
             <ArrowTopRightOnSquareIcon />
           </Button>
         )}
       </div>
-      {!hostedCloud && <Text className="mt-4">{t('sync.disconnectHint')}</Text>}
+      <Text className="mt-4">{t('sync.disconnectHint')}</Text>
       {failed && <Text className="mt-4 text-red-600! dark:text-red-500!">{t('storage.error')}</Text>}
       <SyncedBoards origin={pref.origin} />
       {pref.source === 'server' && <FoldersSection origin={pref.origin} />}
@@ -319,7 +317,7 @@ export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () =>
 
   return (
     <>
-      <PageHeader title={t('home.sync')} description={t(hostedCloud ? 'sync.cloudHint' : 'sync.intro')} />
+      <PageHeader title={t('home.sync')} description={t('sync.intro')} />
       <div className="max-w-2xl">
         <Divider className="my-10" soft />
         {state.step !== 'idle' && state.step !== 'connected' ? (
@@ -332,7 +330,7 @@ export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () =>
           />
         ) : session ? (
           <Connected pref={pref} name={session.name} onChange={onChange} />
-        ) : hostedCloud ? null : (
+        ) : (
           <Choices />
         )}
       </div>

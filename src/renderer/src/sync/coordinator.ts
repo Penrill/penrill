@@ -5,11 +5,11 @@ import { platform } from '../platform'
 import { useApp } from '../appState'
 import { storagePreference } from '../storagePreference'
 import { account, accountsChanged, useAccounts } from './accounts'
-import { isAccessError, isAuthError } from './api'
+import { isAccessError, isAuthError, isQuotaError } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { EditorDocument, type TitlePort } from './editorDocument'
-import { LibrarySync, publishBoard, serverCopyState, setStatus, settleServerCopy, statusFor, type SyncStatus } from './librarySync'
+import { hintFor, LibrarySync, publishBoard, serverCopyState, setStatus, settleServerCopy, statusFor, type SyncStatus } from './librarySync'
 import { activeLink, linkBoard, linkFor, linksChanged, saveLink, scopeOf, syncsNewBoards, useLinks, type Link } from './links'
 import { outboxFor } from './outbox'
 import { Presence } from './presence'
@@ -45,6 +45,7 @@ function sessionStatus(state: SessionState): SyncStatus | null {
     case 'live': return state.pending ? 'pending' : 'synced'
     case 'connecting': return 'pending'
     case 'offline': return 'offline'
+    case 'room-full': return 'room-full'
     case 'stopped': return null
     default: return 'denied'
   }
@@ -169,7 +170,11 @@ class SyncCoordinator {
         }
       },
       onPeers: peers => presence.setPeers(peers),
-      onSignal: (peer, data) => presence.receive(peer, data)
+      onSignal: (peer, data) => presence.receive(peer, data),
+      onReject: reason => {
+        if (reason === 'read-only') setStatus(localId, 'read-only')
+        else if (reason === 'quota-exceeded' || reason === 'plan-required') setStatus(localId, 'quota', { upgradeUrl: new URL('/billing', link.origin).href })
+      }
     })
     const live: LiveBoard = { key, localId, link, session, document, presence, detachCanvas: this.canvas ? presence.attach(this.canvas) : null }
     this.live = live
@@ -185,8 +190,8 @@ class SyncCoordinator {
         const items = [...live.document.ids()].flatMap(id => live.document.item(id) ?? [])
         link = await publishBoard(live.localId, link, { title, background, items })
       } catch (error) {
-        setStatus(live.localId, statusFor(error))
-        if (isAuthError(error) || isAccessError(error)) return
+        setStatus(live.localId, statusFor(error), hintFor(link.origin, error))
+        if (isAuthError(error) || isAccessError(error) || isQuotaError(error)) return
         await delay(Math.min(PUBLISH_RETRY_MAX_MS, 1000 * 2 ** attempt))
       }
     }

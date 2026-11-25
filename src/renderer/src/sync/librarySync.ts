@@ -13,7 +13,7 @@ import { useApp } from '../appState'
 import { boardLibrary } from '../boardLibrary'
 import { platform } from '../platform'
 import { account } from './accounts'
-import { ApiError, isAccessError, isAuthError, isPermanent, REMOVED, type BoardContent, type Community, type RemoteBoard } from './api'
+import { ApiError, isAccessError, isAuthError, isPermanent, isQuotaError, isReadOnlyError, REMOVED, type BoardContent, type Community, type RemoteBoard } from './api'
 import { assetCodec } from './assets'
 import { clientFor } from './clients'
 import { allLinks, copyOutcome, deletionDone, forgetServerCopy, linkedBoards, linkFor, pendingDeletions, removeFromServer, removeLink, saveLink, scopeOf, type CopyState, type Link } from './links'
@@ -21,21 +21,42 @@ import { clearOutbox, outboxFor } from './outbox'
 import { refreshTemplates } from './templates'
 import { fromWire, toWire } from './wire'
 
-export type SyncStatus = 'synced' | 'pending' | 'offline' | 'denied'
+export type SyncStatus = 'synced' | 'pending' | 'offline' | 'denied' | 'read-only' | 'quota' | 'room-full'
 
-export const useSyncStatus = create<{ states: Record<string, SyncStatus> }>(() => ({ states: {} }))
+export interface SyncHint {
+  upgradeUrl?: string
+  message?: string
+}
+
+export const useSyncStatus = create<{ states: Record<string, SyncStatus>; hints: Record<string, SyncHint | undefined> }>(() => ({ states: {}, hints: {} }))
 
 /** What the server shares with this account: folders, their boards, and templates. */
 export const useCommunity = create<{ origin: string; catalog: Community | null }>(() => ({ origin: '', catalog: null }))
 
 export const useRemoteBoards = create<{ origin: string; rows: RemoteBoard[]; error: boolean }>(() => ({ origin: '', rows: [], error: false }))
 
-export function setStatus(localId: string, status: SyncStatus): void {
-  if (useSyncStatus.getState().states[localId] === status) return
-  useSyncStatus.setState(({ states }) => ({ states: { ...states, [localId]: status } }))
+export function setStatus(localId: string, status: SyncStatus, hint?: SyncHint): void {
+  const prev = useSyncStatus.getState()
+  const nextHint = status === 'quota' ? hint : undefined
+  if (prev.states[localId] === status && prev.hints[localId]?.upgradeUrl === nextHint?.upgradeUrl && prev.hints[localId]?.message === nextHint?.message) return
+  useSyncStatus.setState(({ states, hints }) => ({
+    states: { ...states, [localId]: status },
+    hints: { ...hints, [localId]: nextHint }
+  }))
 }
 
-export const statusFor = (error: unknown): SyncStatus => isAuthError(error) || isAccessError(error) ? 'denied' : 'offline'
+export const statusFor = (error: unknown): SyncStatus =>
+  isQuotaError(error) ? 'quota'
+    : isReadOnlyError(error) ? 'read-only'
+    : isAuthError(error) || isAccessError(error) ? 'denied'
+    : 'offline'
+
+export function hintFor(origin: string, error: unknown): SyncHint | undefined {
+  if (!isQuotaError(error)) return undefined
+  const upgrade = error.upgradeUrl
+  const upgradeUrl = upgrade ? (upgrade.startsWith('http://') || upgrade.startsWith('https://') ? upgrade : new URL(upgrade, origin).href) : new URL('/billing', origin).href
+  return { upgradeUrl, message: error.title }
+}
 
 const itemsOf = (wires: Iterable<WireItem>): Item[] =>
   [...wires].map(fromWire).filter((item): item is Item => !!item).sort((a, b) => a.z - b.z)
@@ -260,7 +281,7 @@ export class LibrarySync {
         setStatus(localId, await this.syncBoard(localId, link, entries.get(localId)!, seqs))
       } catch (error) {
         this.problem(origin, error)
-        setStatus(localId, statusFor(error))
+        setStatus(localId, statusFor(error), hintFor(origin, error))
       }
     }
   }
@@ -279,11 +300,16 @@ export class LibrarySync {
         await client.submit(link.remote, await codec.encode(change))
         await outbox.confirm(change.id)
       } catch (error) {
+        if (isReadOnlyError(error)) {
+          this.log.warn('Board is read-only on the server; local edit was not applied remotely', { board: link.remote, change: change.id })
+          await outbox.remove(change.id)
+          throw error
+        }
         if (isAccessError(error)) {
           const state = await serverCopyState(link)
           if (state !== 'here') return await settleServerCopy(localId, link, state) ?? 'synced'
         }
-        if (!(error instanceof PermanentError) && (!isPermanent(error) || isAuthError(error) || isAccessError(error))) throw error
+        if (!(error instanceof PermanentError) && (!isPermanent(error) || isAuthError(error) || isAccessError(error) || isQuotaError(error))) throw error
         this.log.warn('Dropped a change the server can never accept', { board: link.remote, change: change.id, reason: String(error) })
         await outbox.remove(change.id)
       }

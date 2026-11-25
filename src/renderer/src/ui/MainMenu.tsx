@@ -63,6 +63,7 @@ function SaveStatus() {
   const status = useApp((s) => s.saveStatus)
   const board = useApp((s) => s.board)
   const remote = useSyncStatus(s => board ? s.states[board.id] : undefined)
+  const hint = useSyncStatus(s => board ? s.hints[board.id] : undefined)
   useLinks(s => s.version)
   if (!board) return null
 
@@ -74,8 +75,9 @@ function SaveStatus() {
   const localText = t(status === 'error' ? 'save.error' : busy ? 'save.saving' : 'save.saved')
   const state = remote ?? 'pending'
   const label = link ? t(`storage.${state}`) : t('storage.device')
-  const warning = status === 'error' || (link && (state === 'offline' || state === 'denied'))
-  const Icon = status === 'error' || (link && state === 'denied') ? ExclamationTriangleIcon
+  const isProblem = state === 'denied' || state === 'read-only' || state === 'quota' || state === 'room-full'
+  const warning = status === 'error' || (link && (state === 'offline' || isProblem))
+  const Icon = status === 'error' || (link && isProblem) ? ExclamationTriangleIcon
     : link ? state === 'offline' ? SignalSlashIcon : state === 'pending' ? CloudArrowUpIcon : CloudIcon
     : busy ? ArrowPathIcon : ComputerDesktopIcon
   const description = [label, link?.origin, localText, where].filter(Boolean).join('\n')
@@ -95,6 +97,25 @@ function SaveStatus() {
         <span>{localText}</span>
         <span className="break-all">{where}</span>
         {link && state === 'denied' && <span>{t('storage.deniedHelp')}</span>}
+        {link && state === 'read-only' && <span>{t('storage.readOnlyHelp')}</span>}
+        {link && state === 'room-full' && <span>{t('storage.roomFullHelp')}</span>}
+        {link && state === 'quota' && (
+          <>
+            <span>{hint?.message || t('storage.quotaHelp')}</span>
+            {hint?.upgradeUrl && (
+              <button
+                type="button"
+                className="mt-1 self-start font-medium text-blue-600 hover:underline dark:text-blue-400"
+                onClick={() => {
+                  if (platform.connect) void platform.connect.openExternal(hint.upgradeUrl!)
+                  else window.open(hint.upgradeUrl!, '_blank', 'noopener')
+                }}
+              >
+                {t('storage.upgrade')}
+              </button>
+            )}
+          </>
+        )}
       </FlyoutPanel>
     </Headless.Popover>
   )

@@ -321,6 +321,48 @@ test('a revoked session stops reconnecting', async () => {
   assert.equal(sockets.length, 1)
 })
 
+test('close code 4429 reports room-full and retries after backoff', async () => {
+  const { timers, session, sockets, socket } = harness()
+  await session.start()
+  socket().events.close(4429)
+  await settle()
+  assert.equal(session.status, 'room-full')
+  timers.advance(10_000)
+  assert.equal(sockets.length, 2)
+})
+
+test('live reject notifies onReject with the server reason', async () => {
+  const rejected: string[] = []
+  const timers = new Timers()
+  const sockets: Socket[] = []
+  const doc = new Document()
+  const outbox = new MemoryOutbox()
+  const session = new LiveSession({
+    transport: { connect: (events) => { const s = new Socket(events); sockets.push(s); return s } },
+    outbox,
+    codec: { encode: async (c) => c, decode: async (c) => c, decodeItems: async (i) => i },
+    document: doc,
+    timers,
+    log: { info: () => {}, warn: () => {} },
+    token: () => 'tok',
+    onReject: (reason) => rejected.push(reason)
+  })
+  doc.session = session
+  await session.start()
+  sockets[0].events.open()
+  sockets[0].receive({ type: 'snapshot', board: snapshot(0) })
+  sockets[0].receive({ type: 'ready', seq: 0, peers: [] })
+  await settle()
+
+  const c = change(put('x'))
+  session.local(c)
+  await settle()
+  sockets[0].receive({ type: 'reject', id: c.id, reason: 'read-only' })
+  await settle()
+  assert.deepEqual(rejected, ['read-only'])
+  session.stop()
+})
+
 test('first-class ShapeItem round-trips over wire and merges concurrent geometry, construction, label and colour edits without conflict', () => {
   const baseShape = createShapeItem(
     { geo: { kind: 'rhombus', ax: 0, ay: 0, bx: 120, by: 80 } },

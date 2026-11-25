@@ -9,13 +9,12 @@ const root = resolve(import.meta.dirname, '../..')
 const { version } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { version: string }
 
 // The web app, published at https://app.penrill.com/ (see .github/workflows/pages.yml).
-//   npm run dev:web                   http://localhost:5174/
-//   npm run build:web                 into dist/web
-//   npm run build:web -- --mode cloud into dist/cloud, served by Penrill Cloud
+//   npm run dev:web   http://localhost:5174/
+//   npm run build:web into dist/web
 const build = randomUUID()
 const buildInfo = JSON.stringify({ version, build })
 
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   root: import.meta.dirname,
   base: '/',
   plugins: [react(), tailwindcss(), {
@@ -36,7 +35,7 @@ export default defineConfig(({ mode }) => ({
     fs: { allow: [searchForWorkspaceRoot(root)] }
   },
   build: {
-    outDir: resolve(root, mode === 'cloud' ? 'dist/cloud' : 'dist/web'),
+    outDir: resolve(root, 'dist/web'),
     emptyOutDir: true
   }
-}))
+})
