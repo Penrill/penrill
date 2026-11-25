@@ -23,11 +23,11 @@ export type EdgeDocks = Record<DockEdge, ToolbarItemId[]>
 export type OptionsMode = 'strip' | 'popover'
 export type OptionsDock = DockEdge
 export type ZoomDock = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
-export type WorkspacePresetId = 'default' | 'top' | 'left' | 'right' | 'bottom'
+export type WorkspacePresetId = 'default' | 'split' | 'left' | 'right' | 'bottom'
 
 export const DOCK_EDGES: readonly DockEdge[] = ['top', 'bottom', 'left', 'right']
 export const ZOOM_DOCKS: readonly ZoomDock[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left']
-export const WORKSPACE_PRESET_IDS: readonly WorkspacePresetId[] = ['default', 'top', 'left', 'right', 'bottom']
+export const WORKSPACE_PRESET_IDS: readonly WorkspacePresetId[] = ['default', 'split', 'left', 'right', 'bottom']
 
 export interface WorkspaceLayout {
   /** Ordered tools and dividers docked to each screen edge. Each tool sits on at most one edge. */
@@ -90,20 +90,6 @@ export function cloneWorkspaceLayout(layout: WorkspaceLayout): WorkspaceLayout {
 export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
   default: {
     docks: {
-      top: [...DEFAULT_DRAWING_DOCK],
-      bottom: [],
-      left: [...DEFAULT_INSERT_DOCK],
-      right: []
-    },
-    optionsMode: 'popover',
-    optionsDock: 'top',
-    zoomDock: 'bottom-right',
-    insertLabels: true,
-    collapseSelectTools: true,
-    showShortcutBadges: false
-  },
-  top: {
-    docks: {
       top: [...DEFAULT_TOOLBAR_WITH_DIVIDERS],
       bottom: [],
       left: [],
@@ -115,6 +101,20 @@ export const WORKSPACE_PRESETS: Record<WorkspacePresetId, WorkspaceLayout> = {
     insertLabels: false,
     collapseSelectTools: false,
     showShortcutBadges: true
+  },
+  split: {
+    docks: {
+      top: [...DEFAULT_DRAWING_DOCK],
+      bottom: [],
+      left: [...DEFAULT_INSERT_DOCK],
+      right: []
+    },
+    optionsMode: 'popover',
+    optionsDock: 'top',
+    zoomDock: 'bottom-right',
+    insertLabels: true,
+    collapseSelectTools: true,
+    showShortcutBadges: false
   },
   left: {
     docks: {
@@ -232,7 +232,7 @@ export function migrateLegacyLayout(legacyLayout: unknown, legacyToolbarLayout: 
       ? (rawInsertDock as DockEdge | 'merged')
       : hasExplicitV3
         ? 'bottom'
-        : 'left'
+        : 'merged'
 
   const cleanedFlat = cleanToolbarLayout(legacyToolbarLayout)
   const flatItems = cleanedFlat
@@ -429,14 +429,14 @@ export function moveWholeDock(docks: EdgeDocks, fromEdge: DockEdge, toEdge: Dock
 /** Pick a natural edge for quick-adding a hidden tool (e.g. clicking a tile in the palette). */
 export function preferredEdgeForTool(docks: EdgeDocks, toolId: ConcreteToolId): DockEdge {
   const insert = isInsertTool(toolId)
-  const order: readonly DockEdge[] = insert ? ['left', 'bottom', 'top', 'right'] : ['top', 'left', 'right', 'bottom']
+  const order: readonly DockEdge[] = insert ? ['top', 'left', 'bottom', 'right'] : ['top', 'left', 'right', 'bottom']
   for (const edge of order) {
     if (docks[edge].some((id) => !isToolbarDivider(id) && isInsertTool(id) === insert)) return edge
   }
   for (const edge of order) {
     if (docks[edge].length > 0) return edge
   }
-  return insert ? 'left' : 'top'
+  return 'top'
 }
 
 /** Quick-add a hidden tool to the most natural bar edge. */

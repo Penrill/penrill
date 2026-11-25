@@ -31,11 +31,16 @@ test('every built-in preset is detected by detectWorkspacePreset', () => {
 
 test('tweaking any field or dock switches preset detection to custom', () => {
   assert.equal(DEFAULT_WORKSPACE_LAYOUT.optionsMode, 'popover')
+  assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT.docks.left, [])
+  assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT.docks.right, [])
+  assert.deepEqual(DEFAULT_WORKSPACE_LAYOUT.docks.bottom, [])
+  assert.ok(DEFAULT_WORKSPACE_LAYOUT.docks.top.includes('pen1'))
+  assert.ok(DEFAULT_WORKSPACE_LAYOUT.docks.top.includes('shapes'))
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, optionsMode: 'strip' }), 'custom')
-  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.top, optionsMode: 'strip' }), 'custom')
-  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, insertLabels: false }), 'custom')
-  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, collapseSelectTools: false }), 'custom')
-  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, showShortcutBadges: true }), 'custom')
+  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.split, optionsMode: 'strip' }), 'custom')
+  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, insertLabels: true }), 'custom')
+  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, collapseSelectTools: true }), 'custom')
+  assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, showShortcutBadges: false }), 'custom')
   assert.equal(detectWorkspacePreset({ ...WORKSPACE_PRESETS.default, zoomDock: 'top-left' }), 'custom')
   const moved = {
     ...WORKSPACE_PRESETS.default,
@@ -134,7 +139,7 @@ test('removeItemFromDocks hides tools and addToolToPreferredDock restores them',
 
 test('moveWholeDock moves to an empty edge and merges onto an occupied edge with a divider', () => {
   // Move top to empty right.
-  const movedRight = moveWholeDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'top', 'right')
+  const movedRight = moveWholeDock(WORKSPACE_PRESETS.split.docks, 'top', 'right')
   assert.deepEqual(movedRight.top, [])
   assert.ok(movedRight.right.includes('pen1'))
 
@@ -154,7 +159,7 @@ test('custom presets clean cleanly and match via matchWorkspacePreset', () => {
   const customLayout: typeof DEFAULT_WORKSPACE_LAYOUT = {
     ...cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT),
     docks: placeToolInDock(DEFAULT_WORKSPACE_LAYOUT.docks, 'undo', 'bottom'),
-    showShortcutBadges: true
+    showShortcutBadges: false
   }
   const presets = cleanCustomPresets([
     { id: 'p1', name: '  Geometry  ', layout: customLayout, updatedAt: 100 },
@@ -168,8 +173,8 @@ test('custom presets clean cleanly and match via matchWorkspacePreset', () => {
   assert.equal(matched.kind, 'custom')
   if (matched.kind === 'custom') assert.equal(matched.preset.id, 'p1')
 
-  const builtin = matchWorkspacePreset(WORKSPACE_PRESETS.top, presets)
-  assert.deepEqual(builtin, { kind: 'builtin', id: 'top' })
+  const builtin = matchWorkspacePreset(WORKSPACE_PRESETS.split, presets)
+  assert.deepEqual(builtin, { kind: 'builtin', id: 'split' })
 
   const unsaved = matchWorkspacePreset({ ...customLayout, zoomDock: 'top-left' }, presets)
   assert.deepEqual(unsaved, { kind: 'unsaved' })

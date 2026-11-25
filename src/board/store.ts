@@ -19,6 +19,7 @@ import {
   DEFAULT_WORKSPACE_LAYOUT,
   migrateLegacyLayout,
   WORKSPACE_PRESETS,
+  workspaceLayoutsEqual,
   type CustomWorkspacePreset,
   type WorkspaceLayout,
   type WorkspacePresetId
@@ -308,7 +309,7 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => {
         let state = (persisted ?? {}) as Prefs
         if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
@@ -325,6 +326,15 @@ export const prefsStore = createStore<Prefs>()(
             ...state,
             workspaceLayout: migrateLegacyLayout(state.workspaceLayout, state.toolbarLayout),
             customPresets: cleanCustomPresets((state as { customPresets?: unknown }).customPresets)
+          }
+        }
+        if (version < 5 && state.workspaceLayout) {
+          // Users still on the untouched v0.13.12/v0.13.13 split default switch to the classic all-on-top default.
+          const current = cleanWorkspaceLayout(state.workspaceLayout, state.toolbarLayout)
+          const oldSplitPopover = WORKSPACE_PRESETS.split
+          const oldSplitStrip = { ...WORKSPACE_PRESETS.split, optionsMode: 'strip' as const }
+          if (workspaceLayoutsEqual(current, oldSplitPopover) || workspaceLayoutsEqual(current, oldSplitStrip)) {
+            state = { ...state, workspaceLayout: cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT) }
           }
         }
         return state

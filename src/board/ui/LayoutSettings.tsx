@@ -158,7 +158,7 @@ export function PresetPreview({ layout, active }: { layout: WorkspaceLayout; act
 
 const PRESET_LABELS: Record<WorkspacePresetId, { title: MessageKey; hint: MessageKey }> = {
   default: { title: 'layout.preset.default', hint: 'layout.preset.defaultHint' },
-  top: { title: 'layout.preset.top', hint: 'layout.preset.topHint' },
+  split: { title: 'layout.preset.split', hint: 'layout.preset.splitHint' },
   left: { title: 'layout.preset.left', hint: 'layout.preset.leftHint' },
   right: { title: 'layout.preset.right', hint: 'layout.preset.rightHint' },
   bottom: { title: 'layout.preset.bottom', hint: 'layout.preset.bottomHint' }

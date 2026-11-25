@@ -537,7 +537,7 @@ export function ZoomCornerDropZone({ corner }: { corner: ZoomDock }) {
 
 const PRESET_NAMES: Record<WorkspacePresetId, MessageKey> = {
   default: 'layout.preset.default',
-  top: 'layout.preset.top',
+  split: 'layout.preset.split',
   left: 'layout.preset.left',
   right: 'layout.preset.right',
   bottom: 'layout.preset.bottom'
