@@ -17,6 +17,7 @@ const LOOPBACK = ['localhost', '127.0.0.1', '[::1]']
 const API_PATH = /^\/api\/[A-Za-z0-9/_-]*$/
 const METHODS = new Set(['GET', 'PUT', 'POST', 'DELETE'])
 const TIMEOUT_MS = 20_000
+const BINARY_TIMEOUT_MS = 60_000
 
 export function serverOrigin(address: string): string {
   const url = new URL(address)
@@ -34,9 +35,10 @@ export async function sendHttp(origin: string, request: HttpRequest, fetchImpl: 
   if (request.token) headers.set('Authorization', 'Bearer ' + request.token)
   if (request.contentType) headers.set('Content-Type', request.contentType)
   const body = typeof request.body === 'string' ? request.body : request.body ? new Blob([request.body as BlobPart]) : undefined
+  const timeoutMs = request.body instanceof Uint8Array ? BINARY_TIMEOUT_MS : TIMEOUT_MS
   const response = await fetchImpl(url, {
     method: request.method, headers, body,
-    credentials: 'omit', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS)
+    credentials: 'omit', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(timeoutMs)
   })
   return { status: response.status, contentType: response.headers.get('content-type') ?? '', body: new Uint8Array(await response.arrayBuffer()) }
 }

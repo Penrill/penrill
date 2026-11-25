@@ -1,5 +1,5 @@
 import type { Change } from '@penrill/sync/protocol'
-import { LiveSession, type Logger, type SessionState, type Timers } from '@penrill/sync/session'
+import { LiveSession, PermanentError, type Logger, type SessionState, type Timers } from '@penrill/sync/session'
 import { boardLibrary } from '../boardLibrary'
 import { platform } from '../platform'
 import { useApp } from '../appState'
@@ -191,7 +191,12 @@ class SyncCoordinator {
         link = await publishBoard(live.localId, link, { title, background, items })
       } catch (error) {
         setStatus(live.localId, statusFor(error), hintFor(link.origin, error))
-        if (isAuthError(error) || isAccessError(error) || isQuotaError(error)) return
+        if (
+          isAuthError(error) ||
+          isAccessError(error) ||
+          isQuotaError(error) ||
+          (error instanceof PermanentError && (error.reason === 'quota-exceeded' || error.reason === 'plan-required' || error.reason === 'read-only'))
+        ) return
         await delay(Math.min(PUBLISH_RETRY_MAX_MS, 1000 * 2 ** attempt))
       }
     }

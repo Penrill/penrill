@@ -29,7 +29,14 @@ export interface Outbox {
   remove(id: string): Promise<void>
 }
 
-export class PermanentError extends Error {}
+export class PermanentError extends Error {
+  readonly reason?: string
+
+  constructor(message: string, reason?: string) {
+    super(message)
+    this.reason = reason
+  }
+}
 
 export interface WireCodec {
   encode(change: Change): Promise<Change>
@@ -490,6 +497,7 @@ class Core {
         if (!(error instanceof PermanentError)) throw error
         this.ports.log.warn('Dropped a change the server can never accept', { change: next.id, reason: error.message })
         this.settle(next.id, false)
+        if (error.reason) this.ports.onReject?.(error.reason)
         continue
       }
       if (epoch !== this.epoch) return

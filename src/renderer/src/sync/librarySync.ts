@@ -1,6 +1,6 @@
 import type { Item } from '@penrill/core/types'
 import { applyChange, stateOf } from '@penrill/sync/board'
-import type { WireItem } from '@penrill/sync/protocol'
+import type { Change, WireItem } from '@penrill/sync/protocol'
 import { PermanentError, type Logger } from '@penrill/sync/session'
 import { create } from 'zustand'
 import { DEFAULT_CAMERA } from '../../../board/editor'
@@ -46,12 +46,15 @@ export function setStatus(localId: string, status: SyncStatus, hint?: SyncHint):
 }
 
 export const statusFor = (error: unknown): SyncStatus =>
-  isQuotaError(error) ? 'quota'
-    : isReadOnlyError(error) ? 'read-only'
+  isQuotaError(error) || (error instanceof PermanentError && (error.reason === 'quota-exceeded' || error.reason === 'plan-required')) ? 'quota'
+    : isReadOnlyError(error) || (error instanceof PermanentError && error.reason === 'read-only') ? 'read-only'
     : isAuthError(error) || isAccessError(error) ? 'denied'
     : 'offline'
 
 export function hintFor(origin: string, error: unknown): SyncHint | undefined {
+  if (error instanceof PermanentError && (error.reason === 'quota-exceeded' || error.reason === 'plan-required')) {
+    return { upgradeUrl: new URL('/billing', origin).href, message: error.message }
+  }
   if (!isQuotaError(error)) return undefined
   const upgrade = error.upgradeUrl
   const upgradeUrl = upgrade ? (upgrade.startsWith('http://') || upgrade.startsWith('https://') ? upgrade : new URL(upgrade, origin).href) : new URL('/billing', origin).href
@@ -61,13 +64,36 @@ export function hintFor(origin: string, error: unknown): SyncHint | undefined {
 const itemsOf = (wires: Iterable<WireItem>): Item[] =>
   [...wires].map(fromWire).filter((item): item is Item => !!item).sort((a, b) => a.z - b.z)
 
+const isDataImage = (item: WireItem): boolean =>
+  item.type === 'image' && typeof item.src === 'string' && item.src.startsWith('data:')
+
 export async function publishBoard(localId: string, link: Link, content: BoardContent): Promise<Link> {
   const client = clientFor(link.origin)
-  const encoded = await assetCodec(client, link.remote).encode({ id: 'publish', ops: content.items.map(item => ({ op: 'put', item })) })
-  const items = encoded.ops.flatMap(op => op.op === 'put' ? [op.item] : [])
-  const result = await client.createBoard(link.remote, { ...content, items })
-  const published = { ...link, published: true, seq: result.created ? result.seq : null }
+  const imageItems = content.items.filter(isDataImage)
+  const baseItems = imageItems.length ? content.items.filter(item => !isDataImage(item)) : content.items
+  // Create the board first so PUT /api/boards/{id}/assets/{hash} finds an existing board and passes access checks.
+  const result = await client.createBoard(link.remote, { ...content, items: baseItems })
+  let published: Link = { ...link, published: true, seq: result.created ? result.seq : null }
   saveLink(localId, published)
+  if (result.created && imageItems.length) {
+    const change: Change = { id: crypto.randomUUID(), ops: imageItems.map(item => ({ op: 'put' as const, item })) }
+    const outbox = outboxFor(scopeOf(published))
+    await outbox.add(change)
+    try {
+      const encoded = await assetCodec(client, published.remote).encode(change)
+      const seq = await client.submit(published.remote, encoded)
+      await outbox.confirm(change.id)
+      published = { ...published, seq }
+      saveLink(localId, published)
+    } catch (error) {
+      if (error instanceof PermanentError || isQuotaError(error) || isReadOnlyError(error)) {
+        await outbox.remove(change.id)
+        throw error
+      }
+      if (isAuthError(error) || isAccessError(error)) throw error
+      // Transient upload/submit failure: the board exists on the server and image ops stay queued in outbox for retry.
+    }
+  }
   return published
 }
 
@@ -300,8 +326,12 @@ export class LibrarySync {
         await client.submit(link.remote, await codec.encode(change))
         await outbox.confirm(change.id)
       } catch (error) {
-        if (isReadOnlyError(error)) {
+        if (isReadOnlyError(error) || (error instanceof PermanentError && error.reason === 'read-only')) {
           this.log.warn('Board is read-only on the server; local edit was not applied remotely', { board: link.remote, change: change.id })
+          await outbox.remove(change.id)
+          throw error
+        }
+        if (error instanceof PermanentError && (error.reason === 'quota-exceeded' || error.reason === 'plan-required')) {
           await outbox.remove(change.id)
           throw error
         }
