@@ -17,11 +17,11 @@ export class ApiError extends Error {
   }
 }
 
-export const isAuthError = (error: unknown) => error instanceof ApiError && error.status === 401
-export const isAccessError = (error: unknown) => error instanceof ApiError && (error.status === 403 || error.status === 404)
-export const isQuotaError = (error: unknown) => error instanceof ApiError && error.status === 402
-export const isReadOnlyError = (error: unknown) => error instanceof ApiError && error.status === 403 && error.reason === 'read-only'
-export const isPermanent = (error: unknown) =>
+export const isAuthError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 401
+export const isAccessError = (error: unknown): error is ApiError => error instanceof ApiError && (error.status === 403 || error.status === 404)
+export const isQuotaError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 402
+export const isReadOnlyError = (error: unknown): error is ApiError => error instanceof ApiError && error.status === 403 && error.reason === 'read-only'
+export const isPermanent = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429
 
 export interface RemoteBoard {
