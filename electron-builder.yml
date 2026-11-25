@@ -1,6 +1,6 @@
 appId: app.inkboard.desktop
 productName: Penrill
-copyright: Copyright © 2026 Yaroslav Yushchenko and contributors
+copyright: Copyright © 2026 Yaroslav Yushchenko, Danylo Shapenko and contributors
 directories:
   buildResources: build
   output: dist
