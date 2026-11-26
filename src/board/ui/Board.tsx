@@ -18,7 +18,7 @@ import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import { evaluateShape } from '@penrill/core/shapeEval'
 import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
 import { is3D, isLinear, shapeEdges, snapAngle } from '@penrill/core/shapes'
-import { canTurnSelection, hitTest } from '../engine/transform'
+import { applyXform, canTurnSelection, hitTest } from '../engine/transform'
 import type { BBox, Item, Point, ShapeItem, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
 import { isSideViewPreset, type Gizmo3dModel } from '@penrill/shape-editor/gizmo3d'
 import { useEditor } from '../editorContext'
@@ -410,9 +410,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       const box = editor.selectionBBox()
       if (!box || !items.length) return null
       const locked = items.some((i) => i.locked)
-      const shapeItem = items.length === 1 && !locked && items[0].type === 'shape' ? items[0] : null
-      const line = !shapeItem && items.length === 1 && !locked && lineEnds(items[0]) ? (items[0] as StrokeItem) : null
-      const es = locked || line || shapeItem ? null : editableShape(items)
+      // While the selection is being moved, scaled or turned, its handles go along with the preview.
+      const t = editor.preview?.t
+      const moved = <T extends Item>(item: T): T => (t ? (applyXform(item, t) as T) : item)
+      const shapeItem = items.length === 1 && !locked && items[0].type === 'shape' ? moved(items[0]) : null
+      const line = !shapeItem && items.length === 1 && !locked && lineEnds(items[0]) ? moved(items[0] as StrokeItem) : null
+      const rawShape = locked || line || shapeItem ? null : editableShape(items)
+      const es = rawShape && t ? editableShape(items.map(moved)) : rawShape
       const shape = es && !isLinear(es.spec.kind) ? es : null
       const shapeEd = editor.features.shapeEditor
       const gizmoActive = !!(shapeItem && is3D(shapeItem.geo.kind) && isGizmo3dOn())
