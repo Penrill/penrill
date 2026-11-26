@@ -670,6 +670,9 @@ export function ShapeMeasurementControls({ spec, onChange }: { spec: ShapeSpec; 
   )
 }
 
+/** A footer link: icon and text centred on one line (the Button default lines them up by baseline). */
+const FOOTER_LINK = '!items-center !px-2 !py-1 !text-xs/5 *:data-[slot=icon]:!my-0'
+
 /** Footer actions inside Shape flyouts / legacy Shape inspector using Catalyst Buttons. */
 export function ShapePopoverFooter({
   spec,
@@ -696,7 +699,7 @@ export function ShapePopoverFooter({
       {!hideSettingsLink && (
         <Button
           plain
-          className="!px-2 !py-1 !text-xs"
+          className={FOOTER_LINK}
           onClick={() => {
             onOpenSettings?.()
             editor.session.setState({ settingsSection: 'shapes' })
@@ -707,7 +710,7 @@ export function ShapePopoverFooter({
         </Button>
       )}
       {onExact && (
-        <Button plain className="!px-2 !py-1 !text-xs" title={t('shapes.exactHint')} onClick={onExact}>
+        <Button plain className={FOOTER_LINK} title={t('shapes.exactHint')} onClick={onExact}>
           <CalculatorIcon data-slot="icon" />
           {t('shapes.exactLink')}
         </Button>
