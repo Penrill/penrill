@@ -115,6 +115,7 @@ export function FunctionPanel() {
   const active = useSession((s) => s.active)
   // Follow the plane when the board is panned / zoomed or the plane moves.
   useSession((s) => s.camera)
+  useSession((s) => s.previewVersion)
   const sceneVersion = useSession((s) => s.sceneVersion)
   const [rows, setRows] = useState<FnRow[]>([])
   const [hide, setHide] = useState(false)
@@ -170,7 +171,7 @@ export function FunctionPanel() {
     editor.session.setState({ fnPanel: null })
   }
 
-  const { left, top } = dockBeside(g.bbox, editor.camera, PANEL_W, height)
+  const { left, top } = dockBeside(editor.shownBBox(g), editor.camera, PANEL_W, height)
 
   return (
     <div

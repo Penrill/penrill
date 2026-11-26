@@ -13,7 +13,7 @@ import {
 } from './engine/serialize'
 import { editableShape, patchShapeSpec, regenerateShape } from '@penrill/core/shapeItems'
 import { shapeBBox } from '@penrill/core/shapeEval'
-import { applyXform, isIdentity, unionBBox, xformBBox, type Xform } from './engine/transform'
+import { applyXform, isIdentity, unionBBox, xformBBox, xformPoint, type Xform } from './engine/transform'
 import { bgPattern, withPattern } from './engine/surface'
 import { COMPASS_CELL } from './engine/compass'
 import { CM } from './engine/straightedge'
@@ -470,12 +470,28 @@ export class Editor {
 
   setPreview(t: Xform | null): void {
     this.preview = t ? { ids: new Set(this.session.getState().selectedIds), t } : null
+    this.bumpPreview()
     this.invalidate(true)
+  }
+
+  private bumpPreview(): void {
+    this.session.setState((s) => ({ previewVersion: s.previewVersion + 1 }))
+  }
+
+  /** Where a point of item `id` is shown right now: moved along with a live move/scale/turn preview. */
+  shownPoint(id: string, x: number, y: number): [number, number] {
+    return this.preview?.ids.has(id) ? xformPoint(this.preview.t, x, y) : [x, y]
+  }
+
+  /** The bounds an item is shown with right now, including a live move/scale/turn preview. */
+  shownBBox(item: Item): BBox {
+    return this.preview?.ids.has(item.id) ? xformBBox(item.bbox, this.preview.t) : item.bbox
   }
 
   commitPreview(): void {
     const p = this.preview
     this.preview = null
+    if (p) this.bumpPreview()
     if (!p || isIdentity(p.t)) return this.invalidate(true)
     const old = this.scene.getById(p.ids)
     this.scene.replace(old, old.map((i) => applyXform(i, p.t)))

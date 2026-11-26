@@ -23,6 +23,7 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   // Re-render when the camera, items or workspace chrome layout change so the bar stays clear of edges.
   useSession((s) => s.camera)
   useSession((s) => s.sceneVersion)
+  useSession((s) => s.previewVersion)
   usePrefs((s) => s.workspaceLayout)
   const [styling, setStyling] = useState(false)
   const closeStyle = useCallback(() => setStyling(false), [])

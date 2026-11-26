@@ -41,6 +41,7 @@ export function ShapeElementPopover() {
   const active = useSession((s) => s.active)
   useSession((s) => s.camera)
   useSession((s) => s.sceneVersion)
+  useSession((s) => s.previewVersion)
   usePrefs((s) => s.shapeDefaults)
   const ref = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ w: 224, h: 168 })
@@ -63,8 +64,9 @@ export function ShapeElementPopover() {
       const targetId = pop.targetId ?? `v${pop.index}`
       const model = availableVertexActions(shapeItem, targetId)
       if (!model) return null
-      const sx = (model.vertex.pos[0] - cam.x) * cam.zoom
-      const sy = (model.vertex.pos[1] - cam.y) * cam.zoom
+      const [wx, wy] = editor.shownPoint(shapeItem.id, model.vertex.pos[0], model.vertex.pos[1])
+      const sx = (wx - cam.x) * cam.zoom
+      const sy = (wy - cam.y) * cam.zoom
       const place = fitBox({ left: sx - 10, right: sx + 10, top: sy - 10, bottom: sy + 10 }, size.w, size.h, screenArea(), 'below', 10)
       return (
         <div
@@ -156,8 +158,9 @@ export function ShapeElementPopover() {
     const edgeId = pop.targetId ?? `e${pop.index}`
     const model = availableEdgeActions(shapeItem, edgeId)
     if (!model) return null
-    const sx = (model.mid[0] - cam.x) * cam.zoom
-    const sy = (model.mid[1] - cam.y) * cam.zoom
+    const [wx, wy] = editor.shownPoint(shapeItem.id, model.mid[0], model.mid[1])
+    const sx = (wx - cam.x) * cam.zoom
+    const sy = (wy - cam.y) * cam.zoom
     const place = fitBox({ left: sx - 10, right: sx + 10, top: sy - 10, bottom: sy + 10 }, size.w, size.h, screenArea(), 'below', 10)
     const lenText = feature.formatLength(model.edge.length)
     return (
@@ -223,8 +226,9 @@ export function ShapeElementPopover() {
     anchorWorld = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2]
   }
 
-  const sx = (anchorWorld[0] - cam.x) * cam.zoom
-  const sy = (anchorWorld[1] - cam.y) * cam.zoom
+  const [wx, wy] = editor.shownPoint(sel.parts[0].id, anchorWorld[0], anchorWorld[1])
+  const sx = (wx - cam.x) * cam.zoom
+  const sy = (wy - cam.y) * cam.zoom
   const place = fitBox({ left: sx - 10, right: sx + 10, top: sy - 10, bottom: sy + 10 }, size.w, size.h, screenArea(), 'below', 10)
 
   if (pop.kind === 'vertex') {

@@ -36,6 +36,8 @@ export interface Session {
   canRedo: boolean
   /** Bumped on every board change so chrome that reads items (selection bar) re-renders. */
   sceneVersion: number
+  /** Bumped while a move / scale / turn preview changes, so chrome beside the selection follows it. */
+  previewVersion: number
   selectedIds: string[]
   shortcutsOpen: boolean
   /** On-board ruler, or null when hidden. */
@@ -84,6 +86,7 @@ export function createSessionStore(): SessionStore {
     canUndo: false,
     canRedo: false,
     sceneVersion: 0,
+    previewVersion: 0,
     selectedIds: [],
     shortcutsOpen: false,
     ruler: null,
