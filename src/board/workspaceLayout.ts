@@ -11,6 +11,7 @@ import {
   DEFAULT_TOOLBAR_WITH_DIVIDERS,
   insertDefaultDividers,
   isInsertTool,
+  isSelectTool,
   isToolbarDivider,
   resolveToolbarItems,
   sanitizeDividers,
@@ -40,7 +41,7 @@ export interface WorkspaceLayout {
   zoomDock: ZoomDock
   /** Show text labels under icons on horizontal insert-only bars. */
   insertLabels: boolean
-  /** Collapse lasso, brush select and move into one button when multiple sit on the same bar. */
+  /** Collapse the select tools into one button when multiple sit on the same bar. */
   collapseSelectTools: boolean
   /** Show short single-key shortcut badges (1, 2, 3, E, V...) in the corner of toolbar buttons. */
   showShortcutBadges: boolean
@@ -54,7 +55,7 @@ export interface CustomWorkspacePreset {
 }
 
 export const DEFAULT_DRAWING_DOCK: readonly ToolbarItemId[] = [
-  'select', 'brushSelect', 'move', 'pan',
+  'rectSelect', 'select', 'brushSelect', 'move', 'pan',
   'divider:nav',
   'pen1', 'pen2', 'pen3', 'highlighter', 'eraser',
   'divider:present',
@@ -443,6 +444,19 @@ export function preferredEdgeForTool(docks: EdgeDocks, toolId: ConcreteToolId): 
 export function addToolToPreferredDock(docks: EdgeDocks, toolId: ConcreteToolId): EdgeDocks {
   if (findItemInDocks(docks, toolId)) return cloneEdgeDocks(docks)
   return placeToolInDock(docks, toolId, preferredEdgeForTool(docks, toolId))
+}
+
+/** Rectangle select came in 0.14: a saved layout gets it in front of the other select tools it shows. */
+export function addRectSelect(layout: WorkspaceLayout): WorkspaceLayout {
+  if (findItemInDocks(layout.docks, 'rectSelect')) return layout
+  const docks = cloneEdgeDocks(layout.docks)
+  for (const edge of DOCK_EDGES) {
+    const i = docks[edge].findIndex((id) => isSelectTool(id))
+    if (i < 0) continue
+    docks[edge].splice(i, 0, 'rectSelect')
+    return { ...layout, docks }
+  }
+  return layout
 }
 
 export function cleanCustomPresets(value: unknown): CustomWorkspacePreset[] {

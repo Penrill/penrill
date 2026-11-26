@@ -56,6 +56,7 @@ import { beginBrushSelect } from '../tools/brushSelect'
 import { beginErase } from '../tools/eraser'
 import { beginLaser, LASER_FADE_MS, LaserTrail } from '../tools/laser'
 import { beginLasso } from '../tools/lasso'
+import { beginRectSelect } from '../tools/rectSelect'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
@@ -250,7 +251,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const rul = ui.ruler
         const rs = rul ? straightState('ruler') : null
         const hotShapeHit =
-          !gesture && hover && (ui.tool === 'select' || ui.tool === 'move' || ui.tool === 'shape')
+          !gesture && hover && (ui.tool === 'select' || ui.tool === 'rectSelect' || ui.tool === 'move' || ui.tool === 'shape')
             ? selectionHit(hover.sx, hover.sy)
             : null
         const hotShapeHandle = hotShapeHit?.kind === 'shapeHandle' ? hotShapeHit.handle : null
@@ -261,7 +262,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const hotEdge =
           !gesture && hover && shapeEd && !hotShapeHandle &&
           (hotShapeHit?.kind === 'body' || ui.tool === 'shape' || !!info?.line || !!activeItem) &&
-          (ui.tool === 'select' || ui.tool === 'move' || ui.tool === 'shape')
+          (ui.tool === 'select' || ui.tool === 'rectSelect' || ui.tool === 'move' || ui.tool === 'shape')
             ? (() => {
                 const w = screenToWorld(editor.camera, hover.sx, hover.sy)
                 if (activeItem) return shapeEd.hitItemEdge(activeItem, w.x, w.y, editor.camera.zoom)
@@ -376,7 +377,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         ? 'eraser'
         : tool === 'pan'
           ? 'pan'
-          : tool === 'select'
+          : tool === 'select' || tool === 'rectSelect'
             ? 'select'
             : tool === 'brushSelect'
               ? 'brush'
@@ -795,7 +796,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       else if (
         !gesture &&
         hover &&
-        (tool === 'select' || tool === 'move') &&
+        (tool === 'select' || tool === 'rectSelect' || tool === 'move') &&
         (selectionHit(hover.sx, hover.sy)?.kind === 'end' || hoverEndAt(hover.sx, hover.sy))
       )
         c = 'crosshair'
@@ -817,7 +818,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         const h = hover ? selectionHit(hover.sx, hover.sy) : null
         if (h?.kind === 'handle' && !editor.selectionLocked()) c = h.corner % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
         else if (h?.kind === 'turn') c = 'grab'
-      } else if (tool === 'select' || tool === 'move') {
+      } else if (tool === 'select' || tool === 'rectSelect' || tool === 'move') {
         const h = hover ? selectionHit(hover.sx, hover.sy) : null
         if (h?.kind === 'shapeHandle') c = h.handle.cursor
         else if (h?.kind === 'end') c = 'crosshair'
@@ -1387,13 +1388,14 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             gesture = { kind: 'pan', pointerId: e.pointerId, tool: beginPan(toolContext, sampleAt(p.x, p.y)) }
           }
         } else {
-          // Pressing on a highlighted item grabs it right away; empty space (or a locked item) starts a lasso.
+          // Pressing on a highlighted item grabs it right away; empty space (or a locked item) starts a lasso or a box.
           const hit = hitTest(scene.getItems(), w.x, w.y, 6 / editor.camera.zoom)
           if (hit && !isLocked(hit) && (e.pointerType !== 'pen' || hoverBox)) {
             editor.setSelection([hit])
             gesture = { kind: 'move', pointerId: e.pointerId, startX: w.x, startY: w.y, ...(moveAnchor() ?? {}) }
           } else {
-            gesture = { kind: 'lasso', pointerId: e.pointerId, tool: beginLasso(toolContext, sampleAt(p.x, p.y)) }
+            const begin = session.getState().tool === 'rectSelect' ? beginRectSelect : beginLasso
+            gesture = { kind: 'lasso', pointerId: e.pointerId, tool: begin(toolContext, sampleAt(p.x, p.y)) }
           }
         }
         hoverBox = null
@@ -1830,13 +1832,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         // Hover highlight in select / move mode (not over the current selection's frame).
         const tool = session.getState().tool
         const prev = hoverBox
-        const picking = (tool === 'select' || tool === 'move') && !spaceDown
+        const picking = (tool === 'select' || tool === 'rectSelect' || tool === 'move') && !spaceDown
         hoverBox = picking && !selectionHit(p.x, p.y) ? (hoverTarget(p.x, p.y)?.box ?? null) : null
         // Show the end points of a straight line under the pointer (kept while the pointer is on one of them).
         const prevLine = hoverLine
         hoverLine = !picking ? null : hoverLine && nearEnd(hoverLine, p.x, p.y) !== null ? hoverLine : lineAt(p.x, p.y)
         if (prevLine !== hoverLine) invalidate(false)
-        if (prev !== hoverBox || tool === 'select' || tool === 'move' || tool === 'shape') updateCssCursor()
+        if (prev !== hoverBox || tool === 'select' || tool === 'rectSelect' || tool === 'move' || tool === 'shape') updateCssCursor()
       }
       invalidate(false)
     }
@@ -1995,6 +1997,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         eraser: () => ui.setTool('eraser'),
         // Quick swap between the current pen and the eraser (handy on a tablet ExpressKey).
         swapEraser: () => (ui.tool === 'eraser' ? ui.selectPen(ui.activePen) : ui.setTool('eraser')),
+        rectSelect: () => ui.setTool('rectSelect'),
         lasso: () => ui.setTool('select'),
         brushSelect: () => ui.setTool('brushSelect'),
         move: () => ui.setTool('move'),

@@ -45,6 +45,7 @@ const CONTRACT: [KeyLike, string, 'app' | 'board'][] = [
   [key('KeyH'), 'highlighter', 'board'],
   [key('KeyE'), 'eraser', 'board'],
   [key('KeyX'), 'swapEraser', 'board'],
+  [key('KeyB'), 'rectSelect', 'board'],
   [key('KeyV'), 'lasso', 'board'],
   [key('KeyC'), 'brushSelect', 'board'],
   [key('KeyM'), 'move', 'board'],

@@ -13,6 +13,7 @@ import {
   ImageIcon,
   LaserIcon,
   LassoIcon,
+  RectSelectIcon,
   MoveIcon,
   PenIcon,
   RedoIcon,
@@ -24,6 +25,7 @@ import {
 } from './icons'
 
 export const TOOL_LABELS: Record<ConcreteToolId, MessageKey> = {
+  rectSelect: 'select.rect',
   select: 'select.lasso',
   brushSelect: 'select.brush',
   move: 'select.move',
@@ -46,6 +48,7 @@ export const TOOL_LABELS: Record<ConcreteToolId, MessageKey> = {
 }
 
 export const TOOL_SHORTCUTS: Partial<Record<ConcreteToolId, ShortcutId>> = {
+  rectSelect: 'rectSelect',
   select: 'lasso',
   brushSelect: 'brushSelect',
   move: 'move',
@@ -63,6 +66,7 @@ export function ToolMiniIcon({ id }: { id: ConcreteToolId }) {
   const { pens, highlighter } = usePrefs(useShallow((s) => ({ pens: s.pens, highlighter: s.highlighter })))
   const icon = ((): ReactNode => {
     switch (id) {
+      case 'rectSelect': return <RectSelectIcon />
       case 'select': return <LassoIcon />
       case 'brushSelect': return <BrushSelectIcon />
       case 'move': return <MoveIcon />

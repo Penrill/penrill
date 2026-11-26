@@ -63,7 +63,7 @@ test('projectBarItems derives split and merged bars from one unified list', () =
   const drawing = projectBarItems(null, 'drawing', { collapseSelect: true })
   assert.deepEqual(
     drawing.map((i) => (i.kind === 'divider' ? '|' : i.kind === 'selectGroup' ? `select:${i.modes.join(',')}` : i.id)),
-    ['select:select,brushSelect,move', 'pan', '|', 'pen1', 'pen2', 'pen3', 'highlighter', 'eraser', '|', 'laser', '|', 'undo', 'redo']
+    ['select:rectSelect,select,brushSelect,move', 'pan', '|', 'pen1', 'pen2', 'pen3', 'highlighter', 'eraser', '|', 'laser', '|', 'undo', 'redo']
   )
 
   const insert = projectBarItems(null, 'insert', { templates: true })
@@ -79,7 +79,7 @@ test('projectBarItems derives split and merged bars from one unified list', () =
   assert.deepEqual(
     merged.map((i) => (i.kind === 'divider' ? '|' : i.kind === 'selectGroup' ? 'select' : i.id)),
     [
-      'select', 'brushSelect', 'move', 'pan', '|',
+      'rectSelect', 'select', 'brushSelect', 'move', 'pan', '|',
       'pen1', 'pen2', 'pen3', 'highlighter', 'eraser', '|',
       'laser', '|',
       'text', 'formula', 'shapes', 'graph', 'instruments', 'image', 'templates', '|',

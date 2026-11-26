@@ -107,6 +107,14 @@ export const LassoIcon = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
+/** Dashed rectangle with a corner pointer: rectangle select. */
+export const RectSelectIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="15" height="12" rx="1" strokeDasharray="2.6 2.2" />
+    <path d="M14 13l7 3-3 1.2L16.8 21 14 13z" />
+  </svg>
+)
+
 /** Dashed circle with a trail: brush select. */
 export const BrushSelectIcon = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>

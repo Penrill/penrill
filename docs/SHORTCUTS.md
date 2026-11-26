@@ -21,6 +21,7 @@ depend on them. New shortcuts: add to `shortcuts.ts`, this file, the test and bo
 | H | Highlighter |
 | E | Eraser |
 | X | Swap pen ↔ eraser |
+| B | Rectangle select: drag a box around items |
 | V | Lasso select |
 | C | Brush select: touch items with the circle to add them (mouse wheel = circle size) |
 | M | Move items (hover highlights, drag to move) |

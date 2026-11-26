@@ -11,6 +11,7 @@ import { drawLaser } from '../src/board/engine/laser.ts'
 import { beginLaser, LASER_FADE_MS, LaserTrail } from '../src/board/tools/laser.ts'
 import { createSessionStore } from '../src/board/session.ts'
 import { beginLasso } from '../src/board/tools/lasso.ts'
+import { beginRectSelect } from '../src/board/tools/rectSelect.ts'
 import { beginPan } from '../src/board/tools/pan.ts'
 import { beginShape } from '../src/board/tools/shapeTool.ts'
 import type { Sample, ToolContext } from '../src/board/tools/types.ts'
@@ -83,9 +84,9 @@ test('an erase gesture becomes one undo step on release', () => {
     prefs: () => ({ eraserRadius: 5, eraserMode: 'stroke' }),
     invalidate: () => {}
   } as unknown as ToolContext
-  const at = (x: number, y: number): Sample => ({ sx: x, sy: y, x, y, pressure: 0.5, time: 0 })
-  const g = beginErase(ctx, at(50, -20))
-  g.move([at(50, 10), at(50, 60)])
+  const at = (x: number, y: number, time: number): Sample => ({ sx: x, sy: y, x, y, pressure: 0.5, time })
+  const g = beginErase(ctx, at(50, -20, 0))
+  g.move([at(50, 10, 16), at(50, 60, 32)])
   assert.equal(sc.getItems().length, 0)
   assert.equal(sc.canUndo, false)
   g.end()
@@ -147,6 +148,24 @@ test('lasso selects what it goes around; a tap selects the item under it or clea
   assert.deepEqual(editor.selected, [])
 })
 
+test('rectangle select picks what the box covers, dragged either way; a tap selects or clears', () => {
+  const sc = new Scene()
+  sc.add([line('in', 40, 60, 50), line('out', 300, 320, 300)])
+  const { ctx, editor } = fakeContext(sc)
+  const box = beginRectSelect(ctx, pt(100, 100))
+  assert.equal(box.overlay?.().lasso, null)
+  box.move([pt(50, 40), pt(0, 0)], keys)
+  assert.deepEqual(box.overlay?.().lasso, [[100, 100], [0, 100], [0, 0], [100, 0]])
+  box.end()
+  assert.deepEqual(editor.selected, ['in'])
+  const tap = beginRectSelect(ctx, pt(310, 300))
+  tap.end()
+  assert.deepEqual(editor.selected, ['out'])
+  const empty = beginRectSelect(ctx, pt(500, 500))
+  empty.end()
+  assert.deepEqual(editor.selected, [])
+})
+
 test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, a click drops the default size, and switches to select', () => {
   const sc = new Scene()
   const { ctx } = fakeContext(sc)
@@ -155,7 +174,7 @@ test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, 
   drag.move([pt(100, 40)], { ...keys, shift: true })
   assert.ok(drag.overlay?.().live?.parts?.length, 'a preview is shown while dragging')
   drag.end()
-  assert.equal(ctx.session.getState().tool, 'select')
+  assert.equal(ctx.session.getState().tool, 'rectSelect')
   const item = sc.getItems()[0] as ShapeItem
   assert.equal(item.type, 'shape')
   assert.equal(item.geo.kind, 'rectangle')
@@ -163,7 +182,7 @@ test('the shape tool drags out a first-class ShapeItem, Shift keeps it regular, 
   ctx.session.setState({ tool: 'shape', shape: 'rectangle' })
   const click = beginShape(ctx, pt(500, 500))
   click.end()
-  assert.equal(ctx.session.getState().tool, 'select')
+  assert.equal(ctx.session.getState().tool, 'rectSelect')
   const dropped = sc.getItems().at(-1) as ShapeItem
   assert.equal(dropped.type, 'shape')
   assert.equal((dropped.geo.ax + dropped.geo.bx) / 2, 500)

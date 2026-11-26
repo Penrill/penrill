@@ -22,6 +22,7 @@ import {
   isInsertOnlyBar,
   projectEdgeBarItems,
   type ConcreteToolId,
+  isSelectTool,
   type SelectToolId,
   type ToolbarItemId
 } from '../toolbarLayout'
@@ -52,6 +53,7 @@ import {
   ImageIcon,
   LaserIcon,
   LassoIcon,
+  RectSelectIcon,
   MoveIcon,
   PenIcon,
   RedoIcon,
@@ -65,8 +67,9 @@ import { EraserOptionsCard, InkOptionsCard, SelectOptionsCard, TextOptionsCard }
 import { TOOL_LABELS, TOOL_SHORTCUTS, ToolMiniIcon } from './toolMeta'
 import { useWorkspaceCustomize } from './WorkspaceCustomizer'
 
-/** The three ways to select; may collapse into one button or show individually. */
+/** The ways to select; may collapse into one button or show individually. */
 export const SELECT_MODES: { tool: Tool & SelectToolId; shortcut: ShortcutId; label: MessageKey; icon: ReactNode }[] = [
+  { tool: 'rectSelect', shortcut: 'rectSelect', label: 'select.rect', icon: <RectSelectIcon /> },
   { tool: 'select', shortcut: 'lasso', label: 'select.lasso', icon: <LassoIcon /> },
   { tool: 'brushSelect', shortcut: 'brushSelect', label: 'select.brush', icon: <BrushSelectIcon /> },
   { tool: 'move', shortcut: 'move', label: 'select.move', icon: <MoveIcon /> }
@@ -268,7 +271,7 @@ export function ToolBar({
   const dir = penDirection(edge)
 
   // Remember the last-used selection mode for the collapsed Select button.
-  const lastSelect = useRef<SelectToolId>('select')
+  const lastSelect = useRef<SelectToolId>('rectSelect')
   useEffect(() => {
     if (isSelectMode(tool)) lastSelect.current = tool as SelectToolId
   }, [tool])
@@ -474,7 +477,7 @@ export function ToolBar({
   }
 
   const renderTool = (id: ConcreteToolId): ReactNode => {
-    if (id === 'select' || id === 'brushSelect' || id === 'move') return renderSelectButton(id)
+    if (isSelectTool(id)) return renderSelectButton(id)
 
     if (id === 'pan') {
       return (

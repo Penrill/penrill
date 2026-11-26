@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  addRectSelect,
   addToolToPreferredDock,
   allPlacedTools,
   cleanCustomPresets,
@@ -195,4 +196,14 @@ test('dock helpers orient flyouts and pens inward toward the canvas', () => {
   assert.equal(penDirection('bottom'), 'up')
   assert.equal(penDirection('left'), 'right')
   assert.equal(penDirection('right'), 'left')
+})
+
+test('addRectSelect puts rectangle select in front of the select tools a saved layout shows', () => {
+  const saved = cleanWorkspaceLayout({ ...DEFAULT_WORKSPACE_LAYOUT, docks: { top: ['pen1'], left: ['move', 'select', 'pan'], bottom: [], right: [] } })
+  assert.deepEqual(addRectSelect(saved).docks.left, ['rectSelect', 'move', 'select', 'pan'])
+  // Already there, or no select tool shown at all: nothing changes.
+  const again = addRectSelect(saved)
+  assert.equal(addRectSelect(again), again)
+  const none = cleanWorkspaceLayout({ ...DEFAULT_WORKSPACE_LAYOUT, docks: { top: ['pen1'], left: [], bottom: [], right: [] } })
+  assert.equal(addRectSelect(none), none)
 })

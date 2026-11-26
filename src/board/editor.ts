@@ -25,6 +25,7 @@ import { translate, type MessageKey } from './i18n'
 import { FeatureRegistry, type FeatureModule } from './registry'
 import { createSessionStore, type Session } from './session'
 import { FORMULA_HISTORY, prefsStore } from './store'
+import { isSelectTool } from './toolbarLayout'
 
 const CLIPBOARD_MIME = 'application/x-penrill'
 /** Copied by Inkboard before 0.13; still pasted. */
@@ -120,7 +121,7 @@ export class Editor {
     }
     if (s.tool !== prev.tool) {
       // Picking a drawing tool means "done with the selection": drop it (lasso ↔ move keep it).
-      if (s.tool !== 'select' && s.tool !== 'brushSelect' && s.tool !== 'move' && s.selectedIds.length) this.session.setState({ selectedIds: [] })
+      if (!isSelectTool(s.tool) && s.selectedIds.length) this.session.setState({ selectedIds: [] })
       if (s.tool !== 'text' && s.textEdit) this.commitText()
       // (Starting a formula switches the tool itself: that one is not a reason to finish it.)
       if (s.formulaEdit && s.formulaEdit === prev.formulaEdit) this.commitFormula(false)
@@ -332,7 +333,7 @@ export class Editor {
     item.y = c.y - (b.maxY - b.minY) / 2
     item.bbox = textBBox(item)
     this.scene.add([item])
-    this.session.setState({ tool: 'select' })
+    this.session.setState({ tool: 'rectSelect' })
     this.setSelection([item])
   }
 
@@ -359,7 +360,7 @@ export class Editor {
     const { color, size } = prefsStore.getState().formulaStyle
     const c = screenToWorld(this.camera, this.view().width / 2, this.view().height * 0.36)
     this.session.setState({
-      tool: 'select',
+      tool: 'rectSelect',
       selectedIds: [],
       formulaEdit: { x: c.x - size * 2, baseline: c.y, size, color, rows: [], cur: { path: [], i: 0 } }
     })
@@ -456,7 +457,7 @@ export class Editor {
   }
 
   selectAll(): void {
-    this.session.setState({ tool: 'select' })
+    this.session.setState({ tool: 'rectSelect' })
     this.setSelection([...this.scene.getItems()])
   }
 
@@ -663,7 +664,7 @@ export class Editor {
     const snap = (v: number): number => Math.round(v / 24) * 24
     const copies = this.cloneItems(items, snap(c.x - (box.minX + box.maxX) / 2), snap(c.y - (box.minY + box.maxY) / 2))
     this.scene.add(copies)
-    this.session.setState({ tool: 'select' })
+    this.session.setState({ tool: 'rectSelect' })
     this.setSelection(copies)
   }
 
@@ -690,7 +691,7 @@ export class Editor {
     }
     g.bbox = graphBBox(g)
     this.scene.add([g])
-    this.session.setState({ tool: 'select' })
+    this.session.setState({ tool: 'rectSelect' })
     this.setSelection([g])
     return g.id
   }
@@ -741,7 +742,7 @@ export class Editor {
     }
     g.bbox = graphBBox(g)
     this.scene.add([g])
-    this.session.setState({ tool: 'select' })
+    this.session.setState({ tool: 'rectSelect' })
     this.setSelection([g])
     this.session.setState({ fnPanel: { id: g.id, session: Date.now() } })
   }
@@ -882,7 +883,7 @@ export class Editor {
       }
     }
     if (inserted.length) {
-      this.session.setState({ tool: 'select' })
+      this.session.setState({ tool: 'rectSelect' })
       this.setSelection(inserted)
     }
   }

@@ -13,6 +13,7 @@ import { validateRows, type Cursor, type FormulaState, type Row } from '@penrill
 import { cleanInstrumentPrefs, DEFAULT_INSTRUMENTS, type InstrumentPrefs } from './engine/instruments'
 import { cleanToolbarLayout, insertDefaultDividers, isToolbarDivider, type ToolbarItemId } from './toolbarLayout'
 import {
+  addRectSelect,
   cleanCustomPresets,
   cleanWorkspaceLayout,
   cloneWorkspaceLayout,
@@ -29,7 +30,7 @@ import { moveStorageKey } from '../shared/legacyStorage'
 import type { BackgroundKind, LineCap, LineDash } from '@penrill/core/types'
 import { detectLanguage, type Lang } from './i18n'
 
-export type Tool = 'select' | 'brushSelect' | 'move' | 'pen' | 'highlighter' | 'eraser' | 'pan' | 'shape' | 'text' | 'laser'
+export type Tool = 'rectSelect' | 'select' | 'brushSelect' | 'move' | 'pen' | 'highlighter' | 'eraser' | 'pan' | 'shape' | 'text' | 'laser'
 
 /** 'stroke' removes whole strokes (like Whiteboard); 'point' cuts away only what it touches. */
 export type EraserMode = 'stroke' | 'point'
@@ -309,7 +310,7 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => {
         let state = (persisted ?? {}) as Prefs
         if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
@@ -335,6 +336,15 @@ export const prefsStore = createStore<Prefs>()(
           const oldSplitStrip = { ...WORKSPACE_PRESETS.split, optionsMode: 'strip' as const }
           if (workspaceLayoutsEqual(current, oldSplitPopover) || workspaceLayoutsEqual(current, oldSplitStrip)) {
             state = { ...state, workspaceLayout: cloneWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT) }
+          }
+        }
+        if (version < 6) {
+          state = {
+            ...state,
+            ...(state.workspaceLayout ? { workspaceLayout: addRectSelect(cleanWorkspaceLayout(state.workspaceLayout, state.toolbarLayout)) } : {}),
+            ...(Array.isArray(state.customPresets)
+              ? { customPresets: cleanCustomPresets(state.customPresets).map((p) => ({ ...p, layout: addRectSelect(p.layout) })) }
+              : {})
           }
         }
         return state

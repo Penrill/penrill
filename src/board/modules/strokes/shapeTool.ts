@@ -126,7 +126,7 @@ export function beginShape(ctx: ToolContext, start: Sample, startMods?: Modifier
       }
       const item = makeItem(box, newId(), scene.allocZ())
       scene.add([item])
-      ctx.session.setState({ tool: 'select' })
+      ctx.session.setState({ tool: 'rectSelect' })
       editor.setSelection([item])
     },
     overlay: () => ({ live })

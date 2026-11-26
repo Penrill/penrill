@@ -7,21 +7,21 @@
  * `projectBarItems`, so switching layouts keeps the user's custom order, hidden tools and dividers.
  */
 export const DEFAULT_TOOLBAR = [
-  'select', 'brushSelect', 'move', 'pan',
+  'rectSelect', 'select', 'brushSelect', 'move', 'pan',
   'pen1', 'pen2', 'pen3', 'highlighter', 'eraser', 'laser',
   'text', 'formula', 'shapes', 'graph', 'templates', 'image',
   'instruments',
   'undo', 'redo'
 ] as const
 
-export const SELECT_TOOLS = ['select', 'brushSelect', 'move'] as const
+export const SELECT_TOOLS = ['rectSelect', 'select', 'brushSelect', 'move'] as const
 export type SelectToolId = (typeof SELECT_TOOLS)[number]
 
 export const INSERT_TOOLS = ['text', 'formula', 'shapes', 'graph', 'instruments', 'image', 'templates'] as const
 export type InsertToolId = (typeof INSERT_TOOLS)[number]
 
 export const DRAWING_TOOLS = [
-  'select', 'brushSelect', 'move', 'pan',
+  'rectSelect', 'select', 'brushSelect', 'move', 'pan',
   'pen1', 'pen2', 'pen3', 'highlighter', 'eraser', 'laser',
   'undo', 'redo'
 ] as const
@@ -33,7 +33,7 @@ export type ToolbarItemId = ToolbarToolId | `divider:${string}`
 
 /** Canonical ordered toolbar with default group dividers. */
 export const DEFAULT_TOOLBAR_WITH_DIVIDERS: readonly ToolbarItemId[] = [
-  'select', 'brushSelect', 'move', 'pan',
+  'rectSelect', 'select', 'brushSelect', 'move', 'pan',
   'divider:nav',
   'pen1', 'pen2', 'pen3', 'highlighter', 'eraser',
   'divider:present',
@@ -108,7 +108,7 @@ export function isDefaultToolbarLayout(items: readonly ToolbarItemId[]): boolean
 }
 
 function defaultGroupOf(id: ConcreteToolId): number {
-  if (id === 'select' || id === 'brushSelect' || id === 'move' || id === 'pan') return 0
+  if (isSelectTool(id) || id === 'pan') return 0
   if (id === 'pen1' || id === 'pen2' || id === 'pen3' || id === 'highlighter' || id === 'eraser') return 1
   if (id === 'laser') return 2
   if (isInsertTool(id)) return 3
