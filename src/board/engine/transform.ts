@@ -1,5 +1,6 @@
 import { circleHitsPolyline, turnedBBox, turnPoint } from '@penrill/core/geometry'
 import { evaluateShape, shapeBBox } from '@penrill/core/shapeEval'
+import { effectiveQuat, quatFromAxisAngle, quatMul, quatNormalize } from '@penrill/core/shapeEval3d'
 import { boxOfVertices, is3D, isLinear, isVertexShape, shapeVertices } from '@penrill/core/shapes'
 import { formulaBBox, formulaLocalBox } from './formulatype'
 import { graphBBox } from './graph'
@@ -143,12 +144,16 @@ function xformShapeGeo(geo: ShapeGeometry, t: Xform): ShapeGeometry {
     const [ncx, ncy] = xformPoint(t, cx, cy)
     const hw = ((geo.bx - geo.ax) / 2) * t.s
     const hh = ((geo.by - geo.ay) / 2) * t.s
+    // A solid turned with a selection spins about the axis facing the viewer. On screen y points
+    // down and the view's y points up, so a clockwise screen turn is a negative turn about z.
+    const rot3 = t.r ? quatNormalize(quatMul(quatFromAxisAngle([0, 0, 1], -t.r), effectiveQuat(geo))) : null
     return {
       ...geo,
       ax: ncx - hw,
       ay: ncy - hh,
       bx: ncx + hw,
       by: ncy + hh,
+      ...(rot3 ? { rot3 } : {}),
       ...(geo.dim3 ? { dim3: [geo.dim3[0] * t.s, geo.dim3[1] * t.s, geo.dim3[2] * t.s] } : {})
     }
   }

@@ -2,9 +2,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { applyXform, hitTest, xformBBox, xformPoint, type Xform } from '../src/board/engine/transform.ts'
+import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
+import { evaluateShape } from '@penrill/core/shapeEval'
 import { buildShapeItems, editableShape } from '@penrill/core/shapeItems'
 import { specParts } from '@penrill/core/shapes'
-import type { ImageItem, ShapeSpec, StrokeItem } from '@penrill/core/types'
+import type { ImageItem, ShapeItem, ShapeSpec, StrokeItem } from '@penrill/core/types'
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6
 const quarter: Xform = { s: 1, ax: 0, ay: 0, dx: 0, dy: 0, r: Math.PI / 2 }
@@ -80,4 +82,20 @@ test('ink remembers how far it was turned, so the turn can be undone exactly', (
   const back = applyXform(b, { s: 1, ax: 5, ay: 2, dx: 0, dy: 0, r: -b.rot! }) as StrokeItem
   assert.equal(back.rot, undefined)
   back.points.forEach((p, i) => assert.ok(near(p[0], s.points[i][0]) && near(p[1], s.points[i][1])))
+})
+
+test('a 3D solid turned with a group spins with it, so every corner lands where the turn takes it', () => {
+  const cube = createShapeItem(specToShapeData({ kind: 'cube', ax: 0, ay: 0, bx: 120, by: 120 }), { color: '#000', size: 2, tool: 'pen' }, { id: 'c1', z: 1 })
+  // Turn about a point outside the solid, as the middle of a group with a 2D shape beside it.
+  const t: Xform = { s: 1, ax: 200, ay: 40, dx: 0, dy: 0, r: 0.6 }
+  const turned = applyXform(cube, t) as ShapeItem
+  const before = evaluateShape(cube).hitPaths.flat()
+  const after = evaluateShape(turned).hitPaths.flat()
+  assert.equal(after.length, before.length)
+  before.forEach(([x, y], i) => {
+    const [ex, ey] = xformPoint(t, x, y)
+    assert.ok(Math.abs(after[i][0] - ex) < 1e-6 && Math.abs(after[i][1] - ey) < 1e-6)
+  })
+  // A plain move leaves the 3D orientation alone.
+  assert.equal((applyXform(cube, { ...t, r: 0, dx: 5 }) as ShapeItem).geo.rot3, undefined)
 })
