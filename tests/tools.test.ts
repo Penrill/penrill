@@ -6,7 +6,7 @@ import { Scene } from '@penrill/core/scene'
 import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import type { ImageItem, Item, ShapeItem, StrokeItem } from '@penrill/core/types'
 import { itemsTouched } from '../src/board/tools/brushSelect.ts'
-import { beginErase, eraseAlong, eraseUnit, type EraseRecord } from '../src/board/tools/eraser.ts'
+import { beginErase, eraseAlong, eraserModeFor, eraseUnit, type EraseRecord } from '../src/board/tools/eraser.ts'
 import { drawLaser } from '../src/board/engine/laser.ts'
 import { beginLaser, LASER_FADE_MS, LaserTrail } from '../src/board/tools/laser.ts'
 import { createSessionStore } from '../src/board/session.ts'
@@ -294,4 +294,29 @@ test('laser rendering batches fast pen samples and starts a separate path after 
     { points: trail.points, now: 880, fade: LASER_FADE_MS })
   assert.ok(strokes > 0 && strokes <= 16)
   assert.deepEqual(moves.at(-1), [500, 200])
+})
+
+test('the eraser cuts by default and takes whole strokes while Ctrl is held', () => {
+  const off = { shift: false, ctrl: false, alt: false }
+  const ctrl = { ...off, ctrl: true }
+  assert.equal(eraserModeFor('point', off), 'point')
+  assert.equal(eraserModeFor('point', ctrl), 'stroke')
+  assert.equal(eraserModeFor('stroke', ctrl), 'point')
+  const run = (mods: typeof off): string[] => {
+    const sc = new Scene()
+    sc.add([line('a', 0, 100, 0)], false)
+    const ctx = {
+      scene: sc,
+      editor: { camera: { x: 0, y: 0, zoom: 1 } },
+      prefs: () => ({ eraserRadius: 5, eraserMode: 'point' }),
+      invalidate: () => {}
+    } as unknown as ToolContext
+    const at = (x: number, y: number, time: number): Sample => ({ sx: x, sy: y, x, y, pressure: 0.5, time })
+    const g = beginErase(ctx, at(50, -20, 0), mods)
+    g.move([at(50, 20, 16)], mods)
+    g.end()
+    return sc.getItems().map((i) => i.id)
+  }
+  assert.equal(run(off).length, 2)
+  assert.deepEqual(run(ctrl), [])
 })

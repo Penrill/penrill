@@ -1515,7 +1515,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           gesture = { kind: 'brush', pointerId: e.pointerId, tool: beginBrushSelect(toolContext, sample(e), modifiers(e)) }
         }
       } else if (eff === 'eraser') {
-        gesture = { kind: 'eraser', pointerId: e.pointerId, tool: beginErase(toolContext, sample(e)) }
+        gesture = { kind: 'eraser', pointerId: e.pointerId, tool: beginErase(toolContext, sample(e), modifiers(e)) }
       } else {
         editor.clearSelection()
         const ui = readUI()

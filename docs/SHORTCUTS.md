@@ -41,6 +41,7 @@ depend on them. New shortcuts: add to `shortcuts.ts`, this file, the test and bo
 | Ctrl+Y / Ctrl+Shift+Z | Redo |
 | Mouse Back / Forward button | Undo / redo |
 | Shift (hold while drawing) | Straight line (snaps to 0° / 45° / 90°) |
+| Ctrl (hold while erasing) | Erase whole strokes instead of only what the eraser touches (or the other way round, if whole strokes is the chosen mode) |
 | Ctrl+G | Group |
 | Ctrl+Shift+G | Ungroup |
 | Ctrl+D | Duplicate |

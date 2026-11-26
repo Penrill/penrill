@@ -249,7 +249,7 @@ export const prefsStore = createStore<Prefs>()(
       ],
       highlighter: { color: '#ffe066', size: 18 },
       eraserRadius: 12,
-      eraserMode: 'stroke',
+      eraserMode: 'point',
       wheelMode: 'scroll',
       shapeSnap: true,
       shapeSnapDelay: SNAP_DELAY.default,
@@ -310,7 +310,7 @@ export const prefsStore = createStore<Prefs>()(
       // Only user preferences survive restarts; the board itself is restored from the autosave file.
       name: 'penrill-settings',
       storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      version: 6,
+      version: 7,
       migrate: (persisted, version) => {
         let state = (persisted ?? {}) as Prefs
         if (version < 2 && state.shapeDefaults && typeof state.shapeDefaults === 'object') {
@@ -347,6 +347,8 @@ export const prefsStore = createStore<Prefs>()(
               : {})
           }
         }
+        // Partial erasing became the default (Ctrl erases whole strokes): move everyone over once.
+        if (version < 7) state = { ...state, eraserMode: 'point' }
         return state
       },
       merge: (saved, current) => {
@@ -364,7 +366,7 @@ export const prefsStore = createStore<Prefs>()(
           theme: THEME_PREFS.includes(p.theme as ThemePref) ? (p.theme as ThemePref) : 'system',
           // On for new users; people who already had settings keep the board they picked by hand.
           linkBoardToTheme: typeof p.linkBoardToTheme === 'boolean' ? p.linkBoardToTheme : Object.keys(p).length === 0,
-          eraserMode: p.eraserMode === 'point' ? 'point' : 'stroke',
+          eraserMode: p.eraserMode === 'stroke' ? 'stroke' : 'point',
           eraserRadius: typeof p.eraserRadius === 'number' && p.eraserRadius >= 4 && p.eraserRadius <= 120 ? p.eraserRadius : current.eraserRadius,
           wheelMode: p.wheelMode === 'zoom' ? 'zoom' : 'scroll',
           shapeSnap: typeof p.shapeSnap === 'boolean' ? p.shapeSnap : current.shapeSnap,

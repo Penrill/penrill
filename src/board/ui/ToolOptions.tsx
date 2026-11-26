@@ -299,14 +299,14 @@ function EraserOptions({ edge }: { edge: OptionsDock }) {
     return (
       <>
         <ToolButton
-          label={t('eraser.stroke')}
+          label={mode === 'stroke' ? t('eraser.stroke') : `${t('eraser.stroke')} (${t('eraser.holdCtrl')})`}
           active={mode === 'stroke'}
           onClick={() => prefsStore.setState({ eraserMode: 'stroke' })}
         >
           <EraserStrokeIcon />
         </ToolButton>
         <ToolButton
-          label={t('eraser.point')}
+          label={mode === 'point' ? t('eraser.point') : `${t('eraser.point')} (${t('eraser.holdCtrl')})`}
           active={mode === 'point'}
           onClick={() => prefsStore.setState({ eraserMode: 'point' })}
         >
@@ -383,6 +383,7 @@ export function EraserOptionsCard() {
           { value: 'point', label: t('eraser.point') }
         ]}
       />
+      <p className="mt-2 text-xs/4 text-zinc-500 dark:text-zinc-400">{t('eraser.ctrlHint')}</p>
       <label className="mt-3 flex items-center gap-2 text-sm/5 text-zinc-600 dark:text-zinc-300">
         <span>{t('eraser.size')}</span>
         <input

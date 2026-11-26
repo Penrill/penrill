@@ -6,7 +6,7 @@ import { shapeMembers } from '@penrill/core/shapeItems'
 import type { Item, StrokeItem } from '@penrill/core/types'
 import type { EraserMode } from '../store'
 import { penJumped } from './penInput'
-import type { Gesture, Sample, ToolContext } from './types'
+import type { Gesture, Modifiers, Sample, ToolContext } from './types'
 
 /** What one swipe changed so far, kept as a single undo step. */
 export interface EraseRecord {
@@ -31,13 +31,35 @@ export function eraseUnit(items: readonly Item[], item: StrokeItem): Item[] {
 /**
  * Erase along the segment (x0, y0) → (x1, y1) on the board with a circle of radius r (board units).
  * 'stroke' removes every stroke the circle touches (like Whiteboard); 'point' cuts away only what it
- * covers and keeps the rest as separate strokes. Images and locked items are never erased.
+ * covers and keeps the rest as separate strokes. Shape items are always removed whole. Images and
+ * locked items are never erased.
  * Changes go into the scene without undo entries; `record` collects them for one undo step.
  */
 export function eraseAlong(scene: Scene, x0: number, y0: number, x1: number, y1: number, r: number, mode: EraserMode, record: EraseRecord): void {
   const box = { minX: Math.min(x0, x1) - r, minY: Math.min(y0, y1) - r, maxX: Math.max(x0, x1) + r, maxY: Math.max(y0, y1) + r }
   const items = scene.getItems()
+  // Sample along the eraser movement so fast swipes don't skip strokes or shapes.
+  const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (r * 0.5)))
+  const touches = (rr: number, paths: readonly Parameters<typeof circleHitsPolyline>[3][]): boolean => {
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const px = x0 + (x1 - x0) * t
+      const py = y0 + (y1 - y0) * t
+      if (paths.some((path) => circleHitsPolyline(px, py, rr, path))) return true
+    }
+    return false
+  }
+  /** Shape items can't be cut into pieces, so every mode removes them whole. */
+  const shapesHit = (): Item[] =>
+    items.filter(
+      (item) => item.type === 'shape' && !item.locked && bboxIntersects(item.bbox, box) && touches(r + item.size / 2, evaluateShape(item).hitPaths)
+    )
   if (mode === 'point') {
+    const whole = shapesHit()
+    if (whole.length) {
+      record.removed.push(...whole)
+      scene.remove(whole, false)
+    }
     const cut: Item[] = []
     const pieces: Item[] = []
     for (const item of items) {
@@ -59,34 +81,10 @@ export function eraseAlong(scene: Scene, x0: number, y0: number, x1: number, y1:
     record.added.push(...pieces)
     return
   }
-  // Sample along the eraser movement so fast swipes don't skip strokes or shapes.
-  const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / (r * 0.5)))
-  const hit = new Set<Item>()
+  const hit = new Set<Item>(shapesHit())
   for (const item of items) {
-    if (item.locked || hit.has(item) || !bboxIntersects(item.bbox, box)) continue
-    if (item.type === 'shape') {
-      const rr = r + item.size / 2
-      const paths = evaluateShape(item).hitPaths
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps
-        const px = x0 + (x1 - x0) * t
-        const py = y0 + (y1 - y0) * t
-        if (paths.some((path) => circleHitsPolyline(px, py, rr, path))) {
-          hit.add(item)
-          break
-        }
-      }
-      continue
-    }
-    if (item.type !== 'stroke') continue
-    const rr = r + item.size / 2
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps
-      if (circleHitsPolyline(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, rr, item.points)) {
-        for (const m of eraseUnit(items, item)) hit.add(m)
-        break
-      }
-    }
+    if (item.type !== 'stroke' || item.locked || hit.has(item) || !bboxIntersects(item.bbox, box)) continue
+    if (touches(r + item.size / 2, [item.points])) for (const m of eraseUnit(items, item)) hit.add(m)
   }
   if (hit.size) {
     record.removed.push(...hit)
@@ -94,18 +92,29 @@ export function eraseAlong(scene: Scene, x0: number, y0: number, x1: number, y1:
   }
 }
 
-/** The eraser tool: a swipe erases along its path and becomes one undo step on release. */
-export function beginErase(ctx: ToolContext, start: Sample): Gesture {
+/** The chosen eraser mode, or the other one while Ctrl is held. */
+export function eraserModeFor(chosen: EraserMode, mods?: Modifiers): EraserMode {
+  if (!mods?.ctrl) return chosen
+  return chosen === 'point' ? 'stroke' : 'point'
+}
+
+/**
+ * The eraser tool: a swipe erases along its path and becomes one undo step on release.
+ * Holding Ctrl switches to the other mode (by default: whole strokes instead of only what it touches).
+ */
+export function beginErase(ctx: ToolContext, start: Sample, startMods?: Modifiers): Gesture {
   const record: EraseRecord = { removed: [], added: [] }
   const radius = (): number => ctx.prefs().eraserRadius / ctx.editor.camera.zoom
+  let mode = eraserModeFor(ctx.prefs().eraserMode, startMods)
   let last = start
-  eraseAlong(ctx.scene, start.x, start.y, start.x, start.y, radius(), ctx.prefs().eraserMode, record)
+  eraseAlong(ctx.scene, start.x, start.y, start.x, start.y, radius(), mode, record)
   return {
-    move(samples) {
+    move(samples, mods) {
+      if (mods) mode = eraserModeFor(ctx.prefs().eraserMode, mods)
       for (const s of samples) {
         // A driver's parked cursor position must not wipe a path across the board.
         const jumped = penJumped({ x: last.sx, y: last.sy, t: last.time }, { x: s.sx, y: s.sy, t: s.time })
-        if (!jumped) eraseAlong(ctx.scene, last.x, last.y, s.x, s.y, radius(), ctx.prefs().eraserMode, record)
+        if (!jumped) eraseAlong(ctx.scene, last.x, last.y, s.x, s.y, radius(), mode, record)
         last = s
       }
     },
