@@ -82,8 +82,13 @@ export interface ShapeEvalInput {
 
 const DEFAULT_LETTERS = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'
 
+const SUBSCRIPT_DIGITS = '₀₁₂₃₄₅₆₇₈₉'
+
+/** A, B, C … Z (no O: that is the centre), then A₁, B₁ … Z₁, A₂ and so on. */
 export function vertexLetter(index: number, subscript?: string): string {
-  const base = index < DEFAULT_LETTERS.length ? DEFAULT_LETTERS[index] : `V${index + 1}`
+  const round = Math.floor(index / DEFAULT_LETTERS.length)
+  const letter = DEFAULT_LETTERS[index % DEFAULT_LETTERS.length]
+  const base = round ? `${letter}${[...String(round)].map((d) => SUBSCRIPT_DIGITS[+d]).join('')}` : letter
   return subscript ? `${base}${subscript}` : base
 }
 

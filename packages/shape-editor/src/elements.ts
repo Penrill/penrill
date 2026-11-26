@@ -262,7 +262,7 @@ export function switchShapeItemKind(item: ShapeItem, nextKind: ShapeKind): Shape
     else nextGeo.orbit = is3D(g.kind) && g.orbit ? [...g.orbit] : [DEFAULT_ORBIT[0], DEFAULT_ORBIT[1]]
     if (nextKind === 'obliquePyramid') nextGeo.slant3 = [0.85, 0]
   }
-  return pruneAnnotations(withShapeUpdate(item, { geo: nextGeo }))
+  return carryLabels(item, pruneAnnotations(withShapeUpdate(item, { geo: nextGeo })))
 }
 
 /** Change side/base/point count on polygon, star, prism or pyramid (3..24). */
@@ -272,7 +272,7 @@ export function setShapeItemSides(item: ShapeItem, sides: number): ShapeItem {
   const nextGeo: ShapeGeometry = { ...item.geo, sides: clamped }
   if (nextGeo.kind === 'polygon') delete nextGeo.vertices
   delete nextGeo.vertices3
-  return pruneAnnotations(withShapeUpdate(item, { geo: nextGeo }))
+  return carryLabels(item, pruneAnnotations(withShapeUpdate(item, { geo: nextGeo })))
 }
 
 export function toggleLabel(item: ShapeItem, vertexId: string): ShapeItem {
@@ -293,17 +293,36 @@ export function setLabel(item: ShapeItem, vertexId: string, text: string): Shape
   return withShapeUpdate(item, { labels: next })
 }
 
+/** The vertices that "show letters" labels: not a star's inner points or a round shape's quarter points. */
+export function labelVertices(item: ShapeItem): EvalVertex[] {
+  const round = item.geo.kind === 'ellipse' || item.geo.kind === 'cylinder' || item.geo.kind === 'cone' || item.geo.kind === 'sphere'
+  return evaluateShape(item).vertices.filter((v) => v.role !== 'inner' && !(round && v.role === 'cardinal'))
+}
+
 export function toggleAllLabels(item: ShapeItem, on: boolean): ShapeItem {
   if (!on) return withShapeUpdate(item, { labels: undefined })
-  const ev = evaluateShape(item)
   const next: Record<string, string> = { ...(item.labels ?? {}) }
-  for (const v of ev.vertices) {
-    if (v.role === 'inner') continue
-    if (item.geo.kind === 'ellipse' && v.role === 'cardinal') continue
-    if ((item.geo.kind === 'cylinder' || item.geo.kind === 'cone' || item.geo.kind === 'sphere') && v.role === 'cardinal') continue
-    next[v.id] = next[v.id] ?? v.defaultLabel
-  }
+  for (const v of labelVertices(item)) next[v.id] = next[v.id] ?? v.defaultLabel
   return withShapeUpdate(item, { labels: next })
+}
+
+/**
+ * Carry the letters over when the shape's vertices change (side count, kind): letters the user typed
+ * stay on their vertex, default letters are given out again in order (A, B, C, not what the old
+ * shape had there), and when every vertex had a letter, the new ones get one too.
+ */
+function carryLabels(before: ShapeItem, after: ShapeItem): ShapeItem {
+  if (!before.labels) return after
+  const old = labelVertices(before)
+  const all = old.length > 0 && old.every((v) => !!before.labels![v.id])
+  const auto = new Set(old.filter((v) => before.labels![v.id] === v.defaultLabel).map((v) => v.id))
+  const next: Record<string, string> = {}
+  for (const v of labelVertices(after)) {
+    const had = before.labels[v.id]
+    if (had && !auto.has(v.id)) next[v.id] = had
+    else if (all || (had && auto.has(v.id))) next[v.id] = v.defaultLabel
+  }
+  return withShapeUpdate(after, { labels: Object.keys(next).length ? next : undefined })
 }
 
 export function toggleAngle(item: ShapeItem, vertexId: string): ShapeItem {

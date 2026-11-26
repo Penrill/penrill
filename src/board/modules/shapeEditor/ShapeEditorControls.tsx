@@ -23,6 +23,7 @@ import {
   availableWholeShapeActions,
   toggleAllAngles,
   toggleAllLabels,
+  labelVertices,
   toggleAllLengths,
   toggleConstructionBatch,
   withShapeUpdate
@@ -417,9 +418,7 @@ export function ShapeItemEditorControls({
   const gizmoOn = gizmoOverride !== null ? gizmoOverride : gizmoDefault
   const actions = availableWholeShapeActions(item)
   const cornerVerts = ev.vertices.filter((v) => v.angleDeg !== undefined && v.role !== 'inner')
-  const labelVerts = ev.vertices.filter(
-    (v) => v.role !== 'inner' && !(v.role === 'cardinal' && (item.geo.kind === 'ellipse' || item.geo.kind === 'cylinder' || item.geo.kind === 'cone' || item.geo.kind === 'sphere'))
-  )
+  const labelVerts = labelVertices(item)
   const lenCount = item.geo.kind === 'ellipse' || item.geo.kind === 'sphere' ? 1 : ev.edges.length
   const allLabels = labelVerts.length > 0 && labelVerts.every((v) => !!item.labels?.[v.id])
   const allAngles = cornerVerts.length > 0 && cornerVerts.every((v) => !!item.angles?.includes(v.id))

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Scene } from '@penrill/core/scene'
 import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
-import { evaluateShape } from '@penrill/core/shapeEval'
+import { evaluateShape, vertexLetter } from '@penrill/core/shapeEval'
 import {
   effectiveQuat,
   eulerDegToQuat,
@@ -32,6 +32,7 @@ import {
   resetShapeItemGeometry,
   resetShapeItemOrbit,
   setLabel,
+  setShapeItemSides,
   switchShapeItemKind,
   toggleAllAngles,
   toggleAllLabels,
@@ -1033,4 +1034,21 @@ test('cube size handles, regular polygon corners and parallelogram corners stay 
   for (const rot of [0, 0.7]) for (const id of ['v0', 'v1', 'v2', 'v3']) {
     assert.ok(follow(mk('parallelogram', { rot }), id, 17, 23) < 0.5, `parallelogram ${id} rot ${rot}`)
   }
+})
+
+test('star letters run A, B, C over the tips and follow a change of point count', () => {
+  let star = createShapeItem(specToShapeData({ kind: 'star', ax: 0, ay: 0, bx: 200, by: 200, base: 5 }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: 'star-l', z: 1 })
+  star = toggleAllLabels(star, true)
+  assert.deepEqual(star.labels, { v0: 'A', v2: 'B', v4: 'C', v6: 'D', v8: 'E' })
+  // More points: the letters stay on, and every tip has one.
+  const big = setShapeItemSides(star, 24)
+  const tips = Object.values(big.labels ?? {})
+  assert.equal(tips.length, 24)
+  assert.equal(tips[23], 'Y')
+  // Fewer points: A, B, C, not the old letters of those vertices.
+  assert.deepEqual(setShapeItemSides(big, 3).labels, { v0: 'A', v2: 'B', v4: 'C' })
+  // A letter the user typed stays where it was.
+  const named = setShapeItemSides(setLabel(star, 'v2', 'K'), 4)
+  assert.deepEqual(named.labels, { v0: 'A', v2: 'K', v4: 'C', v6: 'D' })
+  assert.equal(vertexLetter(25), 'A₁')
 })

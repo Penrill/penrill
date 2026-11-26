@@ -444,15 +444,19 @@ export function evaluate2dShape(geo: ShapeGeometry, constructions: readonly Shap
 
   const { verts, roles, center } = buildPolygonVerts(geo)
   const areaSign = signedArea2(verts) >= 0 ? 1 : -1
+  // Letters go to the corners in order, so a star's tips read A, B, C; its inner points come after them.
+  let lettered = 0
+  let innerLettered = verts.filter((_, i) => roles?.[i] !== 'inner').length
   const vertices: EvalVertex[] = verts.map((pos, i) => {
     const corner = polygonCornerAngle(verts, i, areaSign)
+    const role = roles?.[i] ?? 'corner'
     return {
       id: `v${i}`,
       pos,
-      defaultLabel: vertexLetter(i),
+      defaultLabel: vertexLetter(role === 'inner' ? innerLettered++ : lettered++),
       angleDeg: corner?.deg,
       angleRays: corner?.rays,
-      role: roles?.[i] ?? 'corner',
+      role,
       visible: true
     }
   })
