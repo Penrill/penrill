@@ -41,6 +41,8 @@ depend on them. New shortcuts: add to `shortcuts.ts`, this file, the test and bo
 | Ctrl+Y / Ctrl+Shift+Z | Redo |
 | Mouse Back / Forward button | Undo / redo |
 | Shift (hold while drawing) | Straight line (snaps to 0° / 45° / 90°) |
+| Ctrl (hold while moving) | Snap to the paper grid (a coordinate line or plane by its origin) |
+| Double-click a coordinate line or plane | Line it up with the paper grid (whole cells per unit, origin on a grid point) |
 | Ctrl (hold while erasing) | Erase whole strokes instead of only what the eraser touches (or the other way round, if whole strokes is the chosen mode) |
 | Ctrl+G | Group |
 | Ctrl+Shift+G | Ungroup |

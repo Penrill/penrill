@@ -799,3 +799,14 @@ export function drawGraph(ctx: CanvasRenderingContext2D, g: GraphItem): void {
 export function graphSvg(g: GraphItem): string {
   return toSvg(graphDisplay(g), inkColors)
 }
+
+/**
+ * The graph lined up with the paper grid of cells `step` = [across, down]: one unit becomes a whole
+ * number of cells (at least one) and the origin moves to the nearest grid point.
+ */
+export function alignedGraph(g: GraphItem, step: readonly [number, number]): GraphItem {
+  const [gx, gy] = step
+  const unit = Math.max(1, Math.round(g.unit / gx)) * gx
+  const next: GraphItem = { ...g, unit, ox: Math.round(g.ox / gx) * gx, oy: Math.round(g.oy / gy) * gy }
+  return { ...next, bbox: graphBBox(next) }
+}

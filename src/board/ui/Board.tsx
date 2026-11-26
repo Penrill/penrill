@@ -571,6 +571,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     /** Anchor point used when Ctrl-snapping a moved selection to the paper grid. */
     const moveAnchor = (): { anchorX: number; anchorY: number } | null => {
       const items = editor.selectedItems()
+      // A coordinate line or plane snaps by its origin, where its axes cross.
+      if (items.length === 1 && items[0].type === 'graph') return { anchorX: items[0].ox, anchorY: items[0].oy }
       if (items.length === 1 && items[0].type === 'shape') {
         const s = items[0]
         const ev = evaluateShape(s)
@@ -1269,10 +1271,11 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         }
       } else if (eff === 'select' || eff === 'move') {
         const w = screenToWorld(editor.camera, p.x, p.y)
-        // Double click / double tap (pen too) on text edits it.
+        // Double click / double tap (pen too) on text edits it; on a coordinate line or plane it lines
+        // the axes up with the paper grid.
         const tapHit = e.button === 0 ? hitTest(scene.getItems(), w.x, w.y, 4 / editor.camera.zoom) : null
         const now = performance.now()
-        const editable = tapHit?.type === 'text' || tapHit?.type === 'formula'
+        const editable = tapHit?.type === 'text' || tapHit?.type === 'formula' || tapHit?.type === 'graph'
         if (tapHit && editable && !isLocked(tapHit) && lastTap?.id === tapHit.id && now - lastTap.t < 500) {
           lastTap = null
           try {
@@ -1283,6 +1286,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           editor.commitPreview()
           if (tapHit.type === 'text') editor.editText(tapHit)
           else if (tapHit.type === 'formula') editor.editFormula(tapHit)
+          else if (tapHit.type === 'graph') editor.alignGraphToGrid(tapHit.id, gridSteps())
           return
         }
         lastTap = tapHit && editable ? { id: tapHit.id, t: now } : null

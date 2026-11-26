@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { EMPTY_FORMULA, typeChar, type Atom, type FormulaState, type Row } from '@penrill/math/formula'
 import { fnHead, labelRows, parseRows, plotFormula, plotHead, renameVar, rowsToText } from '../src/board/engine/formulaexpr.ts'
-import { axisNames, graphPrims } from '../src/board/engine/graph.ts'
+import { alignedGraph, axisNames, graphPrims } from '../src/board/engine/graph.ts'
 import type { GraphItem } from '@penrill/core/types'
 
 const rows = (s: string, st: FormulaState = EMPTY_FORMULA): Row => [...s].reduce(typeChar, st).rows
@@ -108,4 +108,12 @@ test('a curve is drawn only where its value is in range, and that needs version 
   // Fitting keeps to the range of values.
   const { fitRanges } = await import('../src/board/engine/graph.ts')
   assert.deepEqual(fitRanges(g), { xMin: -3, xMax: 3, yMin: -1, yMax: 5 })
+})
+
+test('a plane lines up with the paper grid', () => {
+  const g = alignedGraph({ ...plane([]), ox: 37, oy: -13, unit: 30 }, [24, 24])
+  assert.deepEqual([g.ox, g.oy, g.unit], [48, -24, 24])
+  // A small unit still gets one whole cell; lined paper rounds the height to its own line step.
+  const small = alignedGraph({ ...plane([]), ox: 10, oy: 50, unit: 5 }, [24, 32])
+  assert.deepEqual([small.ox, small.oy, small.unit], [0, 64, 24])
 })

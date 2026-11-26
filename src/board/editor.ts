@@ -1,5 +1,5 @@
 import { clampZoom, screenToWorld, zoomAt } from '@penrill/core/camera'
-import { DEFAULT_PLANE, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
+import { alignedGraph, DEFAULT_PLANE, FN_COLORS, fitRanges, graphBBox, MAX_FNS, sanitizeGraph } from './engine/graph'
 import { plotFormula, plotHead, rowsToText } from './engine/formulaexpr'
 import { bboxOfPoints, newId } from '@penrill/core/geometry'
 import { isImageFile, loadImage, normalizeImageDataUrl, readFileAsDataURL } from './engine/images'
@@ -787,6 +787,19 @@ export class Editor {
     if (!r) return false
     if (r.xMin === old.xMin && r.xMax === old.xMax && r.yMin === old.yMin && r.yMax === old.yMax) return true
     this.updateGraph(id, { ...old, ...r })
+    return true
+  }
+
+  /**
+   * Line a coordinate line / plane up with the paper grid (undoable): one unit becomes a whole number
+   * of cells and the origin sits on a grid point. False when it already was.
+   */
+  alignGraphToGrid(id: string, step: readonly [number, number]): boolean {
+    const old = this.scene.getById([id])[0]
+    if (!old || old.type !== 'graph') return false
+    const next = alignedGraph(old, step)
+    if (next.unit === old.unit && next.ox === old.ox && next.oy === old.oy) return false
+    this.scene.replace([old], [next])
     return true
   }
 
