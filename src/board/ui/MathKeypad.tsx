@@ -48,7 +48,7 @@ export function MathKeypad() {
   const [letters, setLetters] = useState(false)
   const [more, setMore] = useState<More | null>(null)
   const [showHistory, setShowHistory] = useState(false)
-  const hold = useRef<{ timer: number; opened: boolean } | null>(null)
+  const hold = useRef<{ timer: number; opened: boolean; pointerId: number } | null>(null)
   const repeat = useRef(0)
   const panel = useRef<HTMLDivElement>(null)
   const grip = useRef({ x: 0, y: 0 })
@@ -90,7 +90,13 @@ export function MathKeypad() {
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
       if (e.button !== 0) return
       const el = e.currentTarget
-      const h = { timer: 0, opened: false }
+      // Keep the release on this key even when it lands on one of the extra keys.
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        // The pointer is already gone; the extra keys handle a release on them themselves.
+      }
+      const h = { timer: 0, opened: false, pointerId: e.pointerId }
       hold.current = h
       if (key.more) {
         h.timer = window.setTimeout(() => {
@@ -262,8 +268,10 @@ export function MathKeypad() {
               data-more={i}
               className="keypad-key"
               onPointerUp={() => {
-                // A slide from the held key ends on that key's own handler; this is a plain tap.
-                if (hold.current) return
+                // A slide from the held key that still ended here (no capture) or a plain tap: type it.
+                // A hold left over from a release that never reached its key must not block the tap.
+                if (hold.current) window.clearTimeout(hold.current.timer)
+                hold.current = null
                 run(key)
                 setMore(null)
               }}
