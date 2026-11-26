@@ -1,5 +1,5 @@
 import * as Headless from '@headlessui/react'
-import { ArrowPathIcon, ArrowUturnLeftIcon, Cog6ToothIcon, CursorArrowRaysIcon } from '@heroicons/react/20/solid'
+import { ArrowPathIcon, ArrowUturnLeftIcon, CalculatorIcon, Cog6ToothIcon, CursorArrowRaysIcon } from '@heroicons/react/20/solid'
 import { Button } from '@penrill/ui/button'
 import { Checkbox, CheckboxField } from '@penrill/ui/checkbox'
 import { Divider } from '@penrill/ui/divider'
@@ -675,11 +675,14 @@ export function ShapePopoverFooter({
   spec,
   onReset,
   onOpenSettings,
+  onExact,
   hideSettingsLink = false
 }: {
   spec?: ShapeSpec
   onReset?: (next: ShapeSpec) => void
   onOpenSettings?: () => void
+  /** Shown in the shapes menu: opens "Exact shape" (a shape from typed sides and angles). */
+  onExact?: () => void
   hideSettingsLink?: boolean
 }) {
   const editor = useEditor()
@@ -701,6 +704,12 @@ export function ShapePopoverFooter({
         >
           <Cog6ToothIcon data-slot="icon" />
           {t('shapes.settingsLink')}
+        </Button>
+      )}
+      {onExact && (
+        <Button plain className="!px-2 !py-1 !text-xs" title={t('shapes.exactHint')} onClick={onExact}>
+          <CalculatorIcon data-slot="icon" />
+          {t('shapes.exactLink')}
         </Button>
       )}
       {customized && (

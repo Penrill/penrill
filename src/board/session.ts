@@ -27,6 +27,8 @@ export interface Session {
   mathTarget: MathTarget | null
   /** Coordinate settings dialog: insert a new graph or edit the selected one. */
   graphDialog: { mode: 'insert' | 'edit'; id?: string; params: GraphParams } | null
+  /** The "Exact shape" dialog (a shape built from typed sides and angles) is open. */
+  shapeMeasure: boolean
   /** Function panel docked beside the selected coordinate plane (`session` groups its edits into one undo step). */
   fnPanel: { id: string; session: number } | null
   /** Mirrors editor.camera so React chrome (zoom label, selection toolbar) can follow it. */
@@ -80,6 +82,7 @@ export function createSessionStore(): SessionStore {
     formulaEdit: null,
     mathTarget: null,
     graphDialog: null,
+    shapeMeasure: false,
     fnPanel: null,
     camera: { x: 0, y: 0, zoom: 1 },
     zoom: 1,

@@ -8,7 +8,7 @@ import { drawAngleLabel, drawProtractor, type Protractor, type ProtractorState }
 import { drawStraightedge, type Straightedge, type StraightState } from './straightedge'
 import { inkColor, isChalk, withInkSurface } from './surface'
 import { buildInkPath, drawCaps, fillInk, linePath, strokeLine, type InkStyle } from './ink'
-import { xformBBox, type Xform } from './transform'
+import { applyXform, xformBBox, type Xform } from './transform'
 import type { BackgroundKind, BBox, Camera, Item, LineCap, LineDash, Point } from '@penrill/core/types'
 import type { FeatureRegistry, ShapeEditorOverlayState } from '../registry'
 
@@ -428,6 +428,12 @@ export function drawItems(
   for (const item of items) {
     const moving = preview?.ids.has(item.id) ? preview.t : null
     if (!bboxIntersects(moving ? xformBBox(item.bbox, moving) : item.bbox, view)) continue
+    // A shape being scaled or turned is drawn as it will be, so its side lengths, angles and letters
+    // follow live (a canvas scale would keep the old numbers and grow the text).
+    if (moving && (moving.s !== 1 || moving.r) && (item.type === 'shape' || (item.type === 'stroke' && item.shape))) {
+      kinds.draw(c, applyXform(item, moving))
+      continue
+    }
     if (moving) {
       c.save()
       c.translate(moving.ax + moving.dx, moving.ay + moving.dy)

@@ -12,6 +12,7 @@ import { GraphDialog } from './ui/GraphDialog'
 import { Board, type BoardFileActions } from './ui/Board'
 import { SelectionToolbar } from './ui/SelectionToolbar'
 import { ShapeElementPopover } from './modules/shapeEditor/ShapeElementPopover'
+import { ShapeMeasureDialog } from './modules/shapeEditor/ShapeMeasureDialog'
 import { ShapePanel } from './modules/shapeEditor/ShapePanel'
 import { ShortcutsDialog } from './ui/ShortcutsDialog'
 import { TextEditor } from './ui/TextEditor'
@@ -305,6 +306,7 @@ export function BoardWorkspace({
             />
           </WorkspaceCustomizeProvider>
           <GraphDialog />
+          <ShapeMeasureDialog />
           <FunctionPanel />
           <ShapePanel />
           <InstrumentPanel />

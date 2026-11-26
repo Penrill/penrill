@@ -712,6 +712,18 @@ export class Editor {
     return g.id
   }
 
+  /** Put a ready shape (built around 0, 0) in the middle of the view and select it (undoable). */
+  insertShapeItem(shape: ShapeItem): string {
+    const c = screenToWorld(this.camera, this.view().width / 2, this.view().height / 2)
+    const b = shape.bbox
+    const moved = applyXform(shape, { s: 1, ax: 0, ay: 0, dx: c.x - (b.minX + b.maxX) / 2, dy: c.y - (b.minY + b.maxY) / 2 }) as ShapeItem
+    const item: ShapeItem = { ...moved, id: newId(), z: this.scene.allocZ() }
+    this.scene.add([item])
+    this.session.setState({ tool: 'rectSelect' })
+    this.setSelection([item])
+    return item.id
+  }
+
   /** The functions the selected formulas stand for (formulas that are no function are left out). */
   selectedPlots(): PlotFn[] {
     const formulas = this.selectedItems()

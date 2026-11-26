@@ -128,7 +128,13 @@ export function ShapesPanel({ close }: { close: () => void }) {
           onChange={(patch) => prefsStore.setState((s) => ({ triangleCircles: { ...s.triangleCircles, ...patch } }))}
         />
       )}
-      <ShapePopoverFooter onOpenSettings={close} />
+      <ShapePopoverFooter
+        onOpenSettings={close}
+        onExact={() => {
+          close()
+          editor.session.setState({ shapeMeasure: true })
+        }}
+      />
     </>
   )
 }

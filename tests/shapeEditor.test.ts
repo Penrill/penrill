@@ -21,6 +21,7 @@ import { triangleCircles } from '@penrill/core/triangleCircles'
 import { triangleAngles } from '@penrill/core/triangleConstructions'
 import type { ShapeItem, ShapeSpec, StrokeItem } from '@penrill/core/types'
 import { formatShapeLength, shapeAnnotationsDisplay } from '@penrill/shape-editor/annotations'
+import { MEASURE_RECIPES, shapeFromMeasurements, type MeasureRecipeId } from '@penrill/shape-editor/fromMeasurements'
 import {
   applyShapeItemDefaults,
   availableEdgeActions,
@@ -1051,4 +1052,45 @@ test('star letters run A, B, C over the tips and follow a change of point count'
   const named = setShapeItemSides(setLabel(star, 'v2', 'K'), 4)
   assert.deepEqual(named.labels, { v0: 'A', v2: 'K', v4: 'C', v6: 'D' })
   assert.equal(vertexLetter(25), 'A₁')
+})
+
+test('exact shapes come out with the typed sides and angles', () => {
+  const near = (a: number, b: number): void => assert.ok(Math.abs(a - b) < 0.01, `${a} ≈ ${b}`)
+  for (const id of Object.keys(MEASURE_RECIPES) as MeasureRecipeId[]) {
+    const vals: Record<string, number> = {}
+    for (const f of MEASURE_RECIPES[id].fields) vals[f.id] = f.type === 'len' ? f.def * 48 : f.def
+    const r = shapeFromMeasurements(id, vals)
+    assert.ok(r.ok, id)
+    if (!r.ok) continue
+    const ev = evaluateShape({ geo: r.data.geo })
+    // Every length switched on is one that was typed, so it reads back the typed number.
+    const typed = MEASURE_RECIPES[id].fields.filter((f) => f.type === 'len').map((f) => vals[f.id])
+    for (const eid of r.data.lengths ?? []) {
+      const e = ev.edges.find((x) => x.id === eid)!
+      assert.ok(typed.some((t) => Math.abs(t - e.length) < 0.01), `${id} ${eid}`)
+    }
+    for (const vid of r.data.angles ?? []) {
+      const v = ev.vertices.find((x) => x.id === vid)!
+      const want = vals[`∠${v.defaultLabel}`]
+      near(v.angleDeg!, want)
+    }
+  }
+  // Regular polygons have every side the typed length.
+  const hept = shapeFromMeasurements('regular', { n: 7, AB: 100 })
+  assert.ok(hept.ok)
+  if (hept.ok) for (const e of evaluateShape({ geo: hept.data.geo }).edges) near(e.length, 100)
+  // A very slanted parallelogram still gets its numbers, as a free polygon.
+  const slanted = shapeFromMeasurements('parallelogram', { AB: 10, AD: 200, '∠A': 170 })
+  assert.ok(slanted.ok)
+  if (slanted.ok) {
+    const ev = evaluateShape({ geo: slanted.data.geo })
+    near(ev.edges[0].length, 10)
+    near(ev.edges[3].length, 200)
+    near(ev.vertices[0].angleDeg!, 170)
+  }
+  // Numbers that make no shape are refused.
+  assert.deepEqual(shapeFromMeasurements('triangleSSS', { AB: 10, BC: 3, CA: 4 }), { ok: false, error: 'triangle' })
+  assert.deepEqual(shapeFromMeasurements('triangleASA', { AB: 10, '∠A': 100, '∠B': 90 }), { ok: false, error: 'angles' })
+  assert.deepEqual(shapeFromMeasurements('trapezoid', { AB: 6, DC: 3, h: 2 }), { ok: false, error: 'trapezoid' })
+  assert.deepEqual(shapeFromMeasurements('rectangle', { AB: 0, BC: 3 }), { ok: false, error: 'positive' })
 })
