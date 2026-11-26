@@ -1,5 +1,5 @@
 import { sendHttp } from '../shared/http'
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, powerMonitor, screen, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,7 @@ import { initFeatures } from './features'
 import { safeFileName, writeDurable } from './fsutil'
 import { Library } from './library'
 import { initUpdater } from './updater'
+import { readWindowState, restoreBounds, writeWindowState } from './windowState'
 import { connectArg, Connections, deviceName, discover, openExternal, probe, registerScheme } from './connect'
 import { BOARD_EXT, BOARD_EXTS, isBoardFileName } from '../shared/boardFile'
 
@@ -204,9 +205,12 @@ function registerIpc(): void {
 }
 
 function createWindow(): void {
+  // Reopen on the screen (and at the spot) the window was closed on, if that screen is still there.
+  const stateFile = join(app.getPath('userData'), 'window.json')
+  const saved = readWindowState(stateFile)
+  const bounds = saved ? restoreBounds(saved, screen.getAllDisplays().map((d) => d.workArea)) : null
   const win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...(bounds ?? { width: 1400, height: 900 }),
     minWidth: 640,
     minHeight: 480,
     show: false,
@@ -224,7 +228,10 @@ function createWindow(): void {
     if (mainWindow === win) mainWindow = null
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    if (bounds && saved?.maximized) win.maximize()
+    win.show()
+  })
 
   // No app menu, so its default accelerators (Ctrl+= / Ctrl+0 page zoom) don't fight the board's zoom.
   // F12 / Ctrl+Shift+I still open DevTools.
@@ -236,6 +243,10 @@ function createWindow(): void {
   // Before closing, let the page flush its autosave so the board reopens exactly as it was left.
   let flushed = false
   win.on('close', (e) => {
+    if (!flushed) {
+      const b = win.getNormalBounds()
+      writeWindowState(stateFile, { ...b, maximized: win.isMaximized() || win.isFullScreen() })
+    }
     if (flushed || installingUpdate) return
     e.preventDefault()
     const done = (): void => {
