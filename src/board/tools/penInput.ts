@@ -14,6 +14,30 @@ export function inkSamples(e: PointerEvent, downTime: number): PointerEvent[] {
   return contact.length ? contact : [e]
 }
 
+type Pos = { x: number; y: number; t: number }
+
+// Screen px, and px per ms: far beyond any real hand movement.
+const JUMP_PX = 48
+const JUMP_SPEED = 6
+
+/** Some tablet drivers park the cursor (often in the screen centre) when the pen lifts and
+ * report the next press there; the first real sample then lands far away a few ms later. */
+export function penJumped(from: Pos, to: Pos): boolean {
+  const d = Math.hypot(to.x - from.x, to.y - from.y)
+  return d > JUMP_PX && d > Math.max(to.t - from.t, 1) * JUMP_SPEED
+}
+
+/** Index of the first sample after the last jump from the press position, or -1 when none jumped. */
+export function afterStaleStart(down: Pos, samples: Pos[]): number {
+  let prev = down
+  let from = -1
+  samples.forEach((s, i) => {
+    if (penJumped(prev, s)) from = i
+    prev = s
+  })
+  return from
+}
+
 /** A tilted tip lays down a wider mark. Store the resulting width in the existing pressure channel. */
 function tabletPressure(e: Pick<PointerEvent, 'pressure' | 'altitudeAngle' | 'tiltX' | 'tiltY'>): number {
   const radians = Math.PI / 180

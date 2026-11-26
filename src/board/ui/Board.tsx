@@ -59,7 +59,7 @@ import { beginLasso } from '../tools/lasso'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
-import { inkSamples, isIPad, penInContact, stylusStrategy } from '../tools/penInput'
+import { afterStaleStart, inkSamples, isIPad, penInContact, stylusStrategy } from '../tools/penInput'
 import { WheelSource } from '../engine/wheel'
 
 type StraightSlot = 'ruler' | 'setSquare'
@@ -83,6 +83,8 @@ type Gesture =
       live: LiveStroke
       downTime: number
       provisionalStart?: boolean
+      /** Where the press landed on screen, until the first move confirms it is not stale. */
+      downAt?: { x: number; y: number; t: number }
       start: Point
       snap?:
         | { mode: 'arc'; startDeg: number; endDeg?: number }
@@ -1524,6 +1526,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           pointerId: e.pointerId,
           downTime: e.timeStamp,
           provisionalStart: !ipad && e.pointerType === 'pen' && e.pressure === 0,
+          // Tablets in mouse mode report as a mouse, so check those presses too.
+          downAt: e.pointerType === 'touch' ? undefined : { x: p.x, y: p.y, t: e.timeStamp },
           start,
           live: {
             tool: isHl ? 'highlighter' : 'pen',
@@ -1796,7 +1800,14 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
             g.held.shift = e.shiftKey
             reshapeHeld(g)
           } else if (g.kind === 'ink') {
-            const events = inkSamples(e, g.downTime)
+            let events = inkSamples(e, g.downTime)
+            if (g.downAt) {
+              // A press reported at a parked cursor position: start where the pen really is.
+              const fresh = afterStaleStart(g.downAt, events.map(ev => ({ ...local(ev), t: ev.timeStamp })))
+              if (fresh > 0) events = events.slice(fresh)
+              if (fresh >= 0) g.provisionalStart = true
+              g.downAt = undefined
+            }
             if (g.provisionalStart) {
               // Some drivers report their last hover position on a zero-pressure down.
               g.start = pointFrom(events[0], g.live.pressure)

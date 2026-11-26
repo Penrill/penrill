@@ -5,6 +5,7 @@ import { evaluateShape } from '@penrill/core/shapeEval'
 import { shapeMembers } from '@penrill/core/shapeItems'
 import type { Item, StrokeItem } from '@penrill/core/types'
 import type { EraserMode } from '../store'
+import { penJumped } from './penInput'
 import type { Gesture, Sample, ToolContext } from './types'
 
 /** What one swipe changed so far, kept as a single undo step. */
@@ -102,7 +103,9 @@ export function beginErase(ctx: ToolContext, start: Sample): Gesture {
   return {
     move(samples) {
       for (const s of samples) {
-        eraseAlong(ctx.scene, last.x, last.y, s.x, s.y, radius(), ctx.prefs().eraserMode, record)
+        // A driver's parked cursor position must not wipe a path across the board.
+        const jumped = penJumped({ x: last.sx, y: last.sy, t: last.time }, { x: s.sx, y: s.sy, t: s.time })
+        if (!jumped) eraseAlong(ctx.scene, last.x, last.y, s.x, s.y, radius(), ctx.prefs().eraserMode, record)
         last = s
       }
     },

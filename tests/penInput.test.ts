@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { allowsFingerInk, shouldOfferPencilChoice } from "../src/board/modules/iPadInput.ts"
-import { inkSamples, penInContact, stylusStrategy } from '../src/board/tools/penInput.ts'
+import { afterStaleStart, inkSamples, penInContact, penJumped, stylusStrategy } from '../src/board/tools/penInput.ts'
 
 function pen(timeStamp: number, pressure: number, buttons: number): PointerEvent {
   return { pointerType: 'pen', timeStamp, pressure, buttons } as PointerEvent
@@ -63,4 +63,14 @@ test('both saved iPad modes suppress the prompt and route finger ink independent
     assert.equal(allowsFingerInk(true, mode), mode === 'draw')
     assert.equal(allowsFingerInk(false, mode), false)
   }
+})
+
+test('a press reported at a parked cursor position gives way to where the pen really is', () => {
+  const down = { x: 960, y: 540, t: 100 }
+  // Driver parked the cursor in the screen centre; the first real sample lands far away 4 ms later.
+  assert.equal(afterStaleStart(down, [{ x: 300, y: 200, t: 104 }, { x: 302, y: 201, t: 109 }]), 0)
+  assert.equal(afterStaleStart(down, [{ x: 960, y: 540, t: 101 }, { x: 300, y: 200, t: 104 }]), 1)
+  // An ordinary quick stroke keeps its press point.
+  assert.equal(afterStaleStart(down, [{ x: 970, y: 545, t: 104 }, { x: 990, y: 552, t: 109 }]), -1)
+  assert.equal(penJumped(down, { x: 1060, y: 540, t: 160 }), false)
 })
