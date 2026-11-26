@@ -1802,6 +1802,11 @@ button:disabled {
   background: var(--hover);
 }
 
+/* Functions after the first share its name and variable: shown, not picked. */
+span.fn-head:hover {
+  background: none;
+}
+
 .fn-head-popover {
   min-width: 0;
   padding: 8px;

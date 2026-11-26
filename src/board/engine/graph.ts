@@ -649,15 +649,14 @@ function buildPrims(g: GraphItem): GraphPrims {
 }
 
 /**
- * Names of the plane's axes, from its functions: the variable they share (t for s(t) = …) on the
- * horizontal axis, and the name they share on the vertical one (s, v; f, g and h are values of y).
+ * Names of the plane's axes, from its functions: the variable they share (a for f(a) = …) on the
+ * horizontal axis, and the name they share (f) on the vertical one; x and y when they differ.
  */
 export function axisNames(g: Pick<GraphParams, 'fns'>): { h: string; v: string } {
   const heads = (g.fns ?? []).map(fnHead)
   const same = (pick: (h: { name: string; arg: string }) => string): string | null =>
     heads.length && heads.every((h) => pick(h) === pick(heads[0])) ? pick(heads[0]) : null
-  const v = same((h) => h.name)
-  return { h: same((h) => h.arg) ?? 'x', v: v && !'fgh'.includes(v) ? v : 'y' }
+  return { h: same((h) => h.arg) ?? 'x', v: same((h) => h.name) ?? 'y' }
 }
 
 /** Screen-plane position of the 3D point (x, y, z): y right, z up, x towards the viewer (down-left). */

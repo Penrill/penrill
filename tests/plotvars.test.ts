@@ -71,7 +71,7 @@ test('a curve is drawn only on its range', () => {
 test('axes are named after the functions', () => {
   assert.deepEqual(axisNames(plane([{ expr: 'x', color: '#000' }])), { h: 'x', v: 'y' })
   assert.deepEqual(axisNames(plane([{ expr: 'x', color: '#000', rows: rows('t'), name: 's', arg: 't' }])), { h: 't', v: 's' })
-  assert.deepEqual(axisNames(plane([{ expr: 'x', color: '#000', rows: rows('t'), name: 'f', arg: 't' }])), { h: 't', v: 'y' })
+  assert.deepEqual(axisNames(plane([{ expr: 'x', color: '#000', rows: rows('t'), name: 'f', arg: 'a' }])), { h: 'a', v: 'f' })
   assert.deepEqual(
     axisNames(plane([{ expr: 'x', color: '#000', name: 's' }, { expr: 'x', color: '#000', name: 'v' }])),
     { h: 'x', v: 'y' }

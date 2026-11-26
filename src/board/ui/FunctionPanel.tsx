@@ -27,7 +27,14 @@ const rowsOf = (g: GraphItem): FnRow[] =>
     const rows = rowsOfFn(f)
     return { key: nextKey++, color: f.color, st: at(rows), shown: rows, name: f.name, arg: f.arg, from: f.from, to: f.to, yFrom: f.yFrom, yTo: f.yTo }
   })
-const blankRow = (color: string): FnRow => ({ key: nextKey++, color, st: at([]), shown: null })
+/** A new empty row; `head` is the name and variable of the plane's first function, which it shares. */
+const blankRow = (color: string, head?: { name: string; arg: string }): FnRow => ({
+  key: nextKey++,
+  color,
+  st: at([]),
+  shown: null,
+  ...(head ? { name: head.name, arg: head.arg } : {})
+})
 const stampOf = (g: GraphItem | undefined): string => (g ? JSON.stringify([g.fns ?? [], !!g.hideFormulas]) : '')
 const freeColor = (rows: FnRow[]): string => {
   const used = new Set(rows.map((r) => r.color))
@@ -162,8 +169,10 @@ export function FunctionPanel() {
     written.current = stampOf(now?.type === 'graph' ? now : undefined)
   }
   const setRow = (key: number, patch: Partial<FnRow>): void => write(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)), hide)
+  /** The name and variable picked on the first function: every other one uses them too. */
+  const firstHead = rows[0] ? fnHead({ rows: rows[0].st.rows, name: rows[0].name, arg: rows[0].arg }) : undefined
   const addRow = (): void => {
-    const r = blankRow(freeColor(rows))
+    const r = blankRow(freeColor(rows), firstHead)
     setFocusKey(r.key)
     write([...rows, r], hide)
   }
@@ -207,17 +216,24 @@ export function FunctionPanel() {
                 title={t('graph.fnColor')}
                 onClick={() => setRow(r.key, { color: FN_COLORS[(FN_COLORS.indexOf(r.color) + 1) % FN_COLORS.length] })}
               />
-              {!ownHead && (
+              {!ownHead && i > 0 && <span className="fn-label fn-head" title={t('graph.fnHeadShared')}>{headText(head.name, head.arg)}</span>}
+              {!ownHead && i === 0 && (
                 <HeadPicker
                   name={head.name}
                   arg={head.arg}
                   onPick={(name, arg) => {
-                    // A left side typed into the formula gives way to the one picked here.
-                    const len = plotHead(r.st.rows).len
-                    let st = len ? at(r.st.rows.slice(len)) : r.st
-                    // A new variable is written into the formula too: x² becomes t².
-                    if (arg !== head.arg) st = at(renameVar(st.rows, head.arg, arg))
-                    setRow(r.key, { st, name, arg })
+                    // The other functions follow the first one (their own left side typed in stays).
+                    const next = rows.map((x, j) => {
+                      if (j > 0 && (isEquation(x.st.rows) || plotHead(x.st.rows).len > 0)) return x
+                      const was = fnHead({ rows: x.st.rows, name: x.name, arg: x.arg })
+                      // A left side typed into the formula gives way to the one picked here.
+                      const len = plotHead(x.st.rows).len
+                      let st = len ? at(x.st.rows.slice(len)) : x.st
+                      // A new variable is written into the formula too: x² becomes t².
+                      if (arg !== was.arg) st = at(renameVar(st.rows, was.arg, arg))
+                      return { ...x, st, name, arg }
+                    })
+                    write(next, hide)
                   }}
                 />
               )}
