@@ -47,11 +47,14 @@ export type LibraryApi = BoardStoreApi & BoardFilesApi
 
 export interface UpdateState {
   /** 'web': the browser version, which updates itself when the page is reloaded. */
-  status: 'idle' | 'dev' | 'store' | 'web' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error'
+  status: 'idle' | 'dev' | 'store' | 'web' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'nospace' | 'error'
   version?: string
   percent?: number
   manual?: boolean
   url?: string
+  /** 'nospace': the drive to free space on (like `C:`) and how many megabytes are missing. */
+  drive?: string
+  missingMb?: number
 }
 
 export interface UpdateApi {

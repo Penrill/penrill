@@ -76,6 +76,16 @@ export function UpdateBanner() {
       </Notice>
     )
   }
+  if (s.status === 'nospace') {
+    return (
+      <Notice
+        onClose={hide(key)}
+        actions={<NoticeButton onClick={() => void platform.update.check()}>{t('update.check')}</NoticeButton>}
+      >
+        {noSpaceText(t, s)}
+      </Notice>
+    )
+  }
   if (s.status === 'available' && s.manual) {
     return (
       <Notice
@@ -93,6 +103,9 @@ export function UpdateBanner() {
   }
   return null
 }
+
+const noSpaceText = (t: ReturnType<typeof useT>, s: UpdateState) =>
+  t('update.noSpace', { version: s.version ?? '', size: String(s.missingMb ?? 0), drive: s.drive ?? '' })
 
 /** Settings, About: the version, a manual check and what the updater is doing. */
 export function AboutSection() {
@@ -136,6 +149,8 @@ export function AboutSection() {
             ? t(web ? 'update.webReady' : 'update.ready', { version: s.version ?? '' })
             : s.status === 'available'
               ? t('update.available', { version: s.version ?? '' })
+              : s.status === 'nospace'
+                ? noSpaceText(t, s)
               : s.status === 'error'
                 ? t('update.error')
                 : ''

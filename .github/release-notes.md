@@ -2,6 +2,10 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Safe updates on a full disk in 0.13.16
+
+- **Updates no longer remove Penrill when the disk is full.** Before installing, the Windows installer and the automatic update check that the drive has room for the new version. If it doesn't, the installed app and your boards stay as they are, and Penrill says which drive to free and how many megabytes are needed.
+
 ## About credits and license in 0.13.15
 
 - Updated Settings → About credits in English and Ukrainian and updated the license copyright notice.
