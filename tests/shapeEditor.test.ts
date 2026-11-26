@@ -984,3 +984,53 @@ test('true free 3D vertex dragging (Alt + Free vertices), isometric + 6 side vie
   assert.equal(evaluateShape(backToPoly).is3D, false)
   assert.equal(backToPoly.geo.dim3, undefined)
 })
+
+test('pulling a pyramid apex straight down in a tilted view lowers it without leaning, so the height stays inside the base', () => {
+  const mk = (): ShapeItem =>
+    createShapeItem(specToShapeData({ kind: 'pyramid', ax: 0, ay: 0, bx: 160, by: 160, base: 4 }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: 'pyr-down', z: 1 })
+  const pyr = toggleConstruction(mk(), { id: 'alt:apex', kind: 'altitude', from: 'apex' })
+  const apex = evaluateShape(pyr).vertices.find((v) => v.id === 'apex')!
+  const center = evaluateShape(pyr).vertices.filter((v) => v.id.startsWith('b'))
+  for (const dy of [40, 80, 200]) {
+    const moved = dragShapeItemHandle(pyr, 'apex', [apex.pos[0], apex.pos[1] + dy], baseOpts, { startWorld: apex.pos, startGeo: pyr.geo }).item
+    const ev = evaluateShape(moved)
+    const a3 = ev.vertices.find((v) => v.id === 'apex')!.pos3!
+    assert.ok(Math.abs(a3[0]) < 1 && Math.abs(a3[2]) < 1, `apex leaned to ${a3}`)
+    const foot = ev.constructions.find((c) => c.id === 'alt:apex')!.dots![0].pos
+    const cx = center.reduce((s, v) => s + v.pos[0], 0) / center.length
+    const cy = center.reduce((s, v) => s + v.pos[1], 0) / center.length
+    assert.ok(Math.hypot(foot[0] - cx, foot[1] - cy) < 1, `foot ${foot} left the base centre ${cx},${cy}`)
+  }
+  // Dragging sideways still leans the apex.
+  const side = dragShapeItemHandle(pyr, 'apex', [apex.pos[0] + 60, apex.pos[1]], baseOpts, { startWorld: apex.pos, startGeo: pyr.geo }).item
+  const s3 = evaluateShape(side).vertices.find((v) => v.id === 'apex')!.pos3!
+  assert.ok(Math.hypot(s3[0], s3[2]) > 20)
+})
+
+test('cube size handles, regular polygon corners and parallelogram corners stay under the pointer', () => {
+  const mk = (kind: ShapeSpec['kind'], extra: Partial<ShapeSpec> = {}): ShapeItem =>
+    createShapeItem(specToShapeData({ kind, ax: 0, ay: 0, bx: 160, by: 120, ...extra }), { color: '#1e1e1e', size: 2, tool: 'pen' }, { id: `follow-${kind}`, z: 1 })
+  const follow = (item: ShapeItem, id: string, dx: number, dy: number): number => {
+    const h = shapeItemHandles(item).find((x) => x.id === id)!
+    const moved = dragShapeItemHandle(item, id, [h.x + dx, h.y + dy], { ...baseOpts, alt: true }, { startWorld: [h.x, h.y], startGeo: item.geo }).item
+    const nh = shapeItemHandles(moved).find((x) => x.id === id)!
+    return Math.hypot(nh.x - h.x - dx, nh.y - h.y - dy)
+  }
+  // The depth handle points into the screen, so its axis looks short: pulling it along that axis must still track.
+  const cube = mk('cube')
+  const hz = shapeItemHandles(cube).find((x) => x.id === 'dimZ')!
+  const c = evaluateShape(cube).center
+  const len = Math.hypot(hz.x - c[0], hz.y - c[1])
+  assert.ok(follow(cube, 'dimZ', ((hz.x - c[0]) / len) * 30, ((hz.y - c[1]) / len) * 30) < 1.5)
+  // A stretched hexagon keeps its proportions; a corner pulled along its ray lands on the pointer.
+  const hex = mk('hexagon')
+  const hv = shapeItemHandles(hex).find((x) => x.id === 'v1')!
+  const hc = evaluateShape(hex).center
+  assert.ok(follow(hex, 'v1', (hv.x - hc[0]) * 0.3, (hv.y - hc[1]) * 0.3) < 0.5)
+  const bigger = dragShapeItemHandle(hex, 'v1', [hc[0] + (hv.x - hc[0]) * 1.3, hc[1] + (hv.y - hc[1]) * 1.3], baseOpts, { startWorld: [hv.x, hv.y], startGeo: hex.geo }).item
+  near((bigger.geo.bx - bigger.geo.ax) / (bigger.geo.by - bigger.geo.ay), 160 / 120, 1e-6)
+  // Every parallelogram corner follows the pointer, also when the shape is turned.
+  for (const rot of [0, 0.7]) for (const id of ['v0', 'v1', 'v2', 'v3']) {
+    assert.ok(follow(mk('parallelogram', { rot }), id, 17, 23) < 0.5, `parallelogram ${id} rot ${rot}`)
+  }
+})

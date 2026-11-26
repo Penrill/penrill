@@ -96,6 +96,27 @@ export interface ShapeItemDragResult {
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+
+/**
+ * Board delta -> local 3D delta for the apex / top-center handle. A drag can't say how deep it
+ * goes, and the plain inverse rotation splits it evenly over all three axes, so in a tilted view
+ * pulling the apex straight down also slid it sideways and the height's foot left the base.
+ * This picks the 3D move that changes height freely and the lean as little as possible.
+ */
+function unprojectApexDelta(dx: number, dy: number, m: readonly number[]): Vec3 {
+  // Board delta = P * local delta, rows [m0 m1 m2] and [-m3 -m4 -m5]; minimize x^2 + k*y^2 + z^2.
+  const k = 0.02
+  const p0: Vec3 = [m[0], m[1], m[2]]
+  const p1: Vec3 = [-m[3], -m[4], -m[5]]
+  const w: Vec3 = [1, 1 / k, 1]
+  const g = (a: Vec3, b: Vec3): number => a[0] * b[0] * w[0] + a[1] * b[1] * w[1] + a[2] * b[2] * w[2]
+  const a00 = g(p0, p0), a01 = g(p0, p1), a11 = g(p1, p1)
+  const det = a00 * a11 - a01 * a01
+  if (Math.abs(det) < 1e-12) return [0, 0, 0]
+  const l0 = (a11 * dx - a01 * dy) / det
+  const l1 = (a00 * dy - a01 * dx) / det
+  return [w[0] * (p0[0] * l0 + p1[0] * l1), w[1] * (p0[1] * l0 + p1[1] * l1), w[2] * (p0[2] * l0 + p1[2] * l1)]
+}
 const DEG = Math.PI / 180
 
 function boundsOf(spec: Pick<ShapeSpec, 'ax' | 'ay' | 'bx' | 'by'>): {
@@ -318,6 +339,19 @@ export function dragShapeItemHandle(
       : worldPt
     const [lx, ly] = toLocal(baseGeo, targetWorld[0], targetWorld[1])
     const minHalf = 10
+    /**
+     * Scale about the centre so the dragged vertex slides along its own ray to the pointer, keeping
+     * the proportions (it used to turn a stretched shape round at once, so the corner jumped aside).
+     */
+    const scaleToPointer = (idx: number): ShapeItemDragResult => {
+      const start = evaluateShape(withShapeUpdate(item, { geo: baseGeo })).vertices[idx]
+      const [vx, vy] = start ? toLocal(baseGeo, start.pos[0], start.pos[1]) : [cx + w / 2, cy]
+      const len2 = (vx - cx) ** 2 + (vy - cy) ** 2
+      const k = len2 > 1e-6 ? ((lx - cx) * (vx - cx) + (ly - cy) * (vy - cy)) / len2 : 1
+      const s = Math.max(k, (minHalf * 2) / Math.max(1, Math.min(w, h)))
+      const nextGeo: ShapeGeometry = { ...baseGeo, ax: cx - (w / 2) * s, ay: cy - (h / 2) * s, bx: cx + (w / 2) * s, by: cy + (h / 2) * s }
+      return { item: withShapeUpdate(item, { geo: nextGeo }), label: null, guides, snapped: opts.ctrl }
+    }
 
     if (geo.kind === 'rhombus' && handleId.startsWith('v')) {
       const idx = Number(handleId.slice(1))
@@ -386,42 +420,48 @@ export function dragShapeItemHandle(
 
     if (geo.kind === 'parallelogram' && handleId.startsWith('v')) {
       const idx = Number(handleId.slice(1))
+      // In the local frame: bottom edge from (b, y1) to (b + len, y1), top edge shifted by `off`.
       const curSkew = clamp(baseGeo.skew ?? 0.25, -0.75, 0.75)
+      const off0 = w * curSkew
+      const len = w - Math.abs(off0)
+      const b = x0 - Math.min(0, off0)
+      const tl: Vec2 = [b + off0, y0], tr: Vec2 = [b + off0 + len, y0]
+      let nb = b, nLen = len, off = off0, ny0 = y0, ny1 = y1
+      let snapped = opts.ctrl
       if (idx === 0 || idx === 1) {
-        // Top corners adjust skew & height smoothly while bottom edge stays anchored.
-        const ny0 = Math.min(y1 - minHalf * 2, ly)
-        const baseTopX = idx === 0 ? x0 : x1
-        let rawSkew: number
-        if (idx === 0) rawSkew = clamp((lx - x0) / Math.max(1, w), -0.75, 0.75)
-        else rawSkew = clamp((lx - x1) / Math.max(1, w) + Math.max(0, curSkew), -0.75, 0.75)
-        void baseTopX
-        let skew = rawSkew
-        let snapped = opts.ctrl
+        // Top corners slide the top edge (lean and height); the bottom edge stays put.
+        ny0 = Math.min(y1 - minHalf * 2, ly)
+        off = (idx === 0 ? lx : lx - len) - b
         if (!opts.alt && !opts.ctrl) {
-          const s = snapScalar(skew, [-0.25, 0, 0.25], opts.snapTol / Math.max(1, w))
-          skew = s.value
-          snapped = s.snapped
-          if (snapped && skew === 0) guides.push({ kind: 'line', points: [toWorld(baseGeo, x0, ny0), toWorld(baseGeo, x0, y1)] })
+          const s = snapScalar(off / (len + Math.abs(off)), [-0.25, 0, 0.25], opts.snapTol / Math.max(1, w))
+          if (s.snapped) {
+            off = (s.value * len) / (1 - Math.abs(s.value))
+            snapped = true
+            if (s.value === 0) guides.push({ kind: 'line', points: [toWorld(baseGeo, b, ny0), toWorld(baseGeo, b, y1)] })
+          }
         }
-        const rot = baseGeo.rot ?? 0
-        const dyCenter = (ny0 - y0) / 2
-        const shiftW = rot ? turnPoint(0, dyCenter, 0, 0, rot) : [0, dyCenter]
-        const nh = y1 - ny0
-        const ncx = cx + shiftW[0], ncy = cy + shiftW[1]
-        const nextGeo: ShapeGeometry = { ...baseGeo, ax: ncx - w / 2, ay: ncy - nh / 2, bx: ncx + w / 2, by: cy + shiftW[1] + nh / 2, skew }
-        const deg = Math.round((Math.atan2(nh, Math.abs(skew) * w) * 180) / Math.PI)
-        return { item: withShapeUpdate(item, { geo: nextGeo }), label: `${deg}°`, guides, snapped }
+      } else {
+        // Bottom corners resize width and height; the opposite top corner and the lean stay put.
+        ny1 = Math.max(y0 + minHalf * 2, ly)
+        const slope = off0 / Math.max(1, h)
+        off = slope * (ny1 - y0)
+        if (idx === 2) {
+          nb = tl[0] - off
+          nLen = Math.max(minHalf * 2, lx - nb)
+        } else {
+          nLen = Math.max(minHalf * 2, tr[0] - off - lx)
+          nb = tr[0] - off - nLen
+        }
       }
-      // Bottom corners resize width & height from top-opposite anchor.
-      const nx0 = idx === 3 ? Math.min(x1 - minHalf * 2, lx) : x0
-      const nx1 = idx === 2 ? Math.max(x0 + minHalf * 2, lx) : x1
-      const ny1 = Math.max(y0 + minHalf * 2, ly)
-      const nw = nx1 - nx0, nh = ny1 - y0
-      const dcx = (nx0 + nx1) / 2 - cx, dcy = (y0 + ny1) / 2 - cy
-      const rot = baseGeo.rot ?? 0
-      const shiftW = rot ? turnPoint(dcx, dcy, 0, 0, rot) : [dcx, dcy]
-      const nextGeo: ShapeGeometry = { ...baseGeo, ax: cx + shiftW[0] - nw / 2, ay: cy + shiftW[1] - nh / 2, bx: cx + shiftW[0] + nw / 2, by: cy + shiftW[1] + nh / 2 }
-      return { item: withShapeUpdate(item, { geo: nextGeo }), label: null, guides, snapped: opts.ctrl }
+      off = clamp(off, -3 * nLen, 3 * nLen)
+      const nw = nLen + Math.abs(off)
+      const nx0 = nb + Math.min(0, off)
+      const nh = ny1 - ny0
+      const c = toWorld(baseGeo, nx0 + nw / 2, ny0 + nh / 2)
+      const skew = clamp(off / nw, -0.75, 0.75)
+      const nextGeo: ShapeGeometry = { ...baseGeo, ax: c[0] - nw / 2, ay: c[1] - nh / 2, bx: c[0] + nw / 2, by: c[1] + nh / 2, skew }
+      const deg = Math.round((Math.atan2(nh, Math.abs(off)) * 180) / Math.PI)
+      return { item: withShapeUpdate(item, { geo: nextGeo }), label: `${deg}°`, guides, snapped }
     }
 
     if (geo.kind === 'trapezoid' && handleId.startsWith('v')) {
@@ -483,16 +523,12 @@ export function dragShapeItemHandle(
         }
         return { item: withShapeUpdate(item, { geo: { ...baseGeo, innerRatio: inner } }), label: `${Math.round(inner * 100)}%`, guides, snapped }
       }
-      // Outer tip scales star uniformly from centre.
-      const r = Math.max(minHalf, Math.hypot(lx - cx, ly - cy))
-      const nextGeo: ShapeGeometry = { ...baseGeo, ax: cx - r, ay: cy - r, bx: cx + r, by: cy + r }
-      return { item: withShapeUpdate(item, { geo: nextGeo }), label: null, guides, snapped: opts.ctrl }
+      // Outer tip scales the star uniformly from its centre.
+      return scaleToPointer(idx)
     }
 
-    if (geo.kind === 'pentagon' || geo.kind === 'hexagon' || (geo.kind === 'polygon' && !geo.vertices)) {
-      const r = Math.max(minHalf, Math.hypot(lx - cx, ly - cy))
-      const nextGeo: ShapeGeometry = { ...baseGeo, ax: cx - r, ay: cy - r, bx: cx + r, by: cy + r }
-      return { item: withShapeUpdate(item, { geo: nextGeo }), label: null, guides, snapped: opts.ctrl }
+    if ((geo.kind === 'pentagon' || geo.kind === 'hexagon' || (geo.kind === 'polygon' && !geo.vertices)) && handleId.startsWith('v')) {
+      return scaleToPointer(Number(handleId.slice(1)))
     }
 
     if (geo.kind === 'ellipse') {
@@ -582,7 +618,9 @@ export function dragShapeItemHandle(
     const axLen = Math.hypot(ax2x, ax2y)
     const dirX = axLen > 1e-3 ? ax2x / axLen : 1
     const dirY = axLen > 1e-3 ? ax2y / axLen : 0
-    const delta = ((worldPt[0] - startWorld[0]) * dirX + (worldPt[1] - startWorld[1]) * dirY) * 2
+    // The handle sits on the face, half the size from the centre, and the axis looks shorter the more
+    // it points at the viewer: undo both so the handle stays under the pointer.
+    const delta = (((worldPt[0] - startWorld[0]) * dirX + (worldPt[1] - startWorld[1]) * dirY) * 2) / Math.max(0.25, axLen)
     let [nw, nh, nd] = [bw, bh, bd]
     let snapped = false
     if (handleId === 'dimX') {
@@ -696,7 +734,7 @@ export function dragShapeItemHandle(
   if (handleId === 'apex' || handleId === 'topCenter') {
     const dx = worldPt[0] - startWorld[0]
     const dy = worldPt[1] - startWorld[1]
-    const d3 = unprojectDelta3dMat(dx, dy, startRot)
+    const d3 = unprojectApexDelta(dx, dy, startRot)
     const rx = Math.max(12, bw / 2)
     const rz = Math.max(12, bd / 2)
     let sx = clamp(startSx + d3[0] / rx, -2.2, 2.2)
