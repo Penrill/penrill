@@ -513,7 +513,7 @@ export function ShapeItemEditorControls({
             <PanelTitle>{t('shapes.sectionElements')}</PanelTitle>
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
               {actions.map((act) => (
-                <CheckboxField key={act.id} className="!gap-x-2">
+                <CheckboxField key={act.id} className="!gap-x-2" disabled={act.disabled} title={act.hintKey ? t(act.hintKey as MessageKey) : undefined}>
                   <Checkbox
                     color="blue"
                     checked={act.active}

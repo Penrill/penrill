@@ -1,6 +1,7 @@
 import { evaluateShape, shapeBBox, type EvalEdge, type EvalVertex } from '@penrill/core/shapeEval'
 import { defaultDim3, DEFAULT_ORBIT } from '@penrill/core/shapeEval3d'
 import { boxOfVertices, is3D, isLinear, isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES, type ShapeKind } from '@penrill/core/shapes'
+import { trapezoidCircles } from '@penrill/core/trapezoidCircles'
 import type { ShapeConstruction, ShapeGeometry, ShapeItem, Vec2 } from '@penrill/core/types'
 
 export interface ShapeItemDefaults {
@@ -50,6 +51,10 @@ export interface WholeShapeAction {
   active: boolean
   /** Toggle one or more constructions together (e.g. both rhombus diagonals at once). */
   constructions: ShapeConstruction[]
+  /** The shape can't have this element right now (e.g. a circumcircle on a non-isosceles trapezoid). */
+  disabled?: boolean
+  /** Why it is disabled. */
+  hintKey?: string
 }
 
 const CONSTRAINED_2D_POLYGONS: ReadonlySet<ShapeKind> = new Set([
@@ -137,7 +142,7 @@ function pruneAnnotations(item: ShapeItem): ShapeItem {
       case 'apothem': return vIds.has('apex') && eIds.has(c.edge)
       case 'incircle':
       case 'circumcircle':
-        return !ev.is3D && (isTriangle(item.geo.kind) || item.geo.kind === 'rhombus' || item.geo.kind === 'rectangle' || item.geo.kind === 'pentagon' || item.geo.kind === 'hexagon' || (item.geo.kind === 'polygon' && !item.geo.vertices))
+        return !ev.is3D && (isTriangle(item.geo.kind) || item.geo.kind === 'rhombus' || item.geo.kind === 'trapezoid' || item.geo.kind === 'rectangle' || item.geo.kind === 'pentagon' || item.geo.kind === 'hexagon' || (item.geo.kind === 'polygon' && !item.geo.vertices))
       case 'radius':
       case 'diameter':
         return item.geo.kind === 'ellipse' || (c.kind === 'radius' && (item.geo.kind === 'cylinder' || item.geo.kind === 'cone' || item.geo.kind === 'sphere'))
@@ -701,15 +706,23 @@ export function availableWholeShapeActions(item: ShapeItem): WholeShapeAction[] 
         ]),
         mk('alt:v0', 'shape.altitude', [{ id: 'alt:v0', kind: 'altitude', from: 'v0', toEdge: 'e2' }])
       ]
-    case 'trapezoid':
+    case 'trapezoid': {
+      const circles = trapezoidCircles(evaluateShape(item).vertices.map((v) => v.pos))
+      const circle = (kind: 'incircle' | 'circumcircle', possible: boolean, hintKey: string): WholeShapeAction => {
+        const act = mk(kind, `shape.${kind}`, [{ id: kind, kind }])
+        return possible || act.active ? act : { ...act, disabled: true, hintKey }
+      }
       return [
         mk('midline:e3-e1', 'shape.midline', [{ id: 'midline:e3-e1', kind: 'midline', edgeA: 'e3', edgeB: 'e1' }]),
         mk('diagonals', 'shape.diagonals', [
           { id: 'diag:v0-v2', kind: 'diagonal', from: 'v0', to: 'v2' },
           { id: 'diag:v1-v3', kind: 'diagonal', from: 'v1', to: 'v3' }
         ]),
-        mk('alt:v0', 'shape.altitude', [{ id: 'alt:v0', kind: 'altitude', from: 'v0', toEdge: 'e2' }])
+        mk('alt:v0', 'shape.altitude', [{ id: 'alt:v0', kind: 'altitude', from: 'v0', toEdge: 'e2' }]),
+        circle('incircle', !!circles.incircle, 'shape.incircleNeedsSums'),
+        circle('circumcircle', !!circles.circumcircle, 'shape.circumcircleNeedsIsosceles')
       ]
+    }
     case 'pentagon':
     case 'hexagon':
       return [

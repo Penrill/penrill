@@ -1,5 +1,6 @@
 import { turnPoint } from './geometry'
 import { isLinear, isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES } from './shapes'
+import { trapezoidCircles } from './trapezoidCircles'
 import { triangleCircles } from './triangleCircles'
 import { evaluateTangents, type TangentConstruction } from './tangents'
 import type { ShapeConstruction, ShapeGeometry, TangentMarks, Vec2 } from './types'
@@ -307,6 +308,12 @@ function evaluate2dConstruction(
           kind: c.kind,
           segments: [{ pts: sampleEllipse(target.x, target.y, target.radius, target.radius, 0, 128) }]
         }
+      }
+      if (geo.kind === 'trapezoid') {
+        const circles = trapezoidCircles(vertices.map((v) => v.pos))
+        const target = c.kind === 'incircle' ? circles.incircle : circles.circumcircle
+        if (!target) return null
+        return { id: c.id, kind: c.kind, segments: [{ pts: sampleEllipse(target.x, target.y, target.radius, target.radius, 0, 128) }] }
       }
       const x0 = Math.min(geo.ax, geo.bx), x1 = Math.max(geo.ax, geo.bx)
       const y0 = Math.min(geo.ay, geo.by), y1 = Math.max(geo.ay, geo.by)
