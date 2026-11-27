@@ -15,8 +15,8 @@ const plane = {
   kind: 'plane' as const, xMin: -10, xMax: 10, yMin: -10, yMax: 10, unit: 24, labelStep: 1, grid: false
 }
 
-test('the format version is 12; a board is stamped with the lowest version that can show it', () => {
-  assert.equal(FORMAT_VERSION, 12)
+test('the format version is 14; a board is stamped with the lowest version that can show it', () => {
+  assert.equal(FORMAT_VERSION, 14)
   // Nothing from version 7 on the board: apps that only know version 6 can still open it.
   const f = serializeBoard({ items: [{ ...plane, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
   assert.equal(f.version, 6)

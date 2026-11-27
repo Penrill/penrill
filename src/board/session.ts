@@ -56,6 +56,8 @@ export interface Session {
   shapePopover: { kind: 'vertex' | 'edge'; index: number; targetId?: string } | null
   /** Non-modal shape inspector docked beside the selected shape (stays open while interacting with the canvas). */
   shapePanel: boolean
+  /** "Build tangent" is on for this circle: a press on its outline puts a tangent there. */
+  tangentPick: string | null
   /** Remembered 3D orientation before switching to an orthographic side editing view. */
   prev3dView: { itemId: string; orbit?: [number, number]; rot3?: Quat } | null
   /** Per-board override for showing the 3D X/Y/Z rotation gizmo (`null` = follow `shapeDefaults.gizmo3d`). */
@@ -99,6 +101,7 @@ export function createSessionStore(): SessionStore {
     protractorPanel: false,
     shapePopover: null,
     shapePanel: false,
+    tangentPick: null,
     prev3dView: null,
     gizmo3dOverride: null,
     gizmo3dSpace: 'local',

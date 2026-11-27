@@ -1,5 +1,6 @@
 import { turnPoint } from '@penrill/core/geometry'
 import { evaluateShape } from '@penrill/core/shapeEval'
+import { ellipseFrame, layTangents, TANGENT_MIN_SIDE, tangentAt, tangentEnds, type TangentConstruction } from '@penrill/core/tangents'
 import {
   effectiveDim3,
   effectiveOrbit,
@@ -53,6 +54,7 @@ export type ShapeHandleHint =
   | 'shape.hint.gizmoRing'
   | 'shape.hint.gizmoPole'
   | 'shape.hint.dim3'
+  | 'shape.hint.tangentEnd'
 
 export interface ShapeHandle {
   /** Stable identifier: 'v0', 'v:0', 'add:1', 'orbit', 'rotX', 'poleX', 'dimX', 'apex', etc. */
@@ -189,6 +191,16 @@ export function shapeItemHandles(item: ShapeItem): ShapeHandle[] {
         })
       }
     }
+    // Both ends of every tangent: each drag changes that side only.
+    if (geo.kind === 'ellipse' && item.constructions?.some((c) => c.kind === 'tangent')) {
+      const tangents = item.constructions.filter((c): c is TangentConstruction => c.kind === 'tangent')
+      for (const t of layTangents(ellipseFrame(geo), tangents).laid) {
+        const [back, fwd] = tangentEnds(t)
+        for (const [side, pt] of [['back', back], ['fwd', fwd]] as const) {
+          out.push({ id: `tan:${t.c.id}:${side}`, kind: 'control', x: pt[0], y: pt[1], hint: 'shape.hint.tangentEnd', cursor: 'grab', draggable: true })
+        }
+      }
+    }
     return out
   }
 
@@ -267,6 +279,11 @@ export function shapeItemHandles(item: ShapeItem): ShapeHandle[] {
   return out
 }
 
+/** The handle on one end of a tangent to a circle (`tan:<tangent id>:back|fwd`). */
+export function isTangentEnd(handleId: string): boolean {
+  return handleId.startsWith('tan:')
+}
+
 /**
  * Update a ShapeItem by dragging handle `handleId` to `worldPt` (preserving 2D geometric constraints
  * until unlocked, or orbiting / resizing real 3D solids).
@@ -280,6 +297,20 @@ export function dragShapeItemHandle(
 ): ShapeItemDragResult {
   const geo = item.geo
   const guides: SnapGuide[] = []
+
+  // --- A tangent's end: that side gets longer or shorter, the other side and the touch point stay ---
+  if (isTangentEnd(handleId) && geo.kind === 'ellipse') {
+    const side = handleId.endsWith(':back') ? 'back' : 'fwd'
+    const id = handleId.slice(4, handleId.lastIndexOf(':'))
+    const f = ellipseFrame(geo)
+    const constructions = (item.constructions ?? []).map((c) => {
+      if (c.kind !== 'tangent' || c.id !== id) return c
+      const { at, dir } = tangentAt(f, c.angle)
+      const s = (worldPt[0] - at[0]) * dir[0] + (worldPt[1] - at[1]) * dir[1]
+      return { ...c, [side]: Math.max(TANGENT_MIN_SIDE, side === 'fwd' ? s : -s) / f.unit }
+    })
+    return { item: withShapeUpdate(item, { constructions }), label: null, guides, snapped: false }
+  }
 
   // --- Free vertex shapes (triangle, rightTriangle, unlocked polygon) ---
   if (handleId.startsWith('v') && (isTriangle(geo.kind) || (geo.kind === 'polygon' && !!geo.vertices))) {

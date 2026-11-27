@@ -18,7 +18,7 @@ import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import { evaluateShape } from '@penrill/core/shapeEval'
 import { editableShape, regenerateShape } from '@penrill/core/shapeItems'
 import { is3D, isLinear, shapeEdges, snapAngle } from '@penrill/core/shapes'
-import { applyXform, canTurnSelection, hitTest } from '../engine/transform'
+import { applyXform, canTurnSelection, hitTest, unionBBox } from '../engine/transform'
 import type { BBox, Item, Point, ShapeItem, ShapeSpec, StrokeItem, TextItem } from '@penrill/core/types'
 import { isSideViewPreset, type Gizmo3dModel } from '@penrill/shape-editor/gizmo3d'
 import { useEditor } from '../editorContext'
@@ -59,6 +59,7 @@ import { beginLasso } from '../tools/lasso'
 import { beginRectSelect } from '../tools/rectSelect'
 import { beginPan } from '../tools/pan'
 import { beginShape } from '../tools/shapeTool'
+import { growTangent, startTangent } from '../modules/shapeEditor/tangentTool'
 import type { Gesture as ToolGesture, Modifiers, Sample, ToolContext } from '../tools/types'
 import { afterStaleStart, inkSamples, isIPad, penInContact, stylusStrategy } from '../tools/penInput'
 import { WheelSource } from '../engine/wheel'
@@ -106,6 +107,12 @@ type Gesture =
   | { kind: 'compMove'; pointerId: number; ox: number; oy: number }
   | { kind: 'compRadius'; pointerId: number }
   | { kind: 'endpoint'; pointerId: number; original: StrokeItem; current: StrokeItem; which: 0 | 1 }
+  /**
+   * Building a tangent: it grows both ways from the touch point while the button is held. `shown` is
+   * the circle put in the scene at the press; `current` grows in the gesture only (drawn in its place)
+   * and goes into the scene on release, so a move doesn't re-render the panels or schedule a save.
+   */
+  | { kind: 'tangent'; pointerId: number; original: ShapeItem; shown: ShapeItem; current: ShapeItem; id: string }
   | {
       kind: 'reshape'
       pointerId: number
@@ -220,6 +227,13 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
     /** Mouse wheel or touchpad, decided once per scroll gesture. */
     const wheelSource = new WheelSource()
 
+    /**
+     * A circle whose tangent is being built or whose tangent end is being dragged: the gesture holds it
+     * until release, and it is drawn (with its frame and handles) in place of the scene's copy.
+     */
+    const liveShape = (): ShapeItem | null =>
+      gesture?.kind === 'tangent' ? gesture.current : gesture?.kind === 'shapeHandle' ? gesture.controller.live : null
+
     // ---------- render loop ----------
     let baseDirty = true
     let overlayDirty = true
@@ -234,7 +248,9 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         // Text being edited is shown by the text box instead.
         const editing = ui.textEdit?.id ?? ui.formulaEdit?.id
         const items = editing ? scene.getItems().filter((i) => i.id !== editing) : scene.getItems()
-        renderer.renderBase(items, editor.camera, ui.background, editor.preview, ui.selectedIds.length ? new Set(ui.selectedIds) : undefined)
+        const live = liveShape()
+        const drawn = live ? items.map((i) => (i.id === live.id ? live : i)) : items
+        renderer.renderBase(drawn, editor.camera, ui.background, editor.preview, ui.selectedIds.length ? new Set(ui.selectedIds) : undefined)
       }
       if (overlayDirty) {
         const shown = gesture && 'tool' in gesture ? gesture.tool.overlay?.() : undefined
@@ -286,7 +302,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           : hotEdge
             ? translate(ui.lang, 'shape.hint.edge')
             : null
-        const hintText = cs?.hint || ps?.hint || ss?.hint || rs?.hint || shapeHint
+        const tangentHint = ui.tangentPick && !gesture ? translate(ui.lang, 'shapes.tangentHint') : null
+        const hintText = tangentHint || cs?.hint || ps?.hint || ss?.hint || rs?.hint || shapeHint
         const isLinearItem = !!(activeItem && isLinear(activeItem.geo.kind))
         renderer.renderOverlay(live, cursorState(), editor.camera, {
           // While turning, the frame is the one at the press, drawn turned (its bounds would jump about).
@@ -406,8 +423,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       turn: boolean
     } | null => {
       if (!session.getState().selectedIds.length) return null
-      const items = editor.selectedItems()
-      const box = editor.selectionBBox()
+      // The frame and handles follow a circle the gesture holds, which is not in the scene yet.
+      const live = liveShape()
+      const items = live ? editor.selectedItems().map((i) => (i.id === live.id ? live : i)) : editor.selectedItems()
+      const box = live ? unionBBox(items) : editor.selectionBBox()
       if (!box || !items.length) return null
       const locked = items.some((i) => i.locked)
       // While the selection is being moved, scaled or turned, its handles go along with the preview.
@@ -797,7 +816,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         c = 'grabbing'
       else if (gesture?.kind === 'ink' && gesture.snap?.mode === 'compass') c = 'grabbing'
       else if (gesture?.kind === 'protRotate') c = 'grabbing'
-      else if (gesture?.kind === 'endpoint') c = 'crosshair'
+      else if (gesture?.kind === 'endpoint' || gesture?.kind === 'tangent' || session.getState().tangentPick) c = 'crosshair'
       // A line end on top of the protractor wins over the protractor (same order as on press).
       else if (
         !gesture &&
@@ -967,6 +986,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         editor.commitPreview()
       } else if (g.kind === 'endpoint') {
         if (g.current !== g.original) scene.record({ added: [g.current], removed: [g.original] })
+      } else if (g.kind === 'tangent') {
+        if (g.current !== g.shown) scene.replace([g.shown], [g.current], false)
+        scene.record({ added: [g.current], removed: [g.original] })
+        editor.setSelection([g.current])
       } else if (g.kind === 'reshape') {
         if (g.current !== g.parts) {
           scene.record({ added: g.current, removed: g.parts })
@@ -1161,6 +1184,21 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
       capture(e.pointerId)
       const p = local(e)
       const eff = effectiveFor(e)
+
+      // "Build tangent": a press on the circle starts a tangent there; a press anywhere else ends the mode.
+      const pickId = session.getState().tangentPick
+      if (pickId && e.button === 0) {
+        const circle = scene.getById([pickId])[0]
+        const w = screenToWorld(editor.camera, p.x, p.y)
+        const started = circle?.type === 'shape' ? startTangent(circle, [w.x, w.y], editor.camera.zoom) : null
+        if (circle?.type === 'shape' && started) {
+          scene.replace([circle], [started.item], false)
+          editor.setSelection([started.item])
+          gesture = { kind: 'tangent', pointerId: e.pointerId, original: circle, shown: started.item, current: started.item, id: started.id }
+          return
+        }
+        session.setState({ tangentPick: null })
+      }
 
       // Line end points win over the protractor: a ray drawn from its centre must stay adjustable.
       const selH = eff === 'select' || eff === 'move' ? selectionHit(p.x, p.y) : null
@@ -1682,6 +1720,10 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           const w = screenToWorld(editor.camera, p.x, p.y)
           lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
           applyMovePreview(g, w, dragMods(e).ctrl)
+        } else if (g.kind === 'tangent') {
+          const w = screenToWorld(editor.camera, p.x, p.y)
+          g.current = growTangent(g.current, g.id, [w.x, w.y])
+          invalidate(true)
         } else if (g.kind === 'endpoint') {
           const w = screenToWorld(editor.camera, p.x, p.y)
           const ends = lineEnds(g.original)!
@@ -1740,6 +1782,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           g.controller.move([w.x, w.y], dragMods(e), gridSteps())
           const lbl = g.controller.label()
           angleLabel = lbl ? { sx: p.x, sy: p.y, text: lbl } : null
+          // Kept out of the scene until release: nothing else asks for the board to be redrawn.
+          if (g.controller.live) invalidate(true)
         } else if (g.kind === 'scale') {
           const w = screenToWorld(editor.camera, p.x, p.y)
           lastDragWorld = { x: w.x, y: w.y, sx: p.x, sy: p.y }
@@ -1934,7 +1978,7 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         g.controller.move([lastDragWorld.x, lastDragWorld.y], mods, gridSteps())
         const lbl = g.controller.label()
         angleLabel = lbl ? { sx: lastDragWorld.sx, sy: lastDragWorld.sy, text: lbl } : null
-        invalidate(false)
+        invalidate(!!g.controller.live)
       } else if (g.kind === 'move' && g.moved !== false) {
         applyMovePreview(g, lastDragWorld, mods.ctrl)
       } else if (g.kind === 'scale') {
@@ -1993,7 +2037,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         delete: () => editor.deleteSelection(),
         escape: () => {
           const st = session.getState()
-          if (st.shapePopover) session.setState({ shapePopover: null })
+          if (st.tangentPick) session.setState({ tangentPick: null })
+          else if (st.shapePopover) session.setState({ shapePopover: null })
           else if (st.shapePanel) session.setState({ shapePanel: false })
           else editor.clearSelection()
         },

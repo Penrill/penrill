@@ -18,7 +18,8 @@ import {
   rotate3dMat
 } from '@penrill/core/shapeEval3d'
 import { shapeEdges, shapePolygonVertices } from '@penrill/core/shapes'
-import type { ShapeItem, ShapeSpec, Vec3 } from '@penrill/core/types'
+import { tangentLetter } from '@penrill/core/tangents'
+import type { ShapeItem, ShapeSpec, TangentMarks, Vec3 } from '@penrill/core/types'
 import {
   availableWholeShapeActions,
   toggleAllAngles,
@@ -35,6 +36,15 @@ import { useEditor, useSession } from '../../editorContext'
 import { useT, type MessageKey } from '../../i18n'
 import { usePrefs } from '../../store'
 import { PanelTitle, Segmented } from '../../ui/chrome'
+import { removeTangent } from './tangentTool'
+
+/** The groups of marks a circle's tangents can show, each with its checkbox. */
+const TANGENT_MARKS: [keyof TangentMarks, MessageKey][] = [
+  ['radius', 'shapes.tangentMarks.radius'],
+  ['angle', 'shapes.tangentMarks.angle'],
+  ['equal', 'shapes.tangentMarks.equal'],
+  ['chord', 'shapes.tangentMarks.chord']
+]
 
 type SidePreset = 'front' | 'back' | 'top' | 'bottom' | 'right' | 'left'
 
@@ -411,8 +421,10 @@ export function ShapeItemEditorControls({
   const gizmoOverride = useSession((s) => s.gizmo3dOverride)
   const gizmoSpace = useSession((s) => s.gizmo3dSpace)
   const prev3dView = useSession((s) => s.prev3dView)
+  const tangentPick = useSession((s) => s.tangentPick)
   const feature = editor.features.shapeEditor
   if (!feature) return null
+  const tangents = (item.constructions ?? []).filter((c) => c.kind === 'tangent')
 
   const ev = evaluateShape(item)
   const gizmoOn = gizmoOverride !== null ? gizmoOverride : gizmoDefault
@@ -511,6 +523,51 @@ export function ShapeItemEditorControls({
                 </CheckboxField>
               ))}
             </div>
+          </div>
+        </>
+      )}
+
+      {item.geo.kind === 'ellipse' && (
+        <>
+          <Divider soft />
+          <div>
+            <PanelTitle>{t('shapes.sectionTangents')}</PanelTitle>
+            {tangentPick === item.id ? (
+              <Button color="blue" className="w-full !py-1 !text-xs" title={t('shapes.tangentHint')} onClick={() => editor.session.setState({ tangentPick: null })}>
+                {t('shapes.tangent')}
+              </Button>
+            ) : (
+              <Button outline className="w-full !py-1 !text-xs" title={t('shapes.tangentHint')} onClick={() => editor.session.setState({ tangentPick: item.id })}>
+                {t('shapes.tangent')}
+              </Button>
+            )}
+            {tangents.length > 0 && (
+              <>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {tangents.map((c, i) => (
+                    <Button key={c.id} plain className="!px-2 !py-0.5 !text-xs" title={t('shapes.tangentRemove')} onClick={() => onChange(removeTangent(item, c.id))}>
+                      {t('shape.tangent')} {tangentLetter(i)} ✕
+                    </Button>
+                  ))}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                  {TANGENT_MARKS.map(([key, label]) => (
+                    <CheckboxField key={key} className="!gap-x-2">
+                      <Checkbox
+                        color="blue"
+                        checked={item.tangentMarks?.[key] !== false}
+                        onChange={(v) => {
+                          const marks = { ...item.tangentMarks, [key]: v ? undefined : false }
+                          for (const k of Object.keys(marks) as (keyof TangentMarks)[]) if (marks[k] === undefined) delete marks[k]
+                          onChange(withShapeUpdate(item, { tangentMarks: Object.keys(marks).length ? marks : undefined }))
+                        }}
+                      />
+                      <Label className="truncate !text-xs/5">{t(label)}</Label>
+                    </CheckboxField>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

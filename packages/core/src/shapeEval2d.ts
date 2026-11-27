@@ -1,7 +1,8 @@
 import { turnPoint } from './geometry'
 import { isLinear, isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES } from './shapes'
 import { triangleCircles } from './triangleCircles'
-import type { ShapeConstruction, ShapeGeometry, Vec2 } from './types'
+import { evaluateTangents, type TangentConstruction } from './tangents'
+import type { ShapeConstruction, ShapeGeometry, TangentMarks, Vec2 } from './types'
 import { boundsOfPaths, vertexLetter, type EvalConstruction, type EvalCurve, type EvalEdge, type EvaluatedShape, type EvalVertex } from './shapeEval'
 
 const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
@@ -378,7 +379,7 @@ function evaluate2dConstruction(
   }
 }
 
-export function evaluate2dShape(geo: ShapeGeometry, constructions: readonly ShapeConstruction[], size: number): EvaluatedShape {
+export function evaluate2dShape(geo: ShapeGeometry, constructions: readonly ShapeConstruction[], size: number, tangentMarks?: TangentMarks): EvaluatedShape {
   if (isLinear(geo.kind)) {
     const a: Vec2 = [geo.ax, geo.ay]
     const b: Vec2 = [geo.bx, geo.by]
@@ -425,9 +426,13 @@ export function evaluate2dShape(geo: ShapeGeometry, constructions: readonly Shap
     ]
     const pts = sampleEllipse(cx, cy, rx, ry, rot, 96)
     const curves: EvalCurve[] = [{ id: 'e0', pts, closed: true, length: rx }]
-    const evalCons = constructions
-      .map((c) => evaluate2dConstruction(c, geo, vertices, [], center, size))
-      .filter((x): x is EvalConstruction => !!x)
+    const tangents = constructions.filter((c): c is TangentConstruction => c.kind === 'tangent')
+    const evalCons = [
+      ...constructions
+        .map((c) => evaluate2dConstruction(c, geo, vertices, [], center, size))
+        .filter((x): x is EvalConstruction => !!x),
+      ...evaluateTangents(geo, tangents, tangentMarks, size, constructions.some((c) => c.kind === 'center'))
+    ]
     const hitPaths: Vec2[][] = [pts, ...evalCons.flatMap((c) => c.segments.map((s) => s.pts))]
     return {
       is3D: false,

@@ -5,6 +5,7 @@ import { shapePolygonVertices } from '@penrill/core/shapes'
 import type { Scene } from '@penrill/core/scene'
 import type { Camera, Item, ShapeGeometry, ShapeItem, ShapeSpec, StrokeItem, Vec2 } from '@penrill/core/types'
 import type { GizmoActiveArc, GizmoSpace } from '@penrill/shape-editor/gizmo3d'
+import { isTangentEnd } from '@penrill/shape-editor/handles'
 import { shapeEdgeTargets } from '@penrill/shape-editor/targets'
 import type { ShapeEditorCornerTarget, ShapeEditorEdgeTarget, ShapeEditorFeature, ShapeEditorGuide, ShapeEditorHandle } from '../../registry'
 
@@ -139,6 +140,11 @@ export interface ShapeHandleGesture {
   guides(): readonly ShapeEditorGuide[]
   label(): string | null
   gizmoArc?(): GizmoActiveArc | null
+  /**
+   * The dragged item while it is kept out of the scene until release (a tangent's end): draw it in
+   * place of the scene's copy. `null` when every move goes into the scene.
+   */
+  readonly live: ShapeItem | null
 }
 
 export interface ShapeItemHandleOptions {
@@ -172,6 +178,9 @@ export function beginShapeItemHandle(
   let lastLabel: string | null = null
   let lastGizmoArc: GizmoActiveArc | null = null
   let moved = false
+  // A tangent's end only changes lines drawn on the circle: the scene (and the panels that follow it)
+  // gets the result once on release, so the drag stays smooth with the shape panel open.
+  const deferred = isTangentEnd(handle.id)
 
   if (handle.kind === 'addVertex' && handle.index !== undefined) {
     const inserted = feature.insertItemVertex(startItem, handle.index, startPt)
@@ -228,12 +237,20 @@ export function beginShapeItemHandle(
       lastGizmoArc = res.gizmoArc ?? null
       prevWorld = worldPt
       prevGeo = res.item.geo
+      if (deferred) {
+        current = res.item
+        return
+      }
       scene.replace([current], [res.item], false)
       current = res.item
       host.setSelection([current])
     },
+    get live() {
+      return deferred && current !== startItem ? current : null
+    },
     end() {
       if (current !== startItem) {
+        if (deferred) scene.replace([startItem], [current], false)
         scene.record({ added: [current], removed: [startItem] })
         host.setSelection([current])
         return true
@@ -332,6 +349,7 @@ export function beginShapeHandle(
     get moved() {
       return moved
     },
+    live: null,
     move(worldPt, mods, gridStep) {
       if (!moved && Math.hypot(worldPt[0] - startPt[0], worldPt[1] - startPt[1]) * host.camera.zoom <= HANDLE_TAP_SLOP) {
         return

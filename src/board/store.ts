@@ -99,6 +99,8 @@ export interface FormulaEdit {
   color: string
   rows: Row
   cur: Cursor
+  /** Tells one editing apart from the next; the field keeps its undo history while it is dragged. */
+  opened?: number
 }
 
 /** Where the math keypad types: the formula field that has the focus. */

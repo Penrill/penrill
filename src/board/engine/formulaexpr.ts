@@ -313,3 +313,162 @@ export function readPlotRows(v: unknown, expr: string, arg = 'x'): Row | null {
   const rows = validateRows(v)
   return rows && rows.length && rowsToText(rows, arg) === expr ? rows : null
 }
+
+// ------------------------------------------------------------------ transformations of a plotted function
+
+/** A transformation of a graph, as taught at school. */
+export type FnTransform =
+  /** Symmetry about the horizontal axis: −f(x). */
+  | { k: 'flipX' }
+  /** Symmetry about the vertical axis: f(−x). */
+  | { k: 'flipY' }
+  /** Symmetry about the origin: −f(−x). */
+  | { k: 'origin' }
+  /** Symmetry about the line y = x: x = f(y). */
+  | { k: 'swap' }
+  /** Parallel shift by the vector (a; b): f(x − a) + b. */
+  | { k: 'shift'; a: number; b: number }
+  /** Stretch along the vertical axis: k·f(x). */
+  | { k: 'scaleY'; by: number }
+  /** Stretch along the horizontal axis: f(k·x). */
+  | { k: 'scaleX'; by: number }
+  /** |f(x)|. */
+  | { k: 'abs' }
+  /** f(|x|). */
+  | { k: 'absX' }
+
+const isMinus = (a: Atom | undefined): boolean => isC(a, '−') || isC(a, '-')
+const isPlusMinus = (a: Atom | undefined): boolean => isMinus(a) || isC(a, '+') || isC(a, '±')
+
+/**
+ * Letters replaced at once (`map`: letter → what stands in its place), standing alone only, as in
+ * `renameVar`. A replacement longer than one atom is put in brackets unless the letter fills its row
+ * alone: 3x → 3(x − 2), x² → (−x)², sin x → sin(−x), but 1/x → 1/(−x) needs none (x is the whole denominator).
+ */
+export function substVars(rows: Row, map: Record<string, Row>): Row {
+  const letter = (a: Atom | undefined): boolean => !!a && a.t === 'c' && /^[a-z]$/i.test(a.s)
+  let changed = false
+  const out: Row = []
+  rows.forEach((a, i) => {
+    if (a.t === 'c') {
+      const repl = Object.prototype.hasOwnProperty.call(map, a.s) ? map[a.s] : undefined
+      if (!repl || letter(rows[i - 1]) || letter(rows[i + 1])) {
+        out.push(a)
+        return
+      }
+      changed = true
+      if (rows.length === 1 || repl.length === 1) out.push(...repl)
+      else out.push({ t: 'fence', k: 'paren', x: repl })
+      return
+    }
+    const kids = slots(a)
+    if (!kids.length) {
+      out.push(a)
+      return
+    }
+    const next = kids.map((r) => substVars(r, map))
+    if (next.every((r, k) => r === kids[k])) out.push(a)
+    else {
+      changed = true
+      out.push(withSlots(a, next))
+    }
+  })
+  return changed ? out : rows
+}
+
+/** Does the row hold a sum or difference at its top level (it needs brackets before a factor)? */
+const isSum = (rows: Row): boolean => rows.some((a, i) => isPlusMinus(a) && (i > 0 || rows.length > 1))
+
+/** −(…): brackets only around a sum, and −(−u) is u. */
+function negate(rows: Row): Row {
+  if (isMinus(rows[0]) && !isSum(rows.slice(1))) return rows.slice(1)
+  return isSum(rows) ? [c('−'), { t: 'fence', k: 'paren', x: rows }] : [c('−'), ...rows]
+}
+
+/** k·(…), written as a teacher would: 2x², 3(x + 1), 2·3x, −(x + 1) for k = −1. */
+function times(k: number, rows: Row, comma: boolean): Row {
+  if (k === 1) return rows
+  if (k === -1) return negate(rows)
+  const num = numberAtoms(k, comma).atoms
+  const body: Row = isSum(rows) || isMinus(rows[0]) ? [{ t: 'fence', k: 'paren', x: rows }] : rows
+  const digit = body[0]?.t === 'c' && /^[0-9.,]$/.test(body[0].s)
+  return [...num, ...(digit ? [c('·')] : []), ...body]
+}
+
+/** u ± |n| written with the sign in front: x − 2, x + 3. */
+function plus(rows: Row, n: number, comma: boolean): Row {
+  if (n === 0) return rows
+  return [...rows, c(n < 0 ? '−' : '+'), ...numberAtoms(Math.abs(n), comma).atoms]
+}
+
+/**
+ * The formula of a transformed graph, from the formula of the original (a function or an equation in
+ * its variable `arg` and y; a left side like `f(x) =` is dropped, the caller writes the new one).
+ * Null when the transformation does not apply (|f| of an equation, a zero stretch).
+ */
+export function transformRows(rows: Row, arg: string, t: FnTransform, comma = false): Row | null {
+  const head = plotHead(rows)
+  const v = head.arg ?? arg
+  const vr = (): Row => [c(v)]
+  const eq = equalsAt(rows)
+  if ((t.k === 'scaleX' || t.k === 'scaleY') && (t.by === 0 || !Number.isFinite(t.by))) return null
+  if (eq >= 0) {
+    // An equation in v and y: the same change of both letters on both sides.
+    const map: Record<string, Row> = {}
+    switch (t.k) {
+      case 'flipX':
+        map.y = [c('−'), c('y')]
+        break
+      case 'flipY':
+        map[v] = [c('−'), c(v)]
+        break
+      case 'origin':
+        map.y = [c('−'), c('y')]
+        map[v] = [c('−'), c(v)]
+        break
+      case 'swap':
+        map.y = vr()
+        map[v] = [c('y')]
+        break
+      case 'shift':
+        if (t.a) map[v] = plus(vr(), -t.a, comma)
+        if (t.b) map.y = plus([c('y')], -t.b, comma)
+        break
+      case 'scaleY':
+        map.y = [{ t: 'frac', n: [c('y')], d: numberAtoms(t.by, comma).atoms }]
+        break
+      case 'scaleX':
+        map[v] = times(t.by, vr(), comma)
+        break
+      case 'absX':
+        map[v] = [{ t: 'fence', k: 'bar', x: vr() }]
+        break
+      case 'abs':
+        return null
+    }
+    return substVars(rows, map)
+  }
+  const body = rows.slice(head.len)
+  if (!body.length) return null
+  const minusV: Row = [c('−'), c(v)]
+  switch (t.k) {
+    case 'flipX':
+      return negate(body)
+    case 'flipY':
+      return substVars(body, { [v]: minusV })
+    case 'origin':
+      return negate(substVars(body, { [v]: minusV }))
+    case 'swap':
+      return [c(v), c('='), ...substVars(body, { [v]: [c('y')] })]
+    case 'shift':
+      return plus(t.a ? substVars(body, { [v]: plus(vr(), -t.a, comma) }) : body, t.b, comma)
+    case 'scaleY':
+      return times(t.by, body, comma)
+    case 'scaleX':
+      return substVars(body, { [v]: times(t.by, vr(), comma) })
+    case 'abs':
+      return [{ t: 'fence', k: 'bar', x: body }]
+    case 'absX':
+      return substVars(body, { [v]: [{ t: 'fence', k: 'bar', x: vr() }] })
+  }
+}

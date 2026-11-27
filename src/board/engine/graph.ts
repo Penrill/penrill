@@ -4,9 +4,10 @@ import { inkColors } from './surface'
 import { isBlank, type FormulaState, type Row } from '@penrill/math/formula'
 import { fnHead, isFnLetter, labelRows, parsePlot, parseRows, readPlotRows, rowsToText } from './formulaexpr'
 import { typesetRows } from './formulatype'
+import { graphPoints, pointLabel } from './graphPoints'
 import { MAX_EXPR_LENGTH, type MathFn } from '@penrill/math/mathexpr'
 import { MATH_FONT, typesetFormula } from './mathtype'
-import type { BBox, GraphItem, GraphParams, PlotFn } from '@penrill/core/types'
+import type { BBox, GraphItem, GraphParams, GraphPoints, PlotFn } from '@penrill/core/types'
 
 /** At most this many functions on one plane. */
 export const MAX_FNS = 8
@@ -68,11 +69,15 @@ export interface GraphPrims {
     color: string
     /** Formula text: serif math font, outlined in paper colour so it stays readable over curves. */
     math?: boolean
+    /** Outlined in paper colour like a formula, in the plain font (coordinates of special points). */
+    halo?: boolean
   }[]
   /** Plotted function curves (polylines). */
   paths: { pts: [number, number][]; w: number; color: string }[]
   /** Strokes of the formulas (fraction bars, radical signs), drawn over the curves. */
   marks: { pts: [number, number][]; w: number; color: string }[]
+  /** Special points (extrema, zeros, crossings), drawn over the curves. */
+  dots: { x: number; y: number; r: number; color: string }[]
 }
 
 const clamp = (v: number, a: number, b: number): number => Math.min(b, Math.max(a, v))
@@ -99,8 +104,22 @@ export function sanitizeGraph(p: GraphParams): GraphParams {
     // Grid lines were dropped by design: the paper background provides them.
     grid: false,
     ...sanitizeFns(p.fns),
-    ...(p.hideFormulas === true ? { hideFormulas: true } : {})
+    ...(p.hideFormulas === true ? { hideFormulas: true } : {}),
+    ...sanitizePoints(p.points)
   }
+}
+
+/** Keep only the known point kinds that are switched on. */
+function sanitizePoints(v: unknown): { points?: GraphPoints } {
+  if (!v || typeof v !== 'object') return {}
+  const o = v as Record<string, unknown>
+  const points: GraphPoints = {
+    ...(o.extrema === true ? { extrema: true as const } : {}),
+    ...(o.roots === true ? { roots: true as const } : {}),
+    ...(o.cross === true ? { cross: true as const } : {})
+  }
+  if (!Object.keys(points).length) return {}
+  return { points: o.comma === true ? { ...points, comma: true } : points }
 }
 
 /** Keep only well-formed functions (non-empty text within the length cap); fix missing colours. */
@@ -570,6 +589,37 @@ export function placeLabels(labels: Label[], box: BBox, u: number): void {
   }
 }
 
+/** Dots on the special points of the curves, each with its coordinates written beside it. */
+function addPointPrims(g: GraphItem, out: GraphPrims): void {
+  const pts = graphPoints(g)
+  if (!pts.length) return
+  const u = g.unit
+  const X = (x: number): number => g.ox + x * u
+  const Y = (y: number): number => g.oy - y * u
+  const r = Math.max(u * 0.13, 2)
+  const size = u * 0.4
+  const gap = r + u * 0.12
+  for (const p of pts) {
+    const x = X(p.x)
+    const y = Y(p.y)
+    out.dots.push({ x, y, r, color: p.color })
+    const s = pointLabel(p.x, p.y, !!g.points?.comma)
+    // A maximum is labelled above it, a minimum below; a zero above the axis (its numbers are below).
+    const below = p.kind === 'min'
+    const side = p.kind === 'cross' || p.kind === 'root'
+    out.texts.push({
+      x: side ? x + gap * 0.7 : x,
+      y: below ? y + gap : y - gap,
+      s,
+      size,
+      align: side ? 'left' : 'center',
+      baseline: below ? 'top' : 'alphabetic',
+      color: p.color,
+      halo: true
+    })
+  }
+}
+
 const primsCache = new WeakMap<GraphItem, GraphPrims>()
 
 /** Items are immutable (edits replace them), so prims are cached per item object. */
@@ -578,6 +628,7 @@ export function graphPrims(g: GraphItem): GraphPrims {
   if (!p) {
     p = buildPrims(g)
     addFnPrims(g, p)
+    addPointPrims(g, p)
     primsCache.set(g, p)
   }
   return p
@@ -592,7 +643,7 @@ function buildPrims(g: GraphItem): GraphPrims {
   const font = u * 0.5
   const ext = u * 0.75 // axis continues past the last unit to the arrow tip
   const head = u * 0.42
-  const out: GraphPrims = { lines: [], tris: [], texts: [], paths: [], marks: [] }
+  const out: GraphPrims = { lines: [], tris: [], texts: [], paths: [], marks: [], dots: [] }
   const label = (n: number): string => (n < 0 ? `−${-n}` : `${n}`)
   const arrow = (tipX: number, tipY: number, dx: number, dy: number): void => {
     out.tris.push({
@@ -783,7 +834,8 @@ export function graphDisplay(g: GraphItem): GroupPrim {
       ...p.lines.map((l): Prim => ({ kind: 'line', x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, width: l.w, color: l.color })),
       ...p.tris.map((t): Prim => ({ kind: 'polygon', pts: t.pts, color: t.color })),
       ...p.paths.map(polyline),
-      ...p.texts.filter((t) => t.math).map((t): Prim => ({ ...text(t), halo: { color: PAPER, width: t.size * 0.22 } })),
+      ...p.dots.map((d): Prim => ({ kind: 'circle', cx: d.x, cy: d.y, r: d.r, fill: d.color, stroke: PAPER, width: d.r * 0.5 })),
+      ...p.texts.filter((t) => t.math || t.halo).map((t): Prim => ({ ...text(t), halo: { color: PAPER, width: t.size * 0.22 } })),
       ...p.marks.map(polyline),
       ...p.texts.map((t): Prim => ({ ...text(t), color: t.color }))
     ]

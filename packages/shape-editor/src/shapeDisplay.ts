@@ -356,6 +356,31 @@ export function shapeDisplay(item: ShapeItem, fmt: ShapeAnnotationFormat): Prim 
       { italic: true, family: MATH_FONT }
     ))
   }
+  // Tangents: touch points, crossing points and their angles.
+  for (const c of ev.constructions) {
+    for (const tx of c.texts ?? []) {
+      if ('deg' in tx) {
+        const rounded = Math.round(tx.deg * 10) / 10
+        const degStr = Math.abs(tx.deg - 90) <= 0.05
+          ? '90°'
+          : Number.isInteger(rounded) ? `${rounded}°` : `${fmt.comma ? rounded.toFixed(1).replace('.', ',') : rounded.toFixed(1)}°`
+        children.push(...haloText(tx.pos[0], tx.pos[1], degStr, fontSize, color))
+        continue
+      }
+      if (tx.letter === 'O' && labeledPoints.has('center')) continue
+      const dx = tx.pos[0] - tx.awayFrom[0]
+      const dy = tx.pos[1] - tx.awayFrom[1]
+      const d = Math.hypot(dx, dy) || 1
+      children.push(...haloText(
+        tx.pos[0] + (dx / d) * (labelOffset * 0.85),
+        tx.pos[1] + (dy / d) * (labelOffset * 0.85),
+        tx.letter,
+        labelFontSize,
+        color,
+        { italic: true, family: MATH_FONT }
+      ))
+    }
+  }
 
   return {
     kind: 'group',

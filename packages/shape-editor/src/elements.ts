@@ -107,7 +107,7 @@ export function isCustomizedShapeItem(item: ShapeItem): boolean {
 /** Return an updated ShapeItem with freshly recomputed bbox and pruned empty optional fields. */
 export function withShapeUpdate(
   item: ShapeItem,
-  patch: Partial<Pick<ShapeItem, 'geo' | 'labels' | 'angles' | 'lengths' | 'constructions' | 'rot' | 'color' | 'size' | 'dash' | 'startCap' | 'endCap'>>
+  patch: Partial<Pick<ShapeItem, 'geo' | 'labels' | 'angles' | 'lengths' | 'constructions' | 'tangentMarks' | 'rot' | 'color' | 'size' | 'dash' | 'startCap' | 'endCap'>>
 ): ShapeItem {
   const next: ShapeItem = { ...item, ...patch }
   if (next.labels && Object.keys(next.labels).length === 0) delete next.labels
@@ -149,6 +149,8 @@ function pruneAnnotations(item: ShapeItem): ShapeItem {
         return item.geo.kind === 'sphere'
       case 'center':
         return true
+      case 'tangent':
+        return item.geo.kind === 'ellipse'
     }
   })
   const validConsIds = new Set(cons.map((c) => c.id))

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormulaState, Row } from '@penrill/math/formula'
 import { caretOf, typesetRows } from '../engine/formulatype'
 import { inkColor, withInkSurface } from '../engine/surface'
 import { useT } from '../i18n'
 import { usePrefs } from '../store'
 import { FormulaField } from './FormulaField'
+import { MoveIcon } from './icons'
 import { MathSvg } from './MathSvg'
 import { useEditor, useSession } from '../editorContext'
 
@@ -34,7 +35,9 @@ export function FormulaEditor() {
     [result, size]
   )
   // The answer stays hidden until asked for, again for every formula edited and after it can't be worked out.
-  const session = fe ? `${fe.id ?? 'new'}:${fe.x}:${fe.baseline}` : ''
+  const session = fe ? `${fe.id ?? 'new'}:${fe.opened ?? `${fe.x}:${fe.baseline}`}` : ''
+  // Where a drag of the grip started: the pointer on screen and the formula on the board.
+  const drag = useRef<{ px: number; py: number; x: number; baseline: number } | null>(null)
   const [revealed, setRevealed] = useState('')
   const open = !!result && revealed === session
   useEffect(() => {
@@ -76,6 +79,29 @@ export function FormulaEditor() {
       style={{ left: (fe.x - cam.x) * cam.zoom - PAD, top: (fe.baseline - cam.y) * cam.zoom - lay.box.asc - PAD, color: withInkSurface(background, () => inkColor(fe.color)) }}
       onPointerDown={(e) => e.stopPropagation()}
     >
+      <div
+        className="formula-grip"
+        title={t('formula.move')}
+        // Not a focus change: the formula keeps the caret (and isn't finished by a blur).
+        onPointerDown={(e) => {
+          e.preventDefault()
+          if (!e.isPrimary || e.button !== 0) return
+          e.currentTarget.setPointerCapture(e.pointerId)
+          drag.current = { px: e.clientX, py: e.clientY, x: fe.x, baseline: fe.baseline }
+        }}
+        onMouseDown={(e) => e.preventDefault()}
+        onPointerMove={(e) => {
+          const d = drag.current
+          const cur = editor.session.getState().formulaEdit
+          if (!d || !cur || !e.currentTarget.hasPointerCapture(e.pointerId)) return
+          const z = editor.camera.zoom
+          editor.session.setState({ formulaEdit: { ...cur, x: d.x + (e.clientX - d.px) / z, baseline: d.baseline + (e.clientY - d.py) / z } })
+        }}
+        onPointerUp={() => (drag.current = null)}
+        onPointerCancel={() => (drag.current = null)}
+      >
+        <MoveIcon />
+      </div>
       <FormulaField
         value={value}
         onChange={set}

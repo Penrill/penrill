@@ -20,7 +20,7 @@ import { CM } from './engine/straightedge'
 import { formatAll, formatRange, fullRuns, textBBox, textFields, trimRunsEnd } from './engine/text'
 import { isBlank } from '@penrill/math/formula'
 import { formulaBBox, formulaBox } from './engine/formulatype'
-import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeItem, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@penrill/core/types'
+import type { BBox, Camera, FormulaItem, GraphItem, GraphParams, GraphPoints, PlotFn, ImageItem, Item, LineCap, LineDash, ShapeItem, ShapeSpec, StrokeItem, TextFormat, TextItem } from '@penrill/core/types'
 import { translate, type MessageKey } from './i18n'
 import { FeatureRegistry, type FeatureModule } from './registry'
 import { createSessionStore, type Session } from './session'
@@ -103,6 +103,9 @@ export class Editor {
     // The function panel belongs to one selected plane: close it when that plane stops being the selection.
     if (s.fnPanel && (s.selectedIds.length !== 1 || s.selectedIds[0] !== s.fnPanel.id || !s.active)) {
       this.session.setState({ fnPanel: null })
+    }
+    if (s.tangentPick && (s.selectedIds.length !== 1 || s.selectedIds[0] !== s.tangentPick || !isSelectTool(s.tool) || !s.active)) {
+      this.session.setState({ tangentPick: null })
     }
     if (s.shapePopover && (s.selectedIds !== prev.selectedIds || s.tool !== prev.tool || !s.active)) {
       this.session.setState({ shapePopover: null })
@@ -353,6 +356,8 @@ export class Editor {
 
   // ---------------------------------------------------------------- formulas
 
+  private formulaOpened = 0
+
   /** Start a new formula in the upper middle of the view (the keypad takes the bottom). */
   startFormula(): void {
     this.commitText()
@@ -362,7 +367,7 @@ export class Editor {
     this.session.setState({
       tool: 'rectSelect',
       selectedIds: [],
-      formulaEdit: { x: c.x - size * 2, baseline: c.y, size, color, rows: [], cur: { path: [], i: 0 } }
+      formulaEdit: { x: c.x - size * 2, baseline: c.y, size, color, rows: [], cur: { path: [], i: 0 }, opened: ++this.formulaOpened }
     })
   }
 
@@ -373,7 +378,7 @@ export class Editor {
     this.commitFormula(false)
     this.session.setState({
       selectedIds: [],
-      formulaEdit: { id: item.id, x: item.x, baseline: item.y + formulaBox(item).asc, size: item.size, color: item.color, rows: item.rows, cur: { path: [], i: item.rows.length } }
+      formulaEdit: { id: item.id, x: item.x, baseline: item.y + formulaBox(item).asc, size: item.size, color: item.color, rows: item.rows, cur: { path: [], i: item.rows.length }, opened: ++this.formulaOpened }
     })
     // The keypad takes the bottom of the window: bring a formula that sits there up into view.
     const cam = this.camera
@@ -394,7 +399,8 @@ export class Editor {
       else this.invalidate(true)
       return
     }
-    if (old && old.rows === fe.rows && old.color === fe.color && old.size === fe.size) {
+    const moved = !!old && (old.x !== fe.x || old.y !== fe.baseline - formulaBox(fe).asc)
+    if (old && !moved && old.rows === fe.rows && old.color === fe.color && old.size === fe.size) {
       if (select) this.setSelection([old])
       return this.invalidate(true)
     }
@@ -779,14 +785,16 @@ export class Editor {
    * Live function edit from the function panel: the board shows it at once; all edits made during one
    * opening of the panel (`session`) are a single undo step.
    */
-  setGraphFns(id: string, fns: PlotFn[], hideFormulas: boolean, session: number): void {
+  setGraphFns(id: string, fns: PlotFn[], opts: { hideFormulas: boolean; points?: GraphPoints }, session: number): void {
     const old = this.scene.getById([id])[0]
     if (!old || old.type !== 'graph') return
-    const clean = sanitizeGraph({ ...old, fns, hideFormulas })
+    const clean = sanitizeGraph({ ...old, fns, hideFormulas: opts.hideFormulas, points: opts.points })
     const next: GraphItem = { ...old, ...clean }
     if (!clean.fns) delete next.fns
     if (!clean.hideFormulas) delete next.hideFormulas
-    if (JSON.stringify(next.fns ?? []) === JSON.stringify(old.fns ?? []) && !!next.hideFormulas === !!old.hideFormulas) return
+    if (!clean.points) delete next.points
+    const same = (a: GraphItem): string => JSON.stringify([a.fns ?? [], !!a.hideFormulas, a.points ?? {}])
+    if (same(next) === same(old)) return
     next.bbox = graphBBox(next)
     this.scene.replaceMerged([old], [next], `fns:${id}:${session}`)
   }
@@ -820,7 +828,7 @@ export class Editor {
     const old = this.scene.getById([id])[0]
     if (!old || old.type !== 'graph') return
     // The settings dialog does not edit the functions: the plane keeps its own (set by the function panel).
-    const next: GraphItem = { ...old, ...sanitizeGraph({ ...params, fns: old.fns, hideFormulas: old.hideFormulas }) }
+    const next: GraphItem = { ...old, ...sanitizeGraph({ ...params, fns: old.fns, hideFormulas: old.hideFormulas, points: old.points }) }
     next.bbox = graphBBox(next)
     this.scene.replace([old], [next])
   }

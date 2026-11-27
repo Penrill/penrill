@@ -1,4 +1,4 @@
-import type { BBox, LineDash, ShapeConstruction, ShapeGeometry, ShapeItem, Vec2, Vec3 } from './types'
+import type { BBox, LineDash, ShapeConstruction, ShapeGeometry, ShapeItem, TangentMarks, Vec2, Vec3 } from './types'
 import { is3D } from './shapes'
 import { evaluate2dShape } from './shapeEval2d'
 import { evaluate3dShape } from './shapeEval3d'
@@ -57,6 +57,11 @@ export interface EvalConstruction {
   length?: number
   lengthAnchor?: [Vec2, Vec2]
   label?: { text: string; pos: Vec2; awayFrom: Vec2 }
+  /**
+   * More texts (tangents and their marks): a letter set off from `pos` away from `awayFrom`, or an
+   * angle in degrees written at `pos`.
+   */
+  texts?: ({ letter: string; pos: Vec2; awayFrom: Vec2 } | { deg: number; pos: Vec2 })[]
 }
 
 export interface EvaluatedShape {
@@ -78,6 +83,7 @@ export interface ShapeEvalInput {
   geo: ShapeGeometry
   size?: number
   constructions?: readonly ShapeConstruction[]
+  tangentMarks?: TangentMarks
 }
 
 const DEFAULT_LETTERS = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'
@@ -112,17 +118,17 @@ export function evaluateShape(input: ShapeItem | ShapeEvalInput): EvaluatedShape
   const constructions = input.constructions ?? []
   return is3D(input.geo.kind)
     ? evaluate3dShape(input.geo, constructions, size)
-    : evaluate2dShape(input.geo, constructions, size)
+    : evaluate2dShape(input.geo, constructions, size, input.tangentMarks)
 }
 
 /** Accurate board bounding box for a ShapeItem (padded for stroke width and active labels/measurements). */
-export function shapeBBox(item: Pick<ShapeItem, 'geo' | 'size' | 'labels' | 'angles' | 'lengths' | 'constructions'>): BBox {
+export function shapeBBox(item: Pick<ShapeItem, 'geo' | 'size' | 'labels' | 'angles' | 'lengths' | 'constructions' | 'tangentMarks'>): BBox {
   const ev = evaluateShape(item)
   const hasAnnotations = Boolean(
     (item.labels && Object.keys(item.labels).length > 0) ||
     item.angles?.length ||
     item.lengths?.length ||
-    ev.constructions.some((c) => c.label)
+    ev.constructions.some((c) => c.label || c.texts?.length)
   )
   const pad = hasAnnotations ? Math.max(item.size * 3, 46) : Math.max(item.size * 3, 8)
   return {

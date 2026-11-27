@@ -20,6 +20,7 @@ import type {
   LineDash,
   Point,
   ShapeConstruction,
+  TangentMarks,
   ShapeGeometry,
   ShapeItem,
   ShapeSpec,
@@ -48,10 +49,12 @@ export const FORMAT = 'inkboard'
  * 11 = triangle incircles and circumcircles, oblique pyramids (editable shape specifications).
  * 12 = direct shape editor: arbitrary triangle/polygon vertices, triangle constructions (altitudes,
  *      medians, bisectors, right-angle mark), rotated editable shapes, parameterized 2D/3D shapes.
+ * 13 = special points marked on coordinate planes (`points`: extrema, roots, intersections).
+ * 14 = tangents to circles (`tangent` constructions) and their marks (`tangentMarks`).
  * Readers accept ≤ this; older apps refuse newer files instead of silently dropping data.
  * A file is stamped with the lowest version that can show it.
  */
-export const FORMAT_VERSION = 12
+export const FORMAT_VERSION = 14
 
 function needsV12Shape(spec: ShapeSpec | undefined): boolean {
   if (!spec) return false
@@ -76,6 +79,8 @@ function needsV12Shape(spec: ShapeSpec | undefined): boolean {
 
 /** Lowest format version that can represent these items without losing anything. */
 export function requiredVersion({ items, background }: Pick<BoardData, 'items' | 'background'>): number {
+  if (items.some((i) => i.type === 'shape' && (!!i.tangentMarks || !!i.constructions?.some((c) => c.kind === 'tangent')))) return 14
+  if (items.some((i) => i.type === 'graph' && !!i.points)) return 13
   if (items.some((i) => i.type === 'shape' || (i.type === 'stroke' && needsV12Shape(i.shape)))) return 12
   if (items.some((i) => i.type === 'stroke' && (i.shape?.kind === 'obliquePyramid' || i.shape?.incircle || i.shape?.circumcircle))) return 11
   if (items.some((i) => (i.type === 'image' || i.type === 'text' || i.type === 'formula') && !!i.rot)) return 10
@@ -179,6 +184,7 @@ interface SerializedShape {
   angles?: string[]
   lengths?: string[]
   constructions?: ShapeConstruction[]
+  tangentMarks?: TangentMarks
   groupId?: string
   locked?: boolean
   rot?: number
@@ -236,7 +242,7 @@ export function serializeBoard(data: BoardData): BoardFile {
       }
     }
     if (it.type === 'shape') {
-      const { id, z, tool, color, size, dash, startCap, endCap, geo, labels, angles, lengths, constructions, groupId, locked, rot } = it
+      const { id, z, tool, color, size, dash, startCap, endCap, geo, labels, angles, lengths, constructions, tangentMarks, groupId, locked, rot } = it
       return {
         type: 'shape',
         id,
@@ -252,6 +258,7 @@ export function serializeBoard(data: BoardData): BoardFile {
         ...(angles?.length ? { angles } : {}),
         ...(lengths?.length ? { lengths } : {}),
         ...(constructions?.length ? { constructions } : {}),
+        ...(tangentMarks ? { tangentMarks } : {}),
         ...(groupId ? { groupId } : {}),
         ...(locked ? { locked } : {}),
         ...(rot ? { rot } : {})
@@ -348,6 +355,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
       const angles = readIdList(s.angles)
       const lengths = readIdList(s.lengths)
       const constructions = readConstructions(s.constructions)
+      const tangentMarks = readTangentMarks(s.tangentMarks)
       const item: ShapeItem = {
         type: 'shape',
         id: s.id,
@@ -363,6 +371,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
         ...(angles ? { angles } : {}),
         ...(lengths ? { lengths } : {}),
         ...(constructions ? { constructions } : {}),
+        ...(tangentMarks ? { tangentMarks } : {}),
         ...(s.groupId ? { groupId: s.groupId } : {}),
         ...(s.locked ? { locked: true } : {}),
         ...readRot(s.rot),
@@ -546,6 +555,11 @@ function readConstructions(v: unknown): ShapeConstruction[] | undefined {
       case 'apothem':
         if (isNonEmptyStr(c.edge)) parsed = { id: c.id, kind: 'apothem', edge: c.edge }
         break
+      case 'tangent':
+        if (isFiniteNum(c.angle) && isFiniteNum(c.back) && isFiniteNum(c.fwd) && c.back > 0 && c.fwd > 0) {
+          parsed = { id: c.id, kind: 'tangent', angle: c.angle, back: c.back, fwd: c.fwd }
+        }
+        break
     }
     if (parsed) {
       seen.add(parsed.id)
@@ -556,6 +570,15 @@ function readConstructions(v: unknown): ShapeConstruction[] | undefined {
 }
 
 const isFiniteNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+/** Only the switched-off marks are kept; anything else means "shown". */
+function readTangentMarks(v: unknown): TangentMarks | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const m = v as Record<string, unknown>
+  const out: TangentMarks = {}
+  for (const k of ['radius', 'angle', 'equal', 'chord'] as const) if (m[k] === false) out[k] = false
+  return Object.keys(out).length ? out : undefined
+}
 
 function readIndexList(v: unknown, max: number): number[] | undefined {
   if (!Array.isArray(v) || !v.length) return undefined

@@ -146,6 +146,20 @@ export interface GraphParams {
   fns?: PlotFn[]
   /** true = don't write the formulas next to the curves (shown by default). */
   hideFormulas?: boolean
+  /** Special points marked on the plane's curves (absent = none). */
+  points?: GraphPoints
+}
+
+/** Which special points a coordinate plane marks on its curves. */
+export interface GraphPoints {
+  /** Maxima and minima of the functions. */
+  extrema?: true
+  /** Zeros: where the curves meet the horizontal axis. */
+  roots?: true
+  /** Where two curves cross. */
+  cross?: true
+  /** Coordinates written the Ukrainian way, (1,5; −2), instead of (1.5, −2). */
+  comma?: true
 }
 
 /** One plotted function: the formula as the teacher typed it (see engine/mathexpr.ts) and its colour. */
@@ -233,6 +247,12 @@ export type ShapeConstruction =
   | { id: string; kind: 'radius' | 'diameter'; angle?: number }
   | { id: string; kind: 'apothem'; edge: string }
   | { id: string; kind: 'axis' | 'section' | 'meridian' }
+  /**
+   * A tangent to a circle (or an ellipse) at parameter `angle`, the same angle a radius uses. `back`
+   * and `fwd` are the lengths of its two sides from the touch point, in radii, so the tangent scales
+   * with the circle; they start equal and are then changed one at a time by dragging an end.
+   */
+  | { id: string; kind: 'tangent'; angle: number; back: number; fwd: number }
 
 /** Pure geometric definition of a 2D or 3D ShapeItem (independent of annotations and style). */
 export interface ShapeGeometry {
@@ -288,6 +308,20 @@ export interface ShapeItem extends ItemBase, Turnable {
   lengths?: string[]
   /** Compositional geometric constructions attached to this shape. */
   constructions?: ShapeConstruction[]
+  /** Which marks the circle's tangents get (absent = all of them). */
+  tangentMarks?: TangentMarks
+}
+
+/** Marks drawn with a circle's tangents; each one is on unless set to false. */
+export interface TangentMarks {
+  /** The radius to each touch point with its 90° square. */
+  radius?: boolean
+  /** The angle between two tangents at their crossing point P and the central angle AOB. */
+  angle?: boolean
+  /** Equal tangent segments PA = PB (ticks) and PO, which halves the angle at P. */
+  equal?: boolean
+  /** The chord AB between the touch points and the angle between it and the tangent. */
+  chord?: boolean
 }
 
 export type Item = StrokeItem | ImageItem | GraphItem | TextItem | FormulaItem | ShapeItem
