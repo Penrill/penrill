@@ -2,6 +2,27 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Tangents, graph points and exact shapes in 0.13.17
+
+- **Tangents to a circle.** *Build tangent* in the shape panel: press on the circle and drag away. Two tangents from one point show the radius with its 90° mark, the angles at P and O, PA = PB with PO, and the chord with its angle. Each mark can be switched off, and each side of a tangent can be dragged longer or shorter.
+- **Points on graphs.** A coordinate plane can mark maxima and minima, zeros and the points where two graphs cross, with their coordinates.
+- **Transform a graph.** Reflect it about Ox, Oy, the origin or the line y = x, shift it by a vector, stretch or compress it, or take its absolute value. The result is added as a new function.
+- **Exact shape.** *Exact shape…* in the shapes menu builds a triangle, quadrilateral, regular polygon, circle or 3D solid from typed sides and angles. Impossible numbers are refused with a reason.
+- **Rectangle select** is now the main select tool (`B`): drag a box to select what is inside it.
+- **The eraser erases only what it touches** by default. Hold `Ctrl` while erasing to remove whole strokes.
+- **Graphs line up with the paper.** Double-click a coordinate line, plane or 3D axes to fit its units and origin to the grid. `Ctrl` while moving snaps the origin to the grid.
+- **Move a formula while editing it** by dragging the grip next to it.
+- Axes are named after the function (f(a) gives axes a and f), and every function on a plane shares the first one's name and variable.
+- Star tips are lettered A, B, C in order, and letters stay when the number of points changes.
+- Side lengths, angles and letters follow a shape while it is scaled or turned. Handles, the selection toolbar and popovers move along with a dragged selection.
+- Shape handles stay under the pointer for pyramids, cones, prisms, cylinders, cubes, stretched polygons, stars and parallelograms.
+- 3D solids turn together with the rest of a turned selection.
+- Pen strokes start where the pen lands, not at a cursor parked in the centre of the screen by some tablet drivers.
+- The keypad's extra keys type when picked by sliding from a held key.
+- The window reopens on the screen where it was closed.
+
+Boards with tangents are saved as format version 14 and boards with points on graphs as version 13; they need version 0.13.17 or newer. Other boards still open in older versions.
+
 ## Safe updates on a full disk in 0.13.16
 
 - **Updates no longer remove Penrill when the disk is full.** Before installing, the Windows installer and the automatic update check that the drive has room for the new version. If it doesn't, the installed app and your boards stay as they are, and Penrill says which drive to free and how many megabytes are needed.
