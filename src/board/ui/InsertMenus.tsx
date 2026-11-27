@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { BUILTIN_GRAPHS, DEFAULT_PLANE, graphBBox, graphSvg, type GraphPreset } from '../engine/graph'
 import { createShapeItem, specToShapeData } from '@penrill/core/shapeConvert'
 import { evaluateShape } from '@penrill/core/shapeEval'
 import { isTriangle, MAX_BASE, MIN_BASE, SHAPE_BASES, SHAPES_2D, SHAPES_3D, type ShapeKind } from '@penrill/core/shapes'
 import type { GraphItem, GraphParams, ShapeSpec } from '@penrill/core/types'
 import { PAPER, toSvg } from '@penrill/render/display'
+import { Checkbox, CheckboxField } from '@penrill/ui/checkbox'
+import { Label } from '@penrill/ui/fieldset'
 import { shapeDisplay } from '@penrill/shape-editor/shapeDisplay'
 import { useT, type MessageKey } from '../i18n'
 import { usePrefs, prefsStore } from '../store'
@@ -93,6 +95,8 @@ export function ShapesPanel({ close }: { close: () => void }) {
   const shape = useSession((s) => s.shape)
   const bases = usePrefs((s) => s.shapeBases)
   const circles = usePrefs((s) => s.triangleCircles)
+  // Hold-to-snap: the same setting as in Settings, Pen and mouse.
+  const snap = usePrefs((s) => s.shapeSnap)
   const baseOf = (k: ShapeKind): number | undefined => (SHAPE_BASES[k] ? (bases[k] ?? SHAPE_BASES[k]!.def) : undefined)
   return (
     <>
@@ -128,6 +132,14 @@ export function ShapesPanel({ close }: { close: () => void }) {
           onChange={(patch) => prefsStore.setState((s) => ({ triangleCircles: { ...s.triangleCircles, ...patch } }))}
         />
       )}
+      {editor.features.strokeRecognizer && (
+        <div className="mt-2.5 border-t border-zinc-950/5 pt-2.5 dark:border-white/5">
+          <CheckboxField className="!gap-x-2">
+            <Checkbox color="blue" checked={snap} onChange={(shapeSnap) => prefsStore.setState({ shapeSnap })} />
+            <Label className="!text-xs/5">{t('settings.shapeSnap')}</Label>
+          </CheckboxField>
+        </div>
+      )}
       <ShapePopoverFooter
         onOpenSettings={close}
         onExact={() => {
@@ -156,9 +168,21 @@ export function useInstrumentRows() {
   return rows
 }
 
+/**
+ * Stays open while instruments are toggled, so several can be turned on or off in a row. Closes on
+ * its button, on a click elsewhere, or as soon as the board is touched (the board cancels the
+ * pointer's default action, so the popover's own outside-click check never sees it).
+ */
 export function InstrumentsPanel({ close }: { close: () => void }) {
   const t = useT()
   const rows = useInstrumentRows()
+  useEffect(() => {
+    const onDown = (e: PointerEvent): void => {
+      if (e.target instanceof Element && e.target.closest('.board-canvas')) close()
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [close])
   return (
     <>
       <PanelTitle>{t('toolbar.instruments')}</PanelTitle>
@@ -169,10 +193,7 @@ export function InstrumentsPanel({ close }: { close: () => void }) {
             className={`instrument-row ${r.on ? 'active' : ''}`}
             aria-pressed={r.on}
             aria-keyshortcuts={shortcutKey(r.id)}
-            onClick={() => {
-              r.toggle()
-              close()
-            }}
+            onClick={r.toggle}
           >
             {r.icon}
             <span>{t(r.label)}</span>

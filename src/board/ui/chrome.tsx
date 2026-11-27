@@ -399,7 +399,7 @@ export function AnchoredPopover({
       style={pos ? { left: pos.left, top: pos.top, maxHeight: pos.maxHeight } : { left: -9999, top: -9999 }}
       className={clsx(
         className,
-        'fixed z-[80] overflow-y-auto rounded-2xl bg-white p-3 shadow-xl ring-1 ring-zinc-950/10',
+        'fixed z-[80] overflow-x-hidden overflow-y-auto rounded-2xl bg-white p-3 shadow-xl ring-1 ring-zinc-950/10',
         'dark:bg-zinc-800 dark:ring-white/10'
       )}
     >

@@ -26,8 +26,8 @@ depend on them. New shortcuts: add to `shortcuts.ts`, this file, the test and bo
 | C | Brush select: touch items with the circle to add them (mouse wheel = circle size) |
 | M | Move items (hover highlights, drag to move) |
 | R | Show / hide ruler |
-| S | Show / hide 45° set square |
-| Shift+S | Show / hide 30° / 60° set square |
+| Shift+S | Show / hide 45° set square |
+| S | Show / hide 30° / 60° set square |
 | T | Show / hide protractor |
 | K | Show / hide compass |
 | L | Laser pointer (the trail fades and is never saved) |

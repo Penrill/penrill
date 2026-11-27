@@ -64,7 +64,38 @@ function Swatches({
           />
         </button>
       ))}
+      <CustomColor colors={colors} value={value} onChange={onChange} />
     </div>
+  )
+}
+
+/** Last swatch: the system colour picker for any colour that is not in the row (as in the shape style panel). */
+function CustomColor({ colors, value, onChange }: { colors: string[]; value: string; onChange: (color: string) => void }) {
+  const t = useT()
+  const custom = !colors.some((c) => c.toLowerCase() === value.toLowerCase())
+  return (
+    <label
+      title={t('sel.otherColor')}
+      aria-label={t('sel.otherColor')}
+      aria-checked={custom}
+      className="group relative flex size-8 cursor-pointer items-center justify-center rounded-full"
+    >
+      <span
+        style={{
+          background: custom ? value : 'conic-gradient(#e03131, #f59f00, #2f9e44, #0c8599, #1971c2, #6741d9, #c2255c, #e03131)'
+        }}
+        className={clsx(
+          'size-6 rounded-full ring-1 ring-zinc-950/15 ring-inset transition-transform duration-100 dark:ring-white/20',
+          'group-hover:scale-110 group-aria-checked:scale-100 group-aria-checked:outline-2 group-aria-checked:outline-offset-2 group-aria-checked:outline-blue-500'
+        )}
+      />
+      <input
+        type="color"
+        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#1971c2'}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+      />
+    </label>
   )
 }
 
@@ -121,7 +152,7 @@ function More({ label, edge, children }: { label: string; edge: OptionsDock; chi
       <Headless.PopoverButton as={ToolButton} label={label}>
         <StyleIcon />
       </Headless.PopoverButton>
-      <FlyoutPanel anchor={flyoutAnchor(edge)} className="line-style-flyout w-72">
+      <FlyoutPanel anchor={flyoutAnchor(edge)} className="line-style-flyout w-80">
         <PanelTitle>{label}</PanelTitle>
         {children}
       </FlyoutPanel>
@@ -173,7 +204,7 @@ export function InkOptionsCard({
   onChange: (patch: Partial<InkSlot>) => void
 }) {
   return (
-    <div className="w-64">
+    <div className="w-74">
       <PanelTitle>{title}</PanelTitle>
       <Swatches colors={colors} value={slot.color} onChange={(color) => onChange({ color })} grid />
       <div className="mt-2.5 border-t border-zinc-950/10 pt-2.5 dark:border-white/10">
@@ -371,7 +402,7 @@ export function EraserOptionsCard() {
   const mode = usePrefs((s) => s.eraserMode)
   const radius = usePrefs((s) => s.eraserRadius)
   return (
-    <div className="w-64">
+    <div className="w-74">
       <PanelTitle>{t('eraser.mode')}</PanelTitle>
       <Segmented
         label={t('eraser.mode')}
