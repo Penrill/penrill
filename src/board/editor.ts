@@ -13,6 +13,7 @@ import {
 } from './engine/serialize'
 import { editableShape, patchShapeSpec, regenerateShape } from '@penrill/core/shapeItems'
 import { shapeBBox } from '@penrill/core/shapeEval'
+import { is3D, isLinear } from '@penrill/core/shapes'
 import { applyXform, isIdentity, unionBBox, xformBBox, xformPoint, type Xform } from './engine/transform'
 import { bgPattern, withPattern } from './engine/surface'
 import { COMPASS_CELL } from './engine/compass'
@@ -34,6 +35,8 @@ const LEGACY_CLIPBOARD_MIME = 'application/x-inkboard'
 /** Line ends fit any open line: freehand ink, straight lines, the Line shape (not closed shapes or arrows). */
 export const canHaveEnds = (s: StrokeItem | ShapeItem): boolean =>
   s.type === 'shape' ? s.geo.kind === 'line' : !s.shape || s.shape.kind === 'line'
+/** A fill fits closed flat shapes only (not lines, arrows or solids). */
+export const canFill = (s: Item): s is ShapeItem => s.type === 'shape' && !is3D(s.geo.kind) && !isLinear(s.geo.kind)
 /** Height the math keypad needs at the bottom of the window (px), with a little air above it. */
 const KEYPAD_ROOM = 330
 
@@ -223,14 +226,23 @@ export class Editor {
     this.session.setState({ selectedIds: all.map((i) => i.id) })
   }
 
-  /** Change colour / width / pattern / ends of the selected lines and shapes (undoable). Ends don't go on closed shapes. */
-  restyleSelection(patch: { color?: string; size?: number; dash?: LineDash; startCap?: LineCap; endCap?: LineCap }): void {
-    const targets = this.selectedItems().filter((i): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.locked)
+  /**
+   * Change colour / width / pattern / ends / fill of the selected lines and shapes (undoable). Ends don't go
+   * on closed shapes; a fill only goes on closed flat shapes (`fill: null` takes it off).
+   */
+  restyleSelection(patch: { color?: string; fill?: string | null; size?: number; dash?: LineDash; startCap?: LineCap; endCap?: LineCap }): void {
+    const lines = this.selectedItems().filter((i): i is StrokeItem | ShapeItem => (i.type === 'stroke' || i.type === 'shape') && !i.locked)
+    // A fill alone only touches the shapes that can take one.
+    const targets = 'fill' in patch && Object.keys(patch).length === 1 ? lines.filter(canFill) : lines
     if (!targets.length) return
     const next = targets.map((s): StrokeItem | ShapeItem => {
       if (s.type === 'shape') {
         const n: ShapeItem = { ...s }
         if ('color' in patch && patch.color) n.color = patch.color
+        if ('fill' in patch && canFill(n)) {
+          if (patch.fill) n.fill = patch.fill
+          else delete n.fill
+        }
         if ('size' in patch && patch.size) n.size = patch.size
         if ('dash' in patch) {
           if (patch.dash) n.dash = patch.dash

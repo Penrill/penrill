@@ -112,6 +112,11 @@ export function shapeDisplay(item: ShapeItem, fmt: ShapeAnnotationFormat): Prim 
   const labelFontSize = Math.max(14, Math.min(22, 13.5 + size * 0.75))
   const children: Prim[] = []
 
+  // 0. The inside of a filled closed 2D shape, under everything else.
+  if (item.fill && ev.area && ev.area.length >= 3) {
+    children.push({ kind: 'polygon', pts: ev.area as Point2[], color: item.fill })
+  }
+
   // 1. Translucent shaded fills (e.g. 3D axial cross-sections) underneath all lines.
   for (const c of ev.constructions) {
     if (!c.fills) continue

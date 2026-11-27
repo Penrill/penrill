@@ -284,7 +284,10 @@ export function hitTest(items: readonly Item[], x: number, y: number, tol: numbe
     if (x < it.bbox.minX - tol || x > it.bbox.maxX + tol || y < it.bbox.minY - tol || y > it.bbox.maxY + tol) continue
     if (it.type === 'shape') {
       const r = it.size / 2 + tol
-      if (evaluateShape(it).hitPaths.some((path) => circleHitsPolyline(x, y, r, path))) return it
+      const ev = evaluateShape(it)
+      if (ev.hitPaths.some((path) => circleHitsPolyline(x, y, r, path))) return it
+      // A filled shape is picked up by its inside too.
+      if (it.fill && ev.area && pointInPolygon(x, y, ev.area)) return it
       continue
     }
     if (it.type !== 'stroke') {

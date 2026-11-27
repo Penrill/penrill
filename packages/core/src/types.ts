@@ -294,7 +294,10 @@ export interface ShapeGeometry {
 export interface ShapeItem extends ItemBase, Turnable {
   type: 'shape'
   tool: 'pen' | 'highlighter'
+  /** Outline (edge) colour; also used for constructions, marks and labels. */
   color: string
+  /** Fill colour of a closed 2D shape's inside. Absent = not filled (transparent). */
+  fill?: string
   size: number
   dash?: LineDash
   startCap?: LineCap

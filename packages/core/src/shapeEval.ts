@@ -71,6 +71,8 @@ export interface EvaluatedShape {
   edges: EvalEdge[]
   curves: EvalCurve[]
   constructions: EvalConstruction[]
+  /** Closed outline of a 2D shape's inside (polygons, ellipses), what a fill covers. Absent for lines and solids. */
+  area?: Vec2[]
   /** Extra main-width strokes such as arrow wings. */
   decorations: Vec2[][]
   /** All hit-testable polylines (visible/hidden edges, curves, construction segments). */

@@ -51,10 +51,11 @@ export const FORMAT = 'inkboard'
  *      medians, bisectors, right-angle mark), rotated editable shapes, parameterized 2D/3D shapes.
  * 13 = special points marked on coordinate planes (`points`: extrema, roots, intersections).
  * 14 = tangents to circles (`tangent` constructions) and their marks (`tangentMarks`).
+ * 15 = filled flat shapes (`fill` on shape items).
  * Readers accept ≤ this; older apps refuse newer files instead of silently dropping data.
  * A file is stamped with the lowest version that can show it.
  */
-export const FORMAT_VERSION = 14
+export const FORMAT_VERSION = 15
 
 function needsV12Shape(spec: ShapeSpec | undefined): boolean {
   if (!spec) return false
@@ -79,6 +80,7 @@ function needsV12Shape(spec: ShapeSpec | undefined): boolean {
 
 /** Lowest format version that can represent these items without losing anything. */
 export function requiredVersion({ items, background }: Pick<BoardData, 'items' | 'background'>): number {
+  if (items.some((i) => i.type === 'shape' && !!i.fill)) return 15
   if (items.some((i) => i.type === 'shape' && (!!i.tangentMarks || !!i.constructions?.some((c) => c.kind === 'tangent')))) return 14
   if (items.some((i) => i.type === 'graph' && !!i.points)) return 13
   if (items.some((i) => i.type === 'shape' || (i.type === 'stroke' && needsV12Shape(i.shape)))) return 12
@@ -175,6 +177,7 @@ interface SerializedShape {
   z: number
   tool: 'pen' | 'highlighter'
   color: string
+  fill?: string
   size: number
   dash?: LineDash
   startCap?: LineCap
@@ -211,6 +214,9 @@ export interface BoardData {
  * White ink is no longer offered: on the chalkboard dark ink already shows as chalk white, and white
  * vanishes on paper. Whatever was drawn white before is kept, as black.
  */
+/** A colour a shape fill can use: #rgb, #rrggbb or #rrggbbaa. */
+const isColor = (c: unknown): c is string => typeof c === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(c)
+
 export const noWhite = (c: string): string => (/^#(fff|ffffff)$/i.test(c) ? '#1e1e1e' : c)
 
 const r2 = (v: number): number => Math.round(v * 100) / 100
@@ -242,7 +248,7 @@ export function serializeBoard(data: BoardData): BoardFile {
       }
     }
     if (it.type === 'shape') {
-      const { id, z, tool, color, size, dash, startCap, endCap, geo, labels, angles, lengths, constructions, tangentMarks, groupId, locked, rot } = it
+      const { id, z, tool, color, fill, size, dash, startCap, endCap, geo, labels, angles, lengths, constructions, tangentMarks, groupId, locked, rot } = it
       return {
         type: 'shape',
         id,
@@ -251,6 +257,7 @@ export function serializeBoard(data: BoardData): BoardFile {
         color,
         size,
         geo: serializeGeo(geo),
+        ...(fill ? { fill } : {}),
         ...(dash ? { dash } : {}),
         ...(startCap ? { startCap } : {}),
         ...(endCap ? { endCap } : {}),
@@ -362,6 +369,7 @@ export function deserializeBoard(file: BoardFile): BoardData {
         z: s.z,
         tool,
         color: noWhite(s.color),
+        ...(isColor(s.fill) ? { fill: s.fill } : {}),
         size: s.size,
         geo,
         ...(s.dash === 'dashed' || s.dash === 'dotted' ? { dash: s.dash } : {}),

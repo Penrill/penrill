@@ -15,8 +15,8 @@ const plane = {
   kind: 'plane' as const, xMin: -10, xMax: 10, yMin: -10, yMax: 10, unit: 24, labelStep: 1, grid: false
 }
 
-test('the format version is 14; a board is stamped with the lowest version that can show it', () => {
-  assert.equal(FORMAT_VERSION, 14)
+test('the format version is 15; a board is stamped with the lowest version that can show it', () => {
+  assert.equal(FORMAT_VERSION, 15)
   // Nothing from version 7 on the board: apps that only know version 6 can still open it.
   const f = serializeBoard({ items: [{ ...plane, bbox: { minX: 0, minY: 0, maxX: 0, maxY: 0 } }], background: 'dots', camera: { x: 0, y: 0, zoom: 1 } })
   assert.equal(f.version, 6)
@@ -375,4 +375,26 @@ test('3D ShapeItem free vertices3 map round-trips cleanly and drops malformed en
   ;(badFile.items[0] as unknown as { geo: { vertices3: unknown } }).geo.vertices3 = { b0: [1, 2, 'bad'] }
   const badBack = deserializeBoard(badFile).items[0] as ShapeItem
   assert.equal(badBack.geo.vertices3, undefined)
+})
+
+test('a filled shape keeps its fill and outline colours, needs version 15; bad fills are dropped', () => {
+  const sq = createShapeItem(
+    { geo: { kind: 'rectangle', ax: 0, ay: 0, bx: 100, by: 80 } },
+    { color: '#e03131', size: 3, tool: 'pen' },
+    { id: 'sq', z: 1 }
+  )
+  const filled: ShapeItem = { ...sq, fill: '#ffe066' }
+  const cam = { x: 0, y: 0, zoom: 1 }
+  const f = serializeBoard({ items: [filled], background: 'dots', camera: cam })
+  assert.equal(f.version, 15)
+  const back = deserializeBoard(JSON.parse(JSON.stringify(f))).items[0] as ShapeItem
+  assert.equal(back.fill, '#ffe066')
+  assert.equal(back.color, '#e03131')
+  // Not filled: no fill field, and the board can still be opened by apps that know version 12.
+  const plain = serializeBoard({ items: [sq], background: 'dots', camera: cam })
+  assert.equal(plain.version, 12)
+  assert.equal((deserializeBoard(plain).items[0] as ShapeItem).fill, undefined)
+  const bad = JSON.parse(JSON.stringify(f)) as BoardFile
+  ;(bad.items[0] as { fill?: unknown }).fill = 'url(javascript:x)'
+  assert.equal((deserializeBoard(bad).items[0] as ShapeItem).fill, undefined)
 })

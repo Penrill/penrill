@@ -98,6 +98,10 @@ const en = {
   'sel.duplicate': 'Duplicate (Ctrl+D)',
   'sel.group': 'Group',
   'sel.ungroup': 'Ungroup',
+  'sel.outline': 'Outline',
+  'sel.fill': 'Fill',
+  'sel.noFill': 'No fill (transparent)',
+  'sel.otherColor': 'Other colour…',
 
   'settings.title': 'Settings',
   'settings.background': 'Background',
@@ -947,6 +951,10 @@ const uk: Record<MessageKey, string> = {
   'sel.duplicate': 'Дублювати (Ctrl+D)',
   'sel.group': 'Згрупувати',
   'sel.ungroup': 'Розгрупувати',
+  'sel.outline': 'Контур',
+  'sel.fill': 'Заливка',
+  'sel.noFill': 'Без заливки (прозора)',
+  'sel.otherColor': 'Інший колір…',
 
   'settings.title': 'Налаштування',
   'settings.background': 'Фон',

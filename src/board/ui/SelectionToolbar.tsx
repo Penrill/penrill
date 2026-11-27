@@ -1,11 +1,11 @@
-import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { canHaveEnds } from '../editor'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { canFill, canHaveEnds } from '../editor'
 import { SELECTION_PAD } from '../engine/renderer'
 import { editableShape } from '@penrill/core/shapeItems'
 import { fullRuns, TEXT_SIZES } from '../engine/text'
 import type { FormulaItem, ShapeItem, StrokeItem, TextItem } from '@penrill/core/types'
 import { useT } from '../i18n'
-import { PEN_COLORS, PEN_SIZES, usePrefs } from '../store'
+import { HIGHLIGHTER_COLORS, PEN_COLORS, PEN_SIZES, usePrefs } from '../store'
 import { DuplicateIcon, FitIcon, FormulaIcon, FunctionIcon, GearIcon, GroupIcon, LockIcon, ShapesIcon, StyleIcon, TextIcon, TrashIcon, UngroupIcon, UnlockIcon } from './icons'
 import { LineStyleControls, SizeSlider } from './LineStyle'
 import { fitBox, screenArea } from './dock'
@@ -60,6 +60,8 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
   const firstFormula = items.find((i): i is FormulaItem => i.type === 'formula' && !i.locked)
   /** What the style panel shows the colour and size of. */
   const styled = first ?? firstText ?? firstFormula
+  /** First closed flat shape: the panel shows (and sets) a fill for such shapes. */
+  const fillable = lineItems.find(canFill)
   const resize = (size: number): void => {
     if (firstText) editor.restyleText({ size })
     if (firstFormula) editor.restyleFormula({ size })
@@ -138,21 +140,23 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
           </button>
           {styling && (
             <Popover onClose={closeStyle} className="sel-popover style-popover" fit={place.side}>
-              <div className="swatches">
-                {PEN_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    className={`swatch ${styled.color === c ? 'active' : ''}`}
-                    style={{ background: c }}
-                    title={c}
-                    onClick={() => {
-                      if (first) editor.restyleSelection({ color: c })
-                      if (firstText) editor.restyleText({ color: c })
-                      if (firstFormula) editor.restyleFormula({ color: c })
-                    }}
-                  />
-                ))}
-              </div>
+              {fillable && <div className="style-heading">{t('sel.outline')}</div>}
+              <ColorSwatches
+                colors={PEN_COLORS}
+                value={styled.color}
+                onPick={(c) => {
+                  if (!c) return
+                  if (first) editor.restyleSelection({ color: c })
+                  if (firstText) editor.restyleText({ color: c })
+                  if (firstFormula) editor.restyleFormula({ color: c })
+                }}
+              />
+              {fillable && (
+                <>
+                  <div className="style-heading">{t('sel.fill')}</div>
+                  <ColorSwatches colors={FILL_COLORS} value={fillable.fill} onPick={(fill) => editor.restyleSelection({ fill })} none />
+                </>
+              )}
               {first ? (
                 <>
                   <div className="sizes">
@@ -207,6 +211,51 @@ export function SelectionToolbar({ actions }: { actions?: (side: 'above' | 'belo
       <button className="icon-btn" title={t('sel.delete')} disabled={allLocked} onClick={() => editor.deleteSelection()}>
         <TrashIcon />
       </button>
+    </div>
+  )
+}
+
+/** Fill choices: white, the light highlighter tints, then the pen colours (any other one via the picker). */
+const FILL_COLORS = ['#ffffff', ...HIGHLIGHTER_COLORS, ...PEN_COLORS]
+
+/**
+ * A row of colour swatches plus a picker for any other colour. `none` adds a "no colour" (transparent)
+ * swatch first, which picks null.
+ */
+function ColorSwatches({
+  colors,
+  value,
+  onPick,
+  none
+}: {
+  colors: readonly string[]
+  value: string | undefined
+  onPick: (c: string | null) => void
+  none?: boolean
+}) {
+  const t = useT()
+  const pick = onPick
+  const custom = !!value && !colors.some((c) => c.toLowerCase() === value.toLowerCase())
+  const input = useRef<HTMLInputElement>(null)
+  const pickRef = useRef(pick)
+  pickRef.current = pick
+  // The picker reports every move while open; only the colour it closes on is applied (one undo step).
+  useEffect(() => {
+    const el = input.current
+    if (!el) return
+    const change = (): void => pickRef.current(el.value)
+    el.addEventListener('change', change)
+    return () => el.removeEventListener('change', change)
+  }, [])
+  return (
+    <div className="swatches">
+      {none && <button className={`swatch no-color ${!value ? 'active' : ''}`} title={t('sel.noFill')} onClick={() => pick(null)} />}
+      {colors.map((c) => (
+        <button key={c} className={`swatch ${value?.toLowerCase() === c.toLowerCase() ? 'active' : ''}`} style={{ background: c }} title={c} onClick={() => pick(c)} />
+      ))}
+      <label className={`swatch other-color ${custom ? 'active' : ''}`} title={t('sel.otherColor')} style={custom ? { background: value } : undefined}>
+        <input ref={input} type="color" defaultValue={value && /^#[0-9a-f]{6}$/i.test(value) ? value : '#1971c2'} />
+      </label>
     </div>
   )
 }
