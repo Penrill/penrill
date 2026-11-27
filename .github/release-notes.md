@@ -2,6 +2,17 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Filled shapes and smarter hold-to-snap in 0.13.19
+
+- **Fill for flat shapes.** Selected closed 2D shapes get a Fill row next to the outline colours in the Style panel: no fill, white, light tints, pen colours or any colour.
+- **Hold-to-snap knows more shapes.** The first hold gives the clean shape as drawn, tilt kept: triangles (right, isosceles and equilateral made exact), rectangles, squares, rhombi, parallelograms, trapezoids, other quadrilaterals, polygons and tilted ovals. Keep holding to make it level and regular. The switch is now also in the shapes menu.
+- **Circles in trapezoids.** An isosceles trapezoid can show its circumcircle, and a trapezoid whose bases add up to its legs its incircle.
+- **Any ink colour.** The last swatch in the colour row opens the system colour picker.
+- **Set square keys swapped.** `S` now shows the 30° / 60° set square and `Shift+S` the 45° one.
+- The instruments menu stays open while you turn several instruments on or off.
+
+Boards with filled shapes are saved as format version 15 and need version 0.13.19 or newer. Other boards still open in older versions.
+
 ## Reliable cloud sync and invite sign-up in 0.13.18
 
 - **Penrill Cloud stays available in every build.** Production web and desktop builds default to `https://cloud.penrill.com` when no custom cloud address is set at build time, so Penrill Cloud sync never disappears.
