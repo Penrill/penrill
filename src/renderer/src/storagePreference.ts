@@ -1,6 +1,10 @@
 import { serverOrigin } from '../../shared/http'
 
-export const cloudOrigin = import.meta.env.VITE_PENRILL_CLOUD_URL || (import.meta.env.DEV ? 'http://127.0.0.1:5082' : '')
+const DEFAULT_CLOUD_URL = 'https://cloud.penrill.com'
+export const cloudOrigin =
+  import.meta.env.VITE_PENRILL_CLOUD_URL === 'none'
+    ? ''
+    : import.meta.env.VITE_PENRILL_CLOUD_URL || (import.meta.env.DEV ? 'http://127.0.0.1:5082' : DEFAULT_CLOUD_URL)
 export const cloudLabel = import.meta.env.DEV && !import.meta.env.VITE_PENRILL_CLOUD_URL ? 'storage.localCloud' : 'storage.cloud'
 export type StorageSource = 'device' | 'cloud' | 'server'
 
@@ -18,4 +22,5 @@ export function storagePreference() {
 export function setStoragePreference(source: StorageSource, origin?: string): void {
   if (source === 'server' && origin) localStorage.setItem('penrill-server-origin', serverOrigin(origin))
   localStorage.setItem('penrill-library-source', source)
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('penrill-storage-preference'))
 }

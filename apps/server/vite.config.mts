@@ -5,7 +5,7 @@ import { defineConfig, searchForWorkspaceRoot } from 'vite'
 
 const root = resolve(import.meta.dirname, '../..')
 // The server's web pages ship inside Penrill Server (penrill-server, a sibling checkout by default).
-const wwwroot = process.env.PENRILL_SERVER_WWWROOT ?? resolve(root, '../penrill-server/src/Server/wwwroot')
+const wwwroot = process.env.PENRILL_SERVER_WWWROOT ?? resolve(root, '../penrill-server/src/Web/wwwroot')
 // The server to talk to while developing; run it with `dotnet run` in penrill-server.
 const server = process.env.PENRILL_SERVER_URL ?? 'http://127.0.0.1:5081'
 

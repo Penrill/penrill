@@ -2,6 +2,13 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Reliable cloud sync and invite sign-up in 0.13.18
+
+- **Penrill Cloud stays available in every build.** Production web and desktop builds default to `https://cloud.penrill.com` when no custom cloud address is set at build time, so Penrill Cloud sync never disappears.
+- **One-click opening from the web portal.** Opening a board or editor link from Penrill Cloud or a self-hosted server when already signed in goes straight to your boards or opens the requested board without asking for a new device link code every time.
+- **Safe board publishing.** Boards with empty titles publish cleanly without being rejected by the server.
+- **Invite links work even when already signed in.** Opening an `/invite/...` or `/reset/...` link on a self-hosted server always shows the invitation or password reset form instead of redirecting to the home page, and usernames accept uppercase letters.
+
 ## Tangents, graph points and exact shapes in 0.13.17
 
 - **Tangents to a circle.** *Build tangent* in the shape panel: press on the circle and drag away. Two tangents from one point show the radius with its 90° mark, the angles at P and O, PA = PB with PO, and the chord with its angle. Each mark can be switched off, and each side of a tangent can be dragged longer or shorter.

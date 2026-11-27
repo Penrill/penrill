@@ -1,10 +1,13 @@
 import { create } from 'zustand'
 import { CONNECT_PAGE, parseConnectTarget, type ConnectTarget } from '../../../shared/connect'
+import { boardLibrary } from '../boardLibrary'
 import { platform } from '../platform'
 import { cloudOrigin, setStoragePreference } from '../storagePreference'
-import { rememberAccount } from './accounts'
-import { ApiError } from './api'
+import { account, rememberAccount } from './accounts'
+import { ApiError, isAuthError } from './api'
 import { clientFor } from './clients'
+import { syncCoordinator } from './coordinator'
+import { openRemote } from './librarySync'
 
 export type ConnectFailure = 'invalid' | 'unreachable' | 'outdated' | 'denied' | 'expired' | 'mismatch'
 
@@ -51,13 +54,51 @@ function deviceName(): string {
  * Connect links in the web app's address: the connect page links to `https://app.penrill.com/#server=…`. Hands each one
  * over in the form `parseConnectTarget` reads and clears it from the address bar, so a reload does not
  * start over. Following such a link while the app is already open only changes the fragment.
+ * When this browser is already signed in to that server, switches to it (and opens `&board=…` if given)
+ * without forcing a new device-link approval every time.
  */
 export function onConnectHash(handle: (link: string) => void): void {
   const take = () => {
     const hash = location.hash.slice(1)
-    if (!new URLSearchParams(hash).get('server')) return
+    const params = new URLSearchParams(hash)
+    if (!params.get('server')) return
+    const boardId = params.get('board')?.trim() || null
     history.replaceState(history.state, '', location.pathname + location.search)
-    handle(`${CONNECT_PAGE}#${hash}`)
+    const link = `${CONNECT_PAGE}#${hash}`
+    let target: ConnectTarget
+    try {
+      target = parseConnectTarget(link)
+    } catch {
+      handle(link)
+      return
+    }
+    const existing = account(target.origin)
+    if (!existing) {
+      handle(link)
+      return
+    }
+    void (async () => {
+      try {
+        const rows = await clientFor(target.origin).boards()
+        setStoragePreference(target.origin === cloudOrigin ? 'cloud' : 'server', target.origin)
+        await syncCoordinator.refresh()
+        if (boardId) {
+          const row = rows.find((r) => r.id === boardId)
+          if (row) {
+            await openRemote(target.origin, row)
+            return
+          }
+        }
+        await boardLibrary.goHome('boards')
+      } catch (error) {
+        if (isAuthError(error)) {
+          rememberAccount(target.origin, null)
+          handle(link)
+        } else {
+          await boardLibrary.goHome('boards')
+        }
+      }
+    })()
   }
   window.addEventListener('hashchange', take)
   take()
@@ -115,11 +156,13 @@ export const connectFlow = {
     }
     const client = clientFor(origin)
     let server: string
+    let isCloud = input === 'cloud' || origin === cloudOrigin
     let start
     try {
       const info = await client.serverInfo()
       if (!info.link) throw new ApiError(404)
-      server = input === 'cloud' ? 'Penrill Cloud' : info.name
+      if (info.edition === 'cloud' && origin === cloudOrigin) isCloud = true
+      server = isCloud ? 'Penrill Cloud' : info.name
       start = await client.startLink(deviceName(), `Penrill ${await platform.update.version()}`)
     } catch (error) {
       set(id, { step: 'failed', reason: error instanceof ApiError && error.status === 404 ? 'outdated' : 'unreachable', origin })
@@ -146,7 +189,7 @@ export const connectFlow = {
         return
       }
       rememberAccount(origin, poll.account)
-      setStoragePreference(input === 'cloud' ? 'cloud' : 'server', origin)
+      setStoragePreference(isCloud ? 'cloud' : 'server', origin)
       set(id, { step: 'connected', origin, server, user: poll.account.name })
       return
     }

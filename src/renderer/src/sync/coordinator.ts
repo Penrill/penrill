@@ -52,11 +52,18 @@ function sessionStatus(state: SessionState): SyncStatus | null {
 }
 
 function titlesFor(localId: string): TitlePort {
-  let last = useApp.getState().board?.title ?? ''
+  const initial = (): string => {
+    const state = useApp.getState()
+    if (state.board?.id === localId && state.board.title.trim()) return state.board.title
+    const entry = state.library.boards.find((b) => b.id === localId)
+    return entry?.title?.trim() ? entry.title : 'Untitled'
+  }
+  let last = initial()
   return {
     get() {
       const board = useApp.getState().board
-      if (board?.id === localId) last = board.title
+      if (board?.id === localId && board.title.trim()) last = board.title
+      else if (!last.trim()) last = initial()
       return last
     },
     set(title) {

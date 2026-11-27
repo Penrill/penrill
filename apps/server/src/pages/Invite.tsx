@@ -33,7 +33,7 @@ export function InvitePage({ token }: { token: string }) {
         <FieldGroup>
           <Field>
             <Label>{t('field.username')}</Label>
-            <Input name="name" autoComplete="username" required pattern="[a-z0-9_\-]{3,32}" autoCapitalize="none" spellCheck={false} autoFocus />
+            <Input name="name" autoComplete="username" required pattern="[a-zA-Z0-9_\-]{3,32}" autoCapitalize="none" spellCheck={false} autoFocus />
             <Description>{t('invite.usernameHint')}</Description>
           </Field>
           <Field>

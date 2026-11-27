@@ -93,7 +93,7 @@ export function SetupPage() {
           </Field>
           <Field>
             <Label>{t('setup.username')}</Label>
-            <Input name="name" autoComplete="username" required pattern="[a-z0-9_\-]{3,32}" autoCapitalize="none" spellCheck={false} />
+            <Input name="name" autoComplete="username" required pattern="[a-zA-Z0-9_\-]{3,32}" autoCapitalize="none" spellCheck={false} />
             <Description>{t('field.usernameHint')}</Description>
           </Field>
           <Field>

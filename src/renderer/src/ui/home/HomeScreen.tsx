@@ -88,11 +88,16 @@ export function HomeScreen({ settings }: { settings: Omit<SettingsDialogProps, '
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
+    const refreshPref = (): void => setPref(storagePreference())
     const changed = (event: StorageEvent): void => {
-      if (!event.key || event.key === 'penrill-library-source' || event.key === 'penrill-server-origin') setPref(storagePreference())
+      if (!event.key || event.key === 'penrill-library-source' || event.key === 'penrill-server-origin') refreshPref()
     }
     window.addEventListener('storage', changed)
-    return () => window.removeEventListener('storage', changed)
+    window.addEventListener('penrill-storage-preference', refreshPref)
+    return () => {
+      window.removeEventListener('storage', changed)
+      window.removeEventListener('penrill-storage-preference', refreshPref)
+    }
   }, [])
   useEffect(() => {
     void syncCoordinator.refresh()

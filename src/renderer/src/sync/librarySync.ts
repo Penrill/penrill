@@ -69,10 +69,11 @@ const isDataImage = (item: WireItem): boolean =>
 
 export async function publishBoard(localId: string, link: Link, content: BoardContent): Promise<Link> {
   const client = clientFor(link.origin)
+  const safeTitle = content.title.trim() || 'Untitled'
   const imageItems = content.items.filter(isDataImage)
   const baseItems = imageItems.length ? content.items.filter(item => !isDataImage(item)) : content.items
   // Create the board first so PUT /api/boards/{id}/assets/{hash} finds an existing board and passes access checks.
-  const result = await client.createBoard(link.remote, { ...content, items: baseItems })
+  const result = await client.createBoard(link.remote, { ...content, title: safeTitle, items: baseItems })
   let published: Link = { ...link, published: true, seq: result.created ? result.seq : null }
   saveLink(localId, published)
   if (result.created && imageItems.length) {

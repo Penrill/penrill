@@ -253,10 +253,10 @@ export function App() {
   if (status === 'loading' || !session) page = status === 'offline' ? <Offline /> : null
   else if (session.unclaimed) page = path === '/setup' ? <AuthShell server={session.server}><SetupPage /></AuthShell> : <Redirect to="/setup" />
   else if (path === '/setup') page = <Redirect to="/" />
+  else if (match('/invite/:token', path)) page = <AuthShell server={session.server}><InvitePage token={match('/invite/:token', path)!.token} /></AuthShell>
+  else if (match('/reset/:token', path)) page = <AuthShell server={session.server}><ResetPage token={match('/reset/:token', path)!.token} /></AuthShell>
   else if (!session.user) {
     if (path === '/login') page = <AuthShell server={session.server}><LoginPage returnTo={safeReturn(query.get('return'))} /></AuthShell>
-    else if (match('/invite/:token', path)) page = <AuthShell server={session.server}><InvitePage token={match('/invite/:token', path)!.token} /></AuthShell>
-    else if (match('/reset/:token', path)) page = <AuthShell server={session.server}><ResetPage token={match('/reset/:token', path)!.token} /></AuthShell>
     else page = <Redirect to={'/login?return=' + encodeURIComponent(path + (query.size ? '?' + query.toString() : ''))} />
   } else if (path === '/login') page = <Redirect to={safeReturn(query.get('return'))} />
   else if (ANONYMOUS.some((pattern) => match(pattern, path))) page = <Redirect to="/" />
