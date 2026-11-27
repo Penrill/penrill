@@ -37,7 +37,7 @@ Workspace packages live in `packages/` and are imported by name with a module pa
 |---|---|---|
 | `@penrill/math` | Formula trees and editing (the keypad model), lexer, parser, evaluator | nothing |
 | `@penrill/core` | Item types (including first-class `ShapeItem`), scene with undo and redo, camera, geometry, unified 2D/3D shape evaluators, point erasing | math |
-| `@penrill/shape-recognition` | Hold-to-snap: recognises circles, ovals, arcs, rectangles, squares and triangles in a stroke | core |
+| `@penrill/shape-recognition` | Hold-to-snap: recognises circles, ovals, arcs, triangles, quadrilaterals and polygons in a stroke, tilted as drawn and then level | core |
 | `@penrill/shape-editor` | Direct shape editing: 2D/3D handles, 3D orbit, magnetic snapping, unified elements API and `shapeDisplay` vector renderer | core, render |
 | `@penrill/render` | Display lists (what to draw, as data) and their SVG form | nothing |
 | `@penrill/render-canvas` | Draws display lists on a Canvas 2D context; the only package with the DOM types | render |

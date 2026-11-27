@@ -31,6 +31,8 @@ export interface ItemKind<T extends Item = Item> {
 export interface RecognizedShape {
   points: Point[]
   spec?: ShapeSpec
+  /** The level, tidier version it becomes when the pen stays still for another hold. */
+  next?: RecognizedShape
 }
 
 /** Hold-to-snap: turns a stroke held still at its end into the clean shape it resembles. */

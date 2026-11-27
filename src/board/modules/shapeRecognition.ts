@@ -2,9 +2,10 @@ import { holdShape, recognizeShape, type Snapped } from '@penrill/shape-recognit
 import type { FeatureModule } from '../registry'
 
 /**
- * Hold-to-snap: keep the pen still at the end of a stroke and a rough circle, oval, arc, rectangle,
- * square or triangle becomes a clean one (the recognisers are in @penrill/shape-recognition).
- * Without this module strokes simply stay as drawn.
+ * Hold-to-snap: keep the pen still at the end of a stroke and a rough circle, oval, arc, triangle,
+ * quadrilateral (rectangle, square, rhombus, parallelogram, trapezoid) or polygon becomes a clean
+ * one, tilted as drawn; keep holding and it straightens (the recognisers are in
+ * @penrill/shape-recognition). Without this module strokes simply stay as drawn.
  */
 export const shapeRecognitionModule: FeatureModule = {
   id: 'shape-recognition',

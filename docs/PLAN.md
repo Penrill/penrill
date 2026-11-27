@@ -141,8 +141,12 @@ in progress and the pen cursor (so drawing never forces a full board redraw).
 ### Stage 4: content
 - [x] **Hold-to-snap shapes**: hold the pen still ~1 s (configurable) at the end of a stroke → a rough
       circle, oval, arc, rectangle, square or triangle becomes a clean, level one (board shapes, except
-      the arc); keep holding and drag to resize; Shift / a finger = perfect. Nothing else snaps: lines,
-      arrows, zigzags and turned shapes were tried and dropped as unreliable.
+      the arc); keep holding and drag to resize; Shift / a finger = perfect. Lines, arrows and zigzags
+      were tried and dropped as unreliable.
+- [x] Hold-to-snap in two steps: first the shape as drawn, tilt kept (triangles by their corners,
+      right / isosceles / equilateral made exact; rectangle, square, rhombus, parallelogram, trapezoid
+      or any quadrilateral; pentagon, hexagon and polygons up to 8 corners, regular ones up to 10;
+      tilted ovals); keep holding still and it straightens level
 - [x] Bullet and numbered lists in text (sticky notes were tried and dropped)
 - [x] School paper backgrounds: math grid, handwriting rows, slanted copybook lines (format 9)
 

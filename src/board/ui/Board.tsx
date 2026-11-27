@@ -897,6 +897,14 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
         g.live = { ...g.live, geom: 'line', pressure: false }
         reshapeHeld(g)
         invalidate(false)
+        // Still holding: the shape as drawn straightens (level, tidier). Moving the pen cancels it.
+        if (shape.next) {
+          holdTimer = window.setTimeout(() => {
+            if (gesture !== g || !g.held?.base.next) return
+            g.held.base = g.held.base.next
+            reshapeHeld(g)
+          }, ui.shapeSnapDelay)
+        }
       }, ui.shapeSnapDelay)
     }
 
@@ -1850,6 +1858,8 @@ export function Board({ fileActions }: { fileActions?: BoardFileActions }) {
           } else if (g.kind === 'ink' && g.held) {
             // Snapped to a shape and still held: drag to resize and turn it (sticks level near level; Shift = perfect).
             const w = screenToWorld(editor.camera, p.x, p.y)
+            // Resizing keeps the shape as drawn: no straightening after a drag.
+            if (holdAt && Math.hypot(p.x - holdAt.x, p.y - holdAt.y) > HOLD_SLOP) clearTimeout(holdTimer)
             g.held.to = [w.x, w.y]
             g.held.shift = e.shiftKey
             reshapeHeld(g)
