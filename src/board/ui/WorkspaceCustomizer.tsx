@@ -654,11 +654,8 @@ export function WorkspaceCustomizeOverlay({ templates }: { templates: boolean })
         onPointerDown={(e) => e.stopPropagation()}
         className="fixed top-1/2 left-1/2 z-[78] flex max-h-[calc(100dvh-11rem)] w-[min(42rem,calc(100vw-10.5rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl bg-white text-zinc-950 shadow-2xl ring-1 ring-zinc-950/10 dark:bg-zinc-800 dark:text-white dark:ring-white/10"
       >
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-950/8 px-5 py-4 dark:border-white/8">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base/6 font-semibold">{t('customize.title')}</h2>
-            <p className="mt-0.5 text-xs/5 text-zinc-500 dark:text-zinc-400">{t('customize.hint')}</p>
-          </div>
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-950/8 px-5 py-4 dark:border-white/8">
+          <h2 className="min-w-0 flex-1 text-base/6 font-semibold">{t('customize.title')}</h2>
           <div className="w-44 shrink-0">
             <Select
               aria-label={t('layout.presets')}
@@ -720,7 +717,7 @@ export function WorkspaceCustomizeOverlay({ templates }: { templates: boolean })
                   <span className="flex size-9 items-center justify-center rounded-lg bg-white ring-1 ring-zinc-950/10 dark:bg-zinc-700 dark:ring-white/10">
                     <span className="h-5 w-0.5 rounded-full bg-zinc-400 dark:bg-zinc-300" />
                   </span>
-                  <span className="w-full truncate text-[11px]/3.5 font-medium text-zinc-700 dark:text-zinc-200">
+                  <span className="w-full truncate text-xs/4 font-medium text-zinc-700 dark:text-zinc-200">
                     {t('toolbar.divider')}
                   </span>
                 </button>
@@ -742,10 +739,10 @@ export function WorkspaceCustomizeOverlay({ templates }: { templates: boolean })
                       <span className="flex size-9 items-center justify-center rounded-lg bg-white ring-1 ring-zinc-950/10 dark:bg-zinc-700 dark:ring-white/10">
                         <ToolMiniIcon id={id} />
                       </span>
-                      <span className="w-full truncate text-[11px]/3.5 font-medium text-zinc-700 dark:text-zinc-200">
+                      <span className="w-full truncate text-xs/4 font-medium text-zinc-700 dark:text-zinc-200">
                         {t(TOOL_LABELS[id])}
                       </span>
-                      {sc && <kbd className="text-[10px]/3 text-zinc-400 dark:text-zinc-500">{sc}</kbd>}
+                      {sc && <kbd className="text-xs/4 text-zinc-400 dark:text-zinc-500">{sc}</kbd>}
                     </button>
                   )
                 })}

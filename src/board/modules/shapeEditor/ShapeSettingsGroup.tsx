@@ -1,6 +1,5 @@
 import * as Headless from '@headlessui/react'
 import { Switch } from '@penrill/ui/switch'
-import { Text } from '@penrill/ui/text'
 import { useEditor } from '../../editorContext'
 import { useT } from '../../i18n'
 import { prefsStore, usePrefs, type ShapeLengthUnit } from '../../store'
@@ -18,8 +17,7 @@ export function ShapeSettingsGroup() {
 
   return (
     <section id="settings-shapes">
-      <Text>{t('shapes.settingsHint')}</Text>
-      <div className="mt-4 divide-y divide-zinc-950/5 dark:divide-white/5">
+      <div className="divide-y divide-zinc-950/5 dark:divide-white/5">
         <Headless.Field className="grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 py-3">
           <Headless.Label className="text-sm/6 font-medium text-zinc-950 select-none dark:text-white">
             {t('shapes.defaultLabels')}

@@ -54,7 +54,7 @@ export function Card({
   return (
     <li
       className={clsx(
-        'group relative flex flex-col overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-zinc-950/10 transition',
+        'group relative flex flex-col overflow-hidden rounded-xl bg-white shadow-xs ring-1 ring-zinc-950/10 transition-shadow',
         'dark:bg-zinc-800/60 dark:ring-white/10',
         !disabled && onOpen && 'hover:shadow-md hover:ring-zinc-950/20 dark:hover:ring-white/20'
       )}
@@ -62,7 +62,7 @@ export function Card({
       <div className={clsx('aspect-[16/10] overflow-hidden border-b border-zinc-950/5 bg-zinc-50 dark:border-white/5 dark:bg-zinc-900', disabled && 'opacity-50 grayscale')}>
         {picture}
       </div>
-      <div className="flex items-start gap-1 py-3 pr-1.5 pl-3.5">
+      <div className="flex items-start gap-1 py-3 pr-1.5 pl-3">
         <div className="min-w-0 flex-1">{children}</div>
         {menu && <div className="relative z-10 -my-1">{menu}</div>}
       </div>

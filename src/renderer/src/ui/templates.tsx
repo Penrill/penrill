@@ -264,7 +264,6 @@ export function ServerTemplates() {
   }
   return (
     <Section title={t('tpl.onServer')}>
-      <Text className="-mt-2 mb-4">{t('tpl.onServerHint')}</Text>
       {available.length > 0 ? (
         <CardGrid>
           {available.map((tp) => (

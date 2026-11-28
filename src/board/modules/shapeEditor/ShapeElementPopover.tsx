@@ -200,7 +200,7 @@ export function ShapeElementPopover() {
               }}
             >
               <PlusIcon data-slot="icon" />
-              {t('shape.el.addVertex').replace(/^\+\s*/, '')}
+              {t('shape.el.addVertex')}
             </Button>
           </>
         )}

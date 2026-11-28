@@ -295,11 +295,8 @@ export function LayoutSettings({ onCustomizeBoard }: { onCustomizeBoard?: () => 
   return (
     <>
       {onCustomizeBoard && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-blue-500/8 p-3.5 ring-1 ring-blue-500/20 dark:bg-blue-500/12 dark:ring-blue-400/25">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm/5 font-semibold text-zinc-950 dark:text-white">{t('customize.title')}</div>
-            <div className="mt-0.5 text-xs/4 text-zinc-600 dark:text-zinc-300">{t('customize.hint')}</div>
-          </div>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-blue-500/8 p-4 ring-1 ring-blue-500/20 dark:bg-blue-500/12 dark:ring-blue-400/25">
+          <div className="min-w-0 flex-1 text-sm/5 font-semibold text-zinc-950 dark:text-white">{t('customize.title')}</div>
           <Button color="blue" onClick={onCustomizeBoard}>
             <ToolbarSettingsIcon width={16} height={16} />
             {t('customize.openOnBoard')}

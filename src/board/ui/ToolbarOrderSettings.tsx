@@ -230,7 +230,7 @@ export function ToolbarOrderSettings({
                         {t(TOOL_LABELS[id])}
                       </span>
                       {sc && (
-                        <kbd className="hidden rounded-md border border-zinc-950/10 bg-zinc-50 px-1.5 py-0.5 text-[11px]/4 font-medium text-zinc-500 sm:inline-block dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                        <kbd className="hidden rounded-md border border-zinc-950/10 bg-zinc-50 px-1.5 py-0.5 text-xs/4 font-medium text-zinc-500 sm:inline-block dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
                           {sc}
                         </kbd>
                       )}

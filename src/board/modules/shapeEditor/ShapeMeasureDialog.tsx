@@ -91,7 +91,6 @@ export function ShapeMeasureDialog() {
   return (
     <Dialog open onClose={close} size="md">
       <DialogTitle className="mb-4">{t('shapes.exactTitle')}</DialogTitle>
-      <p className="mb-4 text-sm/5 text-zinc-500 dark:text-zinc-400">{t('shapes.exactHint')}</p>
 
       <div className="shape-grid mb-4">
         {PICKS.map(({ id, base }) => {

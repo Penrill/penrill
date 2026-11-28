@@ -193,7 +193,7 @@ export function ManageTagsDialog({ open, tags, onClose }: { open: boolean; tags:
                     onClick={() => void lib.updateTag(tag.id, { color: c }).then(refresh)}
                     className={clsx(
                       'size-6 rounded-full ring-offset-2 ring-offset-white dark:ring-offset-zinc-900',
-                      tag.color === c ? 'ring-2 ring-zinc-950 dark:ring-white' : 'hover:scale-110'
+                      tag.color === c && 'ring-2 ring-zinc-950 dark:ring-white'
                     )}
                     style={{ background: c }}
                   />

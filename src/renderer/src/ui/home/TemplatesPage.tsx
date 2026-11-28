@@ -9,7 +9,7 @@ export function TemplatesPage() {
   const main = useNewBoardAction()
   return (
     <>
-      <PageHeader title={t('tpl.title')} description={t('tpl.hint')} />
+      <PageHeader title={t('tpl.title')} />
       <TemplateSections main={main} empty={<EmptyState icon={<RectangleStackIcon />} title={t('tpl.none')} />} />
       <ServerTemplates />
     </>

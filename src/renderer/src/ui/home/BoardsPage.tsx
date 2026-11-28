@@ -437,7 +437,6 @@ export function BoardsPage({ tag, onClearTag, origin }: { tag: Tag | null; onCle
           <EmptyState
             icon={<Squares2X2Icon />}
             title={t('home.empty')}
-            hint={t('home.emptyHint')}
             action={
               <Button color="blue" onClick={() => void boardLibrary.newBoard()}>
                 <PlusIcon />
