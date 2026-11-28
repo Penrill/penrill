@@ -144,6 +144,12 @@ function Choices() {
           <Choice
             icon={<CloudIcon />}
             title={t(cloudLabel)}
+            badge={
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs/5 font-medium text-amber-700 ring-1 ring-amber-500/20 ring-inset dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/20">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
+                {t('cloud.inDevelopment')}
+              </span>
+            }
             hint={t('sync.cloudHint')}
           >
             <Button color="blue" onClick={() => void connectFlow.connect('cloud')}>
