@@ -8,7 +8,6 @@ import {
   SidebarBody,
   SidebarFooter,
   SidebarHeader,
-  SidebarHeading,
   SidebarItem,
   SidebarLabel,
   SidebarSection,
@@ -197,7 +196,6 @@ function AppShell({ session, path, children }: { session: Session & { user: NonN
             <SidebarSection>{mine.map(item)}</SidebarSection>
             {admin && (
               <SidebarSection className="mt-8">
-                <SidebarHeading>{t('nav.manage')}</SidebarHeading>
                 {manage.map(item)}
               </SidebarSection>
             )}

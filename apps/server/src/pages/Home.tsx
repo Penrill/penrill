@@ -48,7 +48,7 @@ export function HomePage({ user }: { user: NonNullable<Session['user']> }) {
 
   return (
     <>
-      <PageTitle title={t('home.welcome', { name: user.name })}>{t('home.intro')}</PageTitle>
+      <PageTitle title={t('home.welcome', { name: user.name })} />
 
       {admin && (
         <div className="mt-8 grid gap-8 sm:grid-cols-2 xl:grid-cols-4">

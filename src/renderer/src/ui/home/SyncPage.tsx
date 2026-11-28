@@ -144,7 +144,6 @@ function Choices() {
           <Choice
             icon={<CloudIcon />}
             title={t(cloudLabel)}
-            badge={<Badge color="amber">{t('cloud.inDevelopment')}</Badge>}
             hint={t('sync.cloudHint')}
           >
             <Button color="blue" onClick={() => void connectFlow.connect('cloud')}>
@@ -317,7 +316,7 @@ export function SyncPage({ pref, onChange }: { pref: Preference; onChange: () =>
 
   return (
     <>
-      <PageHeader title={t('home.sync')} description={t('sync.intro')} />
+      <PageHeader title={t('home.sync')} />
       <div className="max-w-2xl">
         <Divider className="my-10" soft />
         {state.step !== 'idle' && state.step !== 'connected' ? (
