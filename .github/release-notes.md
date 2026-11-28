@@ -2,6 +2,11 @@
 
 ![Penrill](https://raw.githubusercontent.com/Penrill/penrill/main/docs/images/hero.png)
 
+## Cleaner interface across the editor and home screen in 0.13.20
+
+- **Tighter dialogs, panels and home screen.** Removed redundant descriptions and hint banners from the Templates page, workspace customizer, shape settings and Exact shape dialog, and refined the *In development* status pill on the Penrill Cloud sync card.
+- **Consistent typography and motion.** Standardized toolbar shortcut badges, customizer tiles and card spacing on the 4 px grid, and scoped card hover transitions.
+
 ## Filled shapes and smarter hold-to-snap in 0.13.19
 
 - **Fill for flat shapes.** Selected closed 2D shapes get a Fill row next to the outline colours in the Style panel: no fill, white, light tints, pen colours or any colour.
